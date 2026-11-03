@@ -174,6 +174,66 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       assert.match(await text('#fatalText'), /WebGL/);
       await send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
     });
+
+    // ---------- Room 1: the escape room ----------
+    const hs = k => click(`[data-hotspot="${k}"]`);
+    const seconds = async () => { const [m, sec] = (await text('#time')).split(':').map(Number); return m * 60 + sec; };
+
+    await t.test('escape room: the briefing explains who, where and how, then the clock starts', async () => {
+      await send('Page.navigate', { url: base + 'escape-room/' });
+      await waitFor("!!document.querySelector('#card h1')", LOAD_MS, 'briefing');
+      await evaluate("localStorage.removeItem('escape-room-save'), true");
+      errors.length = 0;
+      await send('Page.navigate', { url: base + 'escape-room/' });
+      await waitFor("!!document.querySelector('#card h1')", LOAD_MS, 'briefing');
+      assert.match(await text('#card'), /inmate 4471/);
+      for (let i = 0; i < 3; i++) await click('[data-do="next"]');
+      assert.match(await text('#card'), /Drag/);
+      await click('[data-do="start"]');
+      await waitFor("document.getElementById('overlay').hidden && !document.getElementById('hud').classList.contains('off')", 10000, 'clock to start');
+      assert.equal(await text('#place'), 'The Door');
+      await waitFor("document.getElementById('time').textContent !== '10:00'", 120000, 'clock to run');
+      assert.deepEqual(errors, []);
+    });
+
+    await t.test('escape room rejected: the tile will not come off without the spoon', async () => {
+      await hs('go:stall');
+      await hs('pry');
+      assert.match(await text('#say'), /thin and hard/);
+      assert.equal(await evaluate("document.querySelectorAll('.slot.full').length"), 0);
+      assert.equal(await text('#place'), 'The Stall');
+    });
+
+    await t.test('escape room: progress is saved and offered after a reload', async () => {
+      await hs('go:sinks');
+      await hs('take:spoon');
+      await send('Page.navigate', { url: base + 'escape-room/' });
+      await waitFor("!!document.querySelector('[data-do=\"resume\"]')", LOAD_MS, 'continue card');
+      assert.match(await text('#card'), /Spoon/);
+      await click('[data-do="resume"]');
+      assert.equal(await text('#place'), 'The Sinks');
+      assert.equal(await evaluate("document.querySelectorAll('.slot.full').length"), 1);
+    });
+
+    await t.test('escape room: a wrong code costs 30 s, the right one (1912) is Ending A', async () => {
+      await hs('go:stall'); await hs('pry'); await hs('read:scrap');
+      assert.match(await text('#card .paper'), /19▒2/);
+      await click('[data-do="close"]');
+      await hs('go:hatch');
+      await hs('lock');
+      await waitFor("!!document.getElementById('lockUi')", 5000, 'lock card');
+      const before = await seconds();
+      await click('[data-do="try"]');
+      const after = await seconds();
+      assert.ok(before - after >= 30 && before - after <= 32, `wrong code cost ${before - after} s`);
+      for (const [w, n, d] of [[0, 1, 1], [1, 1, -1], [2, 1, 1], [3, 2, 1]]) for (let k = 0; k < n; k++) await click(`[data-turn="${w},${d}"]`);
+      assert.equal(await evaluate("[...document.querySelectorAll('#lockUi output')].map(o => o.textContent).join('')"), '1912');
+      await click('[data-do="try"]');
+      await waitFor("/Ending A/.test((document.querySelector('#card .eyebrow') || {}).textContent || '')", 120000, 'Ending A card');
+      assert.match(await text('#card'), /Took you long enough/);
+      assert.deepEqual(errors, []);
+      await evaluate("localStorage.removeItem('escape-room-save'), true");
+    });
   } finally {
     try { ws.close(); } catch (e) {}
     chrome.kill();

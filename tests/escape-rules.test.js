@@ -1,0 +1,198 @@
+// Room 1, the escape room: story rules, accepted and rejected actions, the clock and saved games (escape-room/src/rules.js)
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const R = require('../escape-room/src/rules.js');
+
+// Runs a list of [action, target] steps and returns the final state; every step must be accepted
+function play(steps, s = R.newState()){
+  for (const [a, t] of steps){
+    const r = R.perform(s, a, t);
+    assert.ok(r.ok, `${a} ${t || ''} was refused: ${r.message}`);
+    s = r.state;
+  }
+  return s;
+}
+const turnTo = (s, code) => { for (let i = 0; i < 4; i++) while (s.lock[i] !== Number(code[i])) s = R.perform(s, 'turn', [i, 1]).state; return s; };
+const START = [['start']];
+const TO_HATCH = [['start'], ['go', 'sinks'], ['take', 'spoon'], ['go', 'stall'], ['pry'], ['read', 'scrap'], ['go', 'hatch']];
+const runClock = (s, secs) => { for (let t = 0; t < secs && !s.ending; t += .5) s = R.tick(s, .5).state; return s; };
+
+test('the story has 5 scenes, 2 items, 3 clues and 2 endings', () => {
+  assert.equal(Object.keys(R.SCENES).length, 5);
+  assert.deepEqual(Object.keys(R.ITEMS), ['spoon', 'mop']);
+  assert.equal(Object.keys(R.CLUES).length, 3);
+  assert.deepEqual(Object.keys(R.ENDINGS), ['A', 'B']);
+  assert.equal(R.TIME_LIMIT, 600);
+  // every exit leads to a real scene, and every "go" hotspot is a real exit
+  for (const [k, sc] of Object.entries(R.SCENES)){
+    sc.exits.forEach(e => assert.ok(R.SCENES[e], `${k} -> ${e}`));
+    sc.hotspots.filter(h => h[0] === 'go').forEach(h => assert.ok(sc.exits.includes(h[1]), `${k}: go ${h[1]}`));
+  }
+});
+
+test('a new game starts in the briefing with the full ten minutes and nothing in hand', () => {
+  const s = R.newState();
+  assert.equal(s.scene, 'intro');
+  assert.equal(s.time, 600);
+  assert.deepEqual(s.inventory, []);
+  assert.deepEqual(s.lock, [0, 0, 0, 0]);
+  assert.equal(s.ending, null);
+});
+
+test('Ending A: spoon, tile, scrap, the code 1912, and out through the hatch', () => {
+  let s = play(TO_HATCH);
+  s = turnTo(s, '1912');
+  const r = R.perform(s, 'try');
+  assert.ok(r.ok);
+  assert.equal(r.state.ending, 'A');
+  assert.equal(r.state.scene, 'tunnel');
+  assert.match(r.message, /Took you long enough/);
+});
+
+test('Ending B: when the clock runs out, Hale takes you back', () => {
+  let s = play(START);
+  s = runClock(s, 700);
+  assert.equal(s.ending, 'B');
+  assert.equal(s.time, 0);
+  assert.equal(s.scene, 'cell');
+});
+
+test('the earlier decision: a jammed door buys exactly one extra minute, once', () => {
+  let s = play([['start'], ['take', 'mop'], ['wedge']]);
+  assert.equal(s.wedged, true);
+  assert.deepEqual(s.inventory, [], 'the mop stays at the door');
+  s = runClock(s, 600);
+  assert.equal(s.ending, null, 'still in the game after ten minutes');
+  assert.equal(s.graceUsed, true);
+  assert.ok(s.time > 0 && s.time <= R.WEDGE_GRACE);
+  s = runClock(s, 61);
+  assert.equal(s.ending, 'B');
+});
+
+test('rejected: nothing happens before the briefing is done', () => {
+  const s = R.newState();
+  for (const [a, t] of [['go', 'sinks'], ['take', 'spoon'], ['try'], ['pry']]){
+    const r = R.perform(s, a, t);
+    assert.equal(r.ok, false, a);
+    assert.equal(r.state, s, 'a refused action returns the same state');
+  }
+  assert.equal(R.tick(s, 5).state, s, 'the clock does not run in the briefing');
+});
+
+test('rejected: walking where there is no way, taking what is not there or twice', () => {
+  const s = play(START);
+  const cases = [['go', 'hatch'], ['go', 'tunnel'], ['go', 'roof'], ['go', undefined], ['take', 'spoon'], ['take', 'key'], ['take', '__proto__'], ['read', 'scrap'], ['read', 'diary'], ['tap'], ['pry'], ['try'], ['turn', [0, 1]], ['fly'], [undefined]];
+  for (const [a, t] of cases){
+    const r = R.perform(s, a, t);
+    assert.equal(r.ok, false, `${a} ${JSON.stringify(t)}`);
+    assert.equal(r.state, s);
+    assert.ok(r.message.length > 0, 'the player is told why');
+  }
+  const withSpoon = play([['go', 'sinks'], ['take', 'spoon']], s);
+  const again = R.perform(withSpoon, 'take', 'spoon');
+  assert.equal(again.ok, false);
+  assert.match(again.message, /already/);
+});
+
+test('rejected: the tile needs the spoon, the door needs the mop, the scrap needs the tile off', () => {
+  const s = play([['start'], ['go', 'stall']]);
+  const pry = R.perform(s, 'pry');
+  assert.equal(pry.ok, false);
+  assert.match(pry.message, /thin and hard/);
+  assert.equal(R.perform(s, 'read', 'scrap').ok, false);
+  const door = play([['start']]);
+  const wedge = R.perform(door, 'wedge');
+  assert.equal(wedge.ok, false);
+  assert.match(wedge.message, /long and solid/);
+  const twice = play([['take', 'mop'], ['wedge']], door);
+  assert.equal(R.perform(twice, 'wedge').ok, false);
+  assert.equal(R.perform(twice, 'take', 'mop').ok, false, 'the mop is stuck in the door now');
+});
+
+test('the mirror only shows its clue while the hot tap steams it up', () => {
+  let s = play([['start'], ['go', 'sinks']]);
+  const dry = R.perform(s, 'read', 'mirror');
+  assert.ok(dry.ok);
+  assert.deepEqual(dry.state.clues, [], 'no clue without steam');
+  s = play([['tap'], ['read', 'mirror']], s);
+  assert.deepEqual(s.clues, ['mirror']);
+  s = play([['read', 'mirror']], s);
+  assert.deepEqual(s.clues, ['mirror'], 'a clue is only counted once');
+  s = play([['tap']], s);
+  assert.equal(s.steam, false, 'the tap turns off again');
+});
+
+test('the lock: four wheels that wrap around, only reachable at the hatch', () => {
+  let s = play(TO_HATCH);
+  s = R.perform(s, 'turn', [0, -1]).state;
+  assert.deepEqual(s.lock, [9, 0, 0, 0], '0 down is 9');
+  s = R.perform(s, 'turn', [0, 1]).state;
+  assert.deepEqual(s.lock, [0, 0, 0, 0], '9 up is 0');
+  for (const bad of [[4, 1], [-1, 1], [0, 2], [0, 0], [1.5, 1], ['0', 1], null, 'x', [0]]){
+    const r = R.perform(s, 'turn', bad);
+    assert.equal(r.ok, false, JSON.stringify(bad));
+    assert.equal(r.state, s);
+  }
+});
+
+test('a wrong code is noisy: it costs 30 seconds and never takes the clock below zero', () => {
+  let s = play(TO_HATCH);
+  const r = R.perform(s, 'try');
+  assert.ok(r.ok);
+  assert.equal(r.state.ending, null);
+  assert.equal(r.state.time, 600 - R.WRONG_CODE_PENALTY);
+  assert.equal(r.state.wrongTries, 1);
+  s = { ...r.state, time: 10 };
+  s = R.perform(s, 'try').state;
+  assert.equal(s.time, 0);
+  s = R.tick(s, .1).state;
+  assert.equal(s.ending, 'B', 'running out because of wrong codes is Ending B');
+});
+
+test('nothing but a new game works after an ending', () => {
+  let s = turnTo(play(TO_HATCH), '1912');
+  s = R.perform(s, 'try').state;
+  for (const [a, t] of [['go', 'stall'], ['try'], ['take', 'mop'], ['start']]) assert.equal(R.perform(s, a, t).ok, false, a);
+  assert.equal(R.tick(s, 5).state, s, 'the clock stops');
+  const n = R.perform(s, 'new');
+  assert.ok(n.ok);
+  assert.deepEqual(n.state, R.newState());
+});
+
+test('the clock: warnings once each, huge or invalid frame times are safe', () => {
+  let s = play(START);
+  const heard = [];
+  for (let t = 0; t < 600; t += .25){ const r = R.tick(s, .25); s = r.state; if (r.message) heard.push(r.message); if (s.ending) break; }
+  assert.equal(heard.filter(m => /Five minutes/.test(m)).length, 1);
+  assert.equal(heard.filter(m => /Thirty seconds/.test(m)).length, 1);
+  const fresh = play(START);
+  assert.equal(R.tick(fresh, 3600).state.time, 599, 'one tick never takes more than a second');
+  for (const bad of [0, -5, NaN, undefined, Infinity * -1]) assert.equal(R.tick(fresh, bad).state, fresh, String(bad));
+});
+
+test('accepted actions return a new state and never change the old one', () => {
+  const s = play(START);
+  const frozen = JSON.stringify(s);
+  R.perform(s, 'go', 'sinks'); R.perform(s, 'take', 'mop'); R.tick(s, 1);
+  assert.equal(JSON.stringify(s), frozen);
+});
+
+test('saved games: a real save is restored, anything else is rejected', () => {
+  const s = play([['start'], ['take', 'mop'], ['go', 'sinks'], ['take', 'spoon'], ['tap'], ['read', 'mirror']]);
+  assert.deepEqual(R.restore(JSON.stringify(s)), s);
+  assert.ok(R.canContinue(R.restore(JSON.stringify(s))));
+  assert.equal(R.canContinue(R.restore(JSON.stringify(R.newState()))), false, 'nothing to continue from the briefing');
+  const bad = [
+    null, '', 'not json', '[]', '"x"', '42', 'x'.repeat(3000),
+    { ...s, time: 9999 }, { ...s, time: -1 }, { ...s, time: 'soon' },
+    { ...s, scene: 'roof' }, { ...s, scene: '__proto__' },
+    { ...s, inventory: ['spoon', 'spoon'] }, { ...s, inventory: ['key'] }, { ...s, inventory: 'spoon' },
+    { ...s, clues: ['diary'] }, { ...s, clues: ['scrap'], tileOpen: false },
+    { ...s, lock: [1, 9, 1] }, { ...s, lock: [1, 9, 1, 12] }, { ...s, lock: [1, 9, 1, 2.5] },
+    { ...s, wedged: true, inventory: ['mop'] }, { ...s, steam: 'yes' }, { ...s, ending: 'C' }, { ...s, wrongTries: -1 }, { ...s, warned: [99] }
+  ];
+  for (const b of bad){
+    const raw = typeof b === 'string' || b === null ? b : JSON.stringify(b);
+    assert.equal(R.restore(raw), null, String(raw).slice(0, 60));
+  }
+});

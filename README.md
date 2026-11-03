@@ -1,5 +1,31 @@
 # Shard Heist
 
+A two-room browser game. **Room 1, *Plot Twist: Cell Block D***, is a 3D prison escape room: find the code for the hatch in the washroom floor before the guard comes back. **Room 2, *Shard Heist***, is the 3D police chase that follows. The two rooms are developed separately and will be connected at the end.
+
+| Room | Play |
+|---|---|
+| 1 · Escape room | https://alexanderleusch.github.io/shard-heist/escape-room/ |
+| 2 · Police chase | https://alexanderleusch.github.io/shard-heist/ |
+
+Both are published automatically from `main` once all tests pass.
+
+## Room 1 · Plot Twist: Cell Block D
+
+You were the detective on the Ashford necklace case; now you are inmate 4471, convicted of the theft. Officer Hale locks you in washroom 2 for ten minutes. A hatch in the floor is held shut by a four-digit combination lock, and the code is hidden in the room.
+
+| | |
+|---|---|
+| Scenes (5) | The door, the sinks, the toilet stall, the hatch, the tunnel |
+| Items (2) | A spoon (pries the crooked tile off the wall) and a mop (optional: jams the door) |
+| Clues (3) | Steam on the mirror, graffiti in the stall, a newspaper scrap behind the tile. Together they give the year the "unsinkable" ship sank. The code is always the same |
+| Endings (2) | **A:** the hatch opens in time and you climb down into the tunnel. **B:** time runs out and Hale takes you back to your cell. The earlier choice to jam the door buys one extra minute before Ending B |
+| Pressure | 10:00 clock, warnings at 5:00, 2:00, 1:00 and 0:30; every wrong code makes noise and costs 30 seconds |
+| Controls | Drag (or arrow keys) to look around, click the pulsing markers or the objects, "Walk to" buttons to move, `P` / `Esc` pause, `M` sound |
+
+Progress is saved in the browser after every accepted action, and a reload offers to continue.
+
+## Room 2 · Shard Heist
+
 A 3D police-chase driving game that runs in any modern browser. Pick a map and a getaway vehicle, grab the glowing star shards, shake off up to three police cars and reach the finish before the clock runs out. Or play **The Necklace Job**, a three-act story with three endings.
 
 **Play:** https://alexanderleusch.github.io/shard-heist/ (published automatically from `main` once all tests pass)
@@ -17,30 +43,39 @@ A 3D police-chase driving game that runs in any modern browser. Pick a map and a
 You need [Node.js](https://nodejs.org) 22 or newer. There is nothing to install.
 
 ```bash
-npm start          # serves the game on http://localhost:8080
-npm test           # rules, story, input and page tests (about 1 s)
+npm start          # serves both rooms: http://localhost:8080/escape-room/ and http://localhost:8080
+npm test           # rules, story, input, page and escape-room tests (about 1 s)
 npm run test:sri   # checks the library files against their integrity hashes (needs internet)
-npm run test:browser   # plays the real game in headless Chrome or Edge (about 1.5 min)
+npm run test:browser   # plays both rooms in headless Chrome or Edge (about 1.5 min)
 npm run test:all   # all of the above
 ```
 
-Opening `index.html` directly from the folder also works.
+Opening `escape-room/index.html` or `index.html` directly from the folder also works.
 
 ## How it is built
 
 ```
-index.html        page structure: HUD, cockpit, menu overlay, error screen; loads the scripts in order
+escape-room/      ROOM 1, self-contained (it shares no files with room 2):
+  index.html        page structure: HUD, markers, cards, error screen
+  styles.css        prison look
+  src/boot.js       error screen (a copy of room 2's, so the room works on its own)
+  src/rules.js      the story and rules as pure functions: scenes, items, clues, lock, clock, saved games
+  src/room.js       the 3D washroom, camera, markers, lock and clue cards, sound
+
+index.html        ROOM 2 page structure: HUD, cockpit, menu overlay, error screen; loads the scripts in order
 styles.css        all styling (glass HUD, cockpit, showroom menu, error screen)
 src/boot.js       error screen: catches load failures, missing WebGL and unexpected errors
 src/core.js       the rules: tuning tables, driving, damage, police pressure, scoring, story, input validation
 src/game.js       everything visual and real-time: 3D worlds, vehicles, traffic and police AI, sound, HUD, story scenes
-tests/            Node tests for core.js and the page, plus a headless-browser test of the real game
+tests/            Node tests for both rooms' rules and pages, plus a headless-browser test of both rooms
 scripts/          dev server (serve.js) and the SRI checker (check-sri.js)
 .github/workflows CI: tests on every push; deploy to GitHub Pages only when they pass
 docs/             Code Guide (PDF): architecture, all code sections, tuning, limits
 ```
 
-**The frame loop.** `frame()` in `game.js` runs once per screen refresh: player physics → police → pickups, timer, story → traffic and signals → particles, boundary, camera → engine sound → HUD and radar → render. The time step is capped at 50 ms (`Core.frameDt`), so a slow frame never moves a car through a wall.
+**Room 1 in one sentence.** `rules.js` holds the state as one plain object; `perform(state, action, target)` returns a new state for an accepted action and the same, unchanged state plus a message for a refused one; `tick()` runs the clock; `room.js` only draws the state and turns clicks into actions. This is the structure of the original Plot Twist project, in JavaScript and 3D.
+
+**The frame loop (room 2).** `frame()` in `game.js` runs once per screen refresh: player physics → police → pickups, timer, story → traffic and signals → particles, boundary, camera → engine sound → HUD and radar → render. The time step is capped at 50 ms (`Core.frameDt`), so a slow frame never moves a car through a wall.
 
 **The state machine.** `menu → play ⇄ pause → done | over`. Every button on a card has a `data-action`, and `Core.actionAllowed(action, state)` decides whether it may run, so a stale click is ignored.
 
@@ -60,8 +95,9 @@ docs/             Code Guide (PDF): architecture, all code sections, tuning, lim
 
 ## Testing
 
-`npm test` runs 44 tests in Node, and `npm run test:browser` runs 10 more in headless Chrome. CI runs all of them, plus the SRI check, on every push to `main` and on every pull request. They cover:
+`npm test` runs 64 tests in Node (15 of them for the escape room), and `npm run test:browser` runs 14 more in headless Chrome (4 of them in the escape room). CI runs all of them, plus the SRI check, on every push to `main` and on every pull request. They cover:
 
+- **Escape room:** both endings and the jammed-door grace minute; refused actions (walking where there is no exit, taking an item twice, the tile without the spoon, the door without the mop, lock wheels that do not exist, anything before the briefing or after an ending) return the unchanged state; wrong codes cost 30 s but never take the clock below zero; warnings sound once; tampered saved games are rejected; in the browser: briefing, refused action, save and continue after a reload, a wrong code and then Ending A.
 - **Accepted actions:** each menu action in the states whose cards show it; valid map and vehicle picks; restoring a valid saved selection; finishing every story act; both story endings.
 - **Rejected actions:** card buttons while driving; story buttons without a story; "next act" after the last act; unknown actions; picks such as `"tank"`, `"constructor"` or `"__proto__"`; acts outside 1–3; the act 2 toll without the clasp; tampered saved data; dev-server requests for `.git`, for paths outside the folder, and with methods other than GET or HEAD.
 - **Edge cases:** gas and brake held together, zero-length and 3-second frames, negative frame times, NaN impacts, damage above 100 or below 0, coasting to exactly zero, a letter found in an attempt that then failed, radio lines that must not repeat, time displays that must never show negative or NaN.

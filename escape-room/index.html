@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- ### SECURITY: scripts may only come from this site and the pinned CDN; no plugins, no forms, no foreign base URL. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Plot Twist: Cell Block D</title>
+<meta name="description" content="Room 1 of Shard Heist: a 3D prison escape room. Find the code for the hatch before the guard comes back.">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;900&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<!-- ### MARKUP: the 3D view, the HUD (place, clock, items, clues, messages), the hotspot markers and the overlay cards. -->
+<canvas id="room" aria-label="Prison washroom"></canvas>
+
+<div id="hud" class="off">
+  <section class="panel where">
+    <div class="eyebrow">Cell Block D · Washroom</div>
+    <div class="place" id="place">The Door</div>
+  </section>
+  <section class="panel clock" id="clockPanel">
+    <div>
+      <div class="eyebrow">Hale is back in</div>
+      <div class="time" id="time">10:00</div>
+    </div>
+    <div class="btns">
+      <button class="icon-btn" id="btnPause" aria-label="Pause">
+        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+      </button>
+      <button class="icon-btn" id="btnSound" aria-label="Mute sound">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path id="soundWaves" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>
+      </button>
+    </div>
+  </section>
+  <section class="panel kit">
+    <div class="eyebrow">Items</div>
+    <div class="slots" id="slots"></div>
+    <button class="notes-btn" id="btnNotes"><span>Clues</span><b id="clueCount">0 / 3</b></button>
+  </section>
+  <nav class="panel go" id="goBar" aria-label="Walk to"><div class="eyebrow">Walk to</div><div class="go-btns" id="goBtns"></div></nav>
+  <div class="say" id="say" role="status" aria-live="polite"></div>
+</div>
+
+<div id="markers" aria-label="Things you can use"></div>
+<div class="hint-look" id="lookHint">Drag to look around · click the markers</div>
+
+<div id="overlay" hidden><div class="card" id="card"></div></div>
+
+<!-- ### ERROR SCREEN: shown by src/boot.js instead of a black page when something cannot load or breaks. -->
+<div id="fatal" class="fatal" role="alertdialog" aria-modal="true" aria-labelledby="fatalTitle" aria-describedby="fatalText" hidden>
+  <div class="fatal-card">
+    <div class="eyebrow">Cell Block D · Error</div>
+    <h2 id="fatalTitle">Something went wrong</h2>
+    <p id="fatalText"></p>
+    <div class="actions">
+      <button class="btn" id="fatalReload">Reload the game</button>
+      <button class="btn ghost" id="fatalDismiss" hidden>Keep playing</button>
+    </div>
+  </div>
+</div>
+
+<!-- ### SCRIPTS: error screen first, then three.js r128 (pinned, checked with an SRI hash), the rules, then the room. -->
+<script src="src/boot.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha384-CI3ELBVUz9XQO+97x6nwMDPosPR5XvsxW2ua7N1Xeygeh1IxtgqtCkGfQY9WWdHu" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="src/rules.js"></script>
+<script src="src/room.js"></script>
+</body>
+</html>

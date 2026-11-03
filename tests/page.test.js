@@ -119,3 +119,46 @@ test('dev server: answers over HTTP with the right status codes', async () => {
     assert.equal((await get('/', 'DELETE')).statusCode, 405);
   } finally { server.close(); }
 });
+
+// ---------- Room 1: the escape-room page ----------
+const escHtml = read('escape-room/index.html');
+const escRoom = read('escape-room/src/room.js');
+const escScripts = [...escHtml.matchAll(/<script\b([^>]*)><\/script>/g)].map(m => m[1]);
+
+test('escape room: scripts load in order, the library is pinned and SRI-checked, no inline scripts', () => {
+  const srcs = escScripts.map(a => a.match(/src="([^"]+)"/)[1]);
+  assert.deepEqual(srcs, ['src/boot.js', 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', 'src/rules.js', 'src/room.js']);
+  const lib = escScripts[1];
+  assert.match(lib, /integrity="sha384-[A-Za-z0-9+/]{64}"/);
+  assert.match(lib, /crossorigin="anonymous"/);
+  assert.equal(lib.match(/integrity="([^"]+)"/)[1], scripts.find(a => a.includes('three.min.js')).match(/integrity="([^"]+)"/)[1], 'same file, same hash as room 2');
+  assert.ok(!/<script>\s*\S/.test(escHtml));
+  for (const f of srcs.filter(s => !s.startsWith('http'))) assert.ok(fs.existsSync(path.join(ROOT, 'escape-room', f)), f);
+});
+
+test('escape room: the security policy only allows this site and the one CDN to run scripts', () => {
+  const csp = escHtml.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1];
+  const dir = Object.fromEntries(csp.split(';').map(d => d.trim().split(/\s+/)).map(([k, ...v]) => [k, v]));
+  assert.deepEqual(dir['script-src'], ["'self'", 'https://cdnjs.cloudflare.com']);
+  assert.deepEqual(dir['object-src'], ["'none'"]);
+  assert.ok(!csp.includes("'unsafe-eval'"));
+});
+
+test('escape room: every element the room looks up by id exists in its page', () => {
+  const ids = new Set([...escHtml.matchAll(/\bid="([^"]+)"/g)].map(m => m[1]));
+  const runtime = new Set(['lockUi', 'tries']);
+  const wanted = new Set([...escRoom.matchAll(/\$\('([A-Za-z0-9_-]+)'\)/g)].map(m => m[1]));
+  assert.ok(wanted.size > 10);
+  for (const id of wanted) assert.ok(ids.has(id) || runtime.has(id), `#${id} is missing from escape-room/index.html`);
+});
+
+test('escape room: the two rooms stay separate (no file of one room loads the other)', () => {
+  assert.ok(!/\.\.\//.test(escHtml), 'room 1 does not load files from room 2');
+  assert.ok(!/escape-room/.test(html), 'room 2 does not load files from room 1');
+  assert.ok(!/ShardCore|src\/core\.js/.test(escRoom));
+});
+
+test('escape room: texts from the story are inserted as text, not as HTML', () => {
+  assert.ok(escRoom.includes("b.querySelector('span').textContent = h.label"));
+  assert.ok(/esc\(c\.text\)/.test(escRoom) && /esc\(E\.text\)/.test(escRoom));
+});
