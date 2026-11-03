@@ -190,7 +190,7 @@ test('the city map carries the real streets of the Baixa, in their real order', 
   assert.equal(Core.streetAt(-3.5, -30, 0), 'Rua Augusta');
   assert.equal(Core.streetAt(96, 20, 0), 'Rua da Prata');
   assert.equal(Core.streetAt(30, 0, Math.PI / 2), 'Rua da Conceição');
-  assert.equal(Core.streetAt(0, 81, 0), 'Rua Augusta', 'the arch stands on Rua Augusta');
+  assert.equal(Core.streetAt(0, 83, 0), 'Rua Augusta', 'the arch stands on Rua Augusta');
 });
 
 test('squares win over streets, a crossing follows your heading, and a pavement or bad input has no name', () => {

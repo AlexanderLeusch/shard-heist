@@ -103,16 +103,16 @@ pre .c{ color:#7fd4e2; }
   <h2>The game at a glance</h2>
   <p><b>Shard Heist</b> is a 3D police-chase game that runs entirely in the browser as a static website: one page, one stylesheet and three scripts. The player picks a map (Lisbon's Baixa, Highway or Countryside) and a getaway vehicle (Car, Motorcycle or Truck), collects glowing star shards, escapes up to three police cars and reaches a finish gate before the clock runs out. Crashes cause damage; repair kits remove it; police can bust the player when they box the vehicle in. The story mode <b>The Necklace Job</b> is an option in the same main menu (section 10).</p>
   <div class="kpis">
-    <div class="kpi"><b>4,437</b><span>lines of game code</span></div>
-    <div class="kpi"><b>3,943</b><span>lines of JavaScript</span></div>
-    <div class="kpi"><b>167</b><span>named functions</span></div>
+    <div class="kpi"><b>4,702</b><span>lines of game code</span></div>
+    <div class="kpi"><b>4,208</b><span>lines of JavaScript</span></div>
+    <div class="kpi"><b>176</b><span>named functions</span></div>
     <div class="kpi"><b>24</b><span>code sections</span></div>
-    <div class="kpi"><b>85</b><span>automated tests</span></div>
+    <div class="kpi"><b>86</b><span>automated tests</span></div>
     <div class="kpi"><b>0</b><span>npm dependencies</span></div>
     <div class="kpi"><b>0</b><span>image / sound files</span></div>
-    <div class="kpi"><b>278 KB</b><span>game code size</span></div>
+    <div class="kpi"><b>299 KB</b><span>game code size</span></div>
   </div>
-  <p class="mono" style="color:var(--muted)">Figures for room 2 (index.html, styles.css, src/). Room 1 is described in section 14. The test count covers both rooms: 71 unit and page tests and 14 browser tests. Tests add 1,010 lines.</p>
+  <p class="mono" style="color:var(--muted)">Figures for room 2 (index.html, styles.css, src/). Room 1 is described in section 14. The test count covers both rooms: 72 unit and page tests and 14 browser tests. Tests add 1,044 lines.</p>
   <h3>The three maps</h3>
   <table>
     <tr><th>Map</th><th>Layout</th><th>Goal</th><th class="num">Car top speed</th><th class="num">Police</th><th class="num">Time</th></tr>
@@ -147,14 +147,14 @@ pre .c{ color:#7fd4e2; }
   </div>
   <table>
     <tr><th>Language</th><th class="num">Lines</th><th class="num">Share</th><th class="num">Characters</th><th class="num">Share</th><th>Role in the game</th></tr>
-    <tr><td>JavaScript</td><td class="num">3,943</td><td class="num">88.9 %</td><td class="num">240,519</td><td class="num">84.4 %</td><td>All logic: rules (core.js), worlds, vehicles, AI, physics, audio, HUD, menus, error screen</td></tr>
-    <tr><td>CSS</td><td class="num">334</td><td class="num">7.5 %</td><td class="num">28,643</td><td class="num">10.0 %</td><td>Look of the HUD, cockpit, menus, warnings, error screen</td></tr>
-    <tr><td>HTML</td><td class="num">137</td><td class="num">3.1 %</td><td class="num">9,961</td><td class="num">3.5 %</td><td>Page skeleton, HUD panels, gauge and icons (inline SVG), script order, security policy</td></tr>
+    <tr><td>JavaScript</td><td class="num">4,208</td><td class="num">89.5 %</td><td class="num">261,364</td><td class="num">85.4 %</td><td>All logic: rules (core.js), worlds, vehicles, AI, physics, audio, HUD, menus, error screen</td></tr>
+    <tr><td>CSS</td><td class="num">334</td><td class="num">7.1 %</td><td class="num">28,643</td><td class="num">9.4 %</td><td>Look of the HUD, cockpit, menus, warnings, error screen</td></tr>
+    <tr><td>HTML</td><td class="num">137</td><td class="num">2.9 %</td><td class="num">9,961</td><td class="num">3.3 %</td><td>Page skeleton, HUD panels, gauge and icons (inline SVG), script order, security policy</td></tr>
     <tr><td>GLSL</td><td class="num">17</td><td class="num">0.4 %</td><td class="num">1,554</td><td class="num">0.5 %</td><td>Sky gradient and the boundary force field (run on the GPU)</td></tr>
-    <tr><td>SVG in JS strings</td><td class="num">6</td><td class="num">0.1 %</td><td class="num">4,386</td><td class="num">1.5 %</td><td>Vehicle and map icons in the start menu</td></tr>
+    <tr><td>SVG in JS strings</td><td class="num">6</td><td class="num">0.1 %</td><td class="num">4,386</td><td class="num">1.4 %</td><td>Vehicle and map icons in the start menu</td></tr>
     <tr><td><b>Python</b></td><td class="num"><b>0</b></td><td class="num"><b>0 %</b></td><td class="num"><b>0</b></td><td class="num"><b>0 %</b></td><td>Not used</td></tr>
   </table>
-  <p class="mono" style="color:var(--muted)">Game code of version 1.0: 4,437 lines, 285,063 characters. The tests (1,010 lines), the dev server and SRI checker are JavaScript too; the CI pipeline is YAML. About 170 of the JavaScript lines are comments, including the “###” explanations.</p>
+  <p class="mono" style="color:var(--muted)">Game code of version 1.0: 4,702 lines, 305,908 characters. The tests (1,044 lines), the dev server and SRI checker are JavaScript too; the CI pipeline is YAML. About 170 of the JavaScript lines are comments, including the “###” explanations.</p>
   <h3>External code that is loaded, not written</h3>
   <table>
     <tr><th>Library</th><th>Language</th><th>Purpose</th></tr>
@@ -269,25 +269,25 @@ composer.render()  or  renderer.render(scene, camera)               <span class=
     <tr><td class="num">109</td><td>Geometry batching</td><td>Merge thousands of boxes into few draw calls</td><td><code>Batch</code>, <code>mergeGeos</code></td></tr>
     <tr><td class="num">159</td><td>Vehicle geometry</td><td>Extruded car bodies, instanced fleets</td><td><code>extrudeProfile</code>, <code>shapeBody</code>, <code>smoothGeo</code>, <code>Fleet</code></td></tr>
     <tr><td class="num">333</td><td>Facade textures</td><td>Painted building and shop textures</td><td><code>makeFacade</code>, <code>makeShops</code></td></tr>
-    <tr><td class="num">547</td><td>Procedural surfaces</td><td>Asphalt, calçada, grass; light cones</td><td><code>surfaceSet</code>, <code>surfaceMat</code></td></tr>
-    <tr><td class="num">634</td><td>Worlds</td><td>World objects, ground height, traffic lights, city build</td><td><code>groundH</code>, <code>buildCity</code>, <code>lightState</code></td></tr>
-    <tr><td class="num">1,118</td><td>City traffic</td><td>Lane following, turns, red lights, trams on their tracks</td><td><code>updateNpcs</code>, <code>startTurn</code>, <code>chooseNext</code></td></tr>
-    <tr><td class="num">1,258</td><td>Highway</td><td>Motorway, barriers, gantries, scenery</td><td><code>buildHighway</code>, <code>makeSign</code></td></tr>
-    <tr><td class="num">1,385</td><td>Highway traffic</td><td>Lane traffic both ways, recycling</td><td><code>updateTraffic</code>, <code>spawnVehicle</code></td></tr>
-    <tr><td class="num">1,462</td><td>Countryside</td><td>Spline road, terrain, farms, village, traffic</td><td><code>buildCountry</code>, <code>roadPoint</code>, <code>roadQuery</code></td></tr>
-    <tr><td class="num">1,781</td><td>Player vehicles</td><td>Coupe, superbike, tractor unit</td><td><code>setVehicle</code></td></tr>
-    <tr><td class="num">1,969</td><td>Police</td><td>Spawning, chase AI, ramming, bust meter (rules in core.js)</td><td><code>updatePolice</code>, <code>spawnPolice</code>, <code>heat</code></td></tr>
-    <tr><td class="num">2,211</td><td>Pickups</td><td>Shards, repair kits, finish gate and toll</td><td><code>placeRun</code></td></tr>
-    <tr><td class="num">2,294</td><td>Particles &amp; smoke</td><td>Sparks and damage smoke</td><td><code>burst</code>, <code>updateSmoke</code></td></tr>
-    <tr><td class="num">2,347</td><td>Sound</td><td>Pulse-based engine, gearbox, pops, turbo, wind, tyres, siren</td><td><code>ENGINES</code>, <code>engineBuffer</code>, <code>setEngineVoice</code>, <code>updateEngine</code></td></tr>
-    <tr><td class="num">2,520</td><td>Map boundary</td><td>Force-field wall, edge distance, HUD warning</td><td><code>buildBoundary</code>, <code>boundaryDistance</code>, <code>updateBoundary</code></td></tr>
-    <tr><td class="num">2,596</td><td>Input</td><td>Keyboard, touch pads, audio suspend, error-screen and lost-graphics hooks</td><td><code>keys</code></td></tr>
-    <tr><td class="num">2,632</td><td>HUD</td><td>Gauges, pedals, pursuit, radar</td><td><code>updateHud</code>, <code>drawRadar</code>, <code>initGauge</code></td></tr>
-    <tr><td class="num">2,864</td><td>Game state</td><td>Runs, events, result cards, showroom menu, validated clicks</td><td><code>startRun</code>, <code>finish</code>, <code>showMenu</code></td></tr>
-    <tr><td class="num">3,141</td><td>Physics</td><td>Driving model, collisions, cameras</td><td><code>updateCar</code>, <code>chaseCam</code>, <code>camClip</code></td></tr>
-    <tr><td class="num">3,351</td><td>Graphics quality</td><td>Ultra / Balanced, bloom composer</td><td><code>applyGfx</code>, <code>buildComposer</code></td></tr>
-    <tr><td class="num">3,386</td><td>Story mode</td><td>Three acts, radio timeline, letter, courier lorry, endings</td><td><code>startStoryAct</code>, <code>updateStory</code>, <code>showEnding</code>, <code>warmUp</code></td></tr>
-    <tr><td class="num">3,605</td><td>Loop</td><td>Resize handling and the frame loop</td><td><code>frame</code>, <code>resize</code></td></tr>
+    <tr><td class="num">650</td><td>Procedural surfaces</td><td>Asphalt, calçada, grass; light cones</td><td><code>surfaceSet</code>, <code>surfaceMat</code></td></tr>
+    <tr><td class="num">750</td><td>Worlds</td><td>World objects, ground height, traffic lights, city build</td><td><code>groundH</code>, <code>buildCity</code>, <code>lightState</code></td></tr>
+    <tr><td class="num">1,371</td><td>City traffic</td><td>Lane following, turns, red lights, trams on their tracks</td><td><code>updateNpcs</code>, <code>startTurn</code>, <code>chooseNext</code></td></tr>
+    <tr><td class="num">1,511</td><td>Highway</td><td>Motorway, barriers, gantries, scenery</td><td><code>buildHighway</code>, <code>makeSign</code></td></tr>
+    <tr><td class="num">1,638</td><td>Highway traffic</td><td>Lane traffic both ways, recycling</td><td><code>updateTraffic</code>, <code>spawnVehicle</code></td></tr>
+    <tr><td class="num">1,715</td><td>Countryside</td><td>Spline road, terrain, farms, village, traffic</td><td><code>buildCountry</code>, <code>roadPoint</code>, <code>roadQuery</code></td></tr>
+    <tr><td class="num">2,034</td><td>Player vehicles</td><td>Coupe, superbike, tractor unit</td><td><code>setVehicle</code></td></tr>
+    <tr><td class="num">2,222</td><td>Police</td><td>Spawning, chase AI, ramming, bust meter (rules in core.js)</td><td><code>updatePolice</code>, <code>spawnPolice</code>, <code>heat</code></td></tr>
+    <tr><td class="num">2,464</td><td>Pickups</td><td>Shards, repair kits, finish gate and toll</td><td><code>placeRun</code></td></tr>
+    <tr><td class="num">2,547</td><td>Particles &amp; smoke</td><td>Sparks and damage smoke</td><td><code>burst</code>, <code>updateSmoke</code></td></tr>
+    <tr><td class="num">2,600</td><td>Sound</td><td>Pulse-based engine, gearbox, pops, turbo, wind, tyres, siren</td><td><code>ENGINES</code>, <code>engineBuffer</code>, <code>setEngineVoice</code>, <code>updateEngine</code></td></tr>
+    <tr><td class="num">2,773</td><td>Map boundary</td><td>Force-field wall, edge distance, HUD warning</td><td><code>buildBoundary</code>, <code>boundaryDistance</code>, <code>updateBoundary</code></td></tr>
+    <tr><td class="num">2,849</td><td>Input</td><td>Keyboard, touch pads, audio suspend, error-screen and lost-graphics hooks</td><td><code>keys</code></td></tr>
+    <tr><td class="num">2,885</td><td>HUD</td><td>Gauges, pedals, pursuit, radar</td><td><code>updateHud</code>, <code>drawRadar</code>, <code>initGauge</code></td></tr>
+    <tr><td class="num">3,118</td><td>Game state</td><td>Runs, events, result cards, showroom menu, validated clicks</td><td><code>startRun</code>, <code>finish</code>, <code>showMenu</code></td></tr>
+    <tr><td class="num">3,395</td><td>Physics</td><td>Driving model, collisions, cameras</td><td><code>updateCar</code>, <code>chaseCam</code>, <code>camClip</code></td></tr>
+    <tr><td class="num">3,605</td><td>Graphics quality</td><td>Ultra / Balanced, bloom composer</td><td><code>applyGfx</code>, <code>buildComposer</code></td></tr>
+    <tr><td class="num">3,640</td><td>Story mode</td><td>Three acts, radio timeline, letter, courier lorry, endings</td><td><code>startStoryAct</code>, <code>updateStory</code>, <code>showEnding</code>, <code>warmUp</code></td></tr>
+    <tr><td class="num">3,859</td><td>Loop</td><td>Resize handling and the frame loop</td><td><code>frame</code>, <code>resize</code></td></tr>
   </table>
   <h3>src/core.js: the rules</h3>
   <table>
@@ -308,7 +308,7 @@ composer.render()  or  renderer.render(scene, camera)               <span class=
   <h3>World objects</h3>
   <p>Every map is represented by the same structure: <code>{ group, colliders, radar }</code>. <code>group</code> holds all meshes so a whole map can be shown or hidden at once. <code>colliders</code> lists boxes (<code>t:'b'</code> buildings, <code>'p'</code> parked cars, <code>'w'</code> walls) and circles (<code>'c'</code> trees, poles). <code>radar</code> holds rectangles drawn on the mini map. The countryside also keeps a 24 m spatial grid so <code>collidersNear()</code> only tests nearby trees out of ~3,000.</p>
   <div class="grid2">
-    <div class="card"><b>City</b><p>Lisbon's Baixa as a 6×6 grid of 48 m blocks with 14 m streets. Each block holds 1–4 low houses (plaster or azulejo fronts, iron balconies, shop fronts, terracotta hip roofs), a park or a square. The Arco da Rua Augusta, the river, the hills, the castle and the bridge are placed by hand. <code>Core.streetAt</code> names the street under the car. Lamp posts at block corners double as traffic-light poles.</p></div>
+    <div class="card"><b>City</b><p>Lisbon's Baixa as a 6×6 grid of 48 m blocks with 14 m streets. A block is a closed row of Pombaline houses (<code>block()</code>): each floor picks its row in the facade texture (<code>FRONT_ROWS</code>), so the first floor has the tallest windows and the balconies; a mask (<code>frontMat</code>) tints only the plaster, not the limestone. Other blocks are a park or a square. The Arco da Rua Augusta, the National Theatre, Rossio station, the Praça do Comércio towers, the Sé, the river and the bridge are placed by hand. <code>Core.streetAt</code> names the street under the car. Lamp posts at block corners double as traffic-light poles.</p></div>
     <div class="card"><b>Highway</b><p>A straight 4 km corridor: textured road, dashed lanes, a median barrier and guard rails as long wall colliders, median lights with light cones, sign gantries, forests, hills and a skyline at the finish.</p></div>
     <div class="card"><b>Countryside</b><p>A Catmull-Rom spline through 15 seeded control points, sampled every ~2 m. The terrain height field (6 m cells) uses noise hills flattened within 9–75 m of the road, coloured as fields, verges and forest.</p></div>
     <div class="card"><b>Seeded randomness</b><p>Layouts use <code>mulberry32(seed)</code>, so every player sees the same city and road. Shard positions use <code>Math.random()</code> and change every run.</p></div>

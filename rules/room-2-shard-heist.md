@@ -49,6 +49,8 @@ The Baixa is the flat centre of Lisbon, rebuilt as a street grid after the 1755 
 - **Squares:** the Rossio and the Praça da Figueira in the north, the Praça do Comércio by the river in the south. The statue on the Praça do Comércio stands in the middle of the road, so traffic passes on both sides.
 - **Landmarks you can see but not reach:** the river Tejo, the 25 de Abril bridge, Cristo Rei and the castle hill. The Santa Justa lift stands on the map, and you can crash into it.
 - **Parks:** there are three, which the real Baixa does not have. The story needs them for the sealed letter.
+- **Houses:** closed blocks of Pombaline houses, wall to wall, as the Baixa was rebuilt after 1755: a ground floor plus 3 to 5 floors (OpenStreetMap gives most buildings 5 levels), arched stone ground floors with old shop fronts, the tallest windows and the balconies on the first floor, limewash colours, and tile roofs with dormers. Tiled fronts are the exception, as they are in the real Baixa.
+- **Real buildings in their place:** the National Theatre and Rossio station north of the Rossio, the yellow arcades and corner towers of the Praça do Comércio, and the Sé, seen at the end of Rua da Conceição. Their position is simplified, and they are modelled freely, not measured.
 - It is always about 02:30 at night. The clock on the arch shows it.
 
 ## Driving

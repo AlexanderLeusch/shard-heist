@@ -183,8 +183,8 @@ test('the story runs on from room 1 into room 2', () => {
 });
 
 test('the city is Lisbon: the gate stands under the arch, and the story says so', () => {
-  assert.match(game, /gp = \{ x: 0, z: 81 \}/, 'the gate is on Rua Augusta');
-  assert.match(game, /arco\(78\)/, 'the arch spans z 78 to 84, around the gate');
+  assert.match(game, /gp = \{ x: 0, z: 83 \}/, 'the gate is on Rua Augusta');
+  assert.match(game, /arco\(80\)/, 'the arch spans z 80 to 86, around the gate');
   assert.match(game, /hidden in Lisbon’s Baixa/);
   assert.ok(!/downtown/i.test(game), 'no leftover from the old unnamed city');
   assert.match(game, /fleet: 'tram'/, 'trams are part of the traffic');
@@ -194,4 +194,12 @@ test('the trams have tracks: bed and rails are built on the same loop the trams 
   assert.match(game, /strip\(trackBed, 0,/, 'a stone track bed');
   assert.match(game, /strip\(marks, side,/, 'rails on both sides');
   assert.match(game, /if \(n\.tram\) return Core\.tramNext\(/, 'trams only follow the loop');
+});
+
+test('the buildings of the city are authentic: closed blocks of low houses and the real landmarks', () => {
+  const city = game.slice(game.indexOf('function buildCity()'), game.indexOf('// ---------- City traffic'));
+  assert.ok(!/'glass'|'office'|'brick'/.test(city), 'no towers, offices or brick from the old city');
+  assert.match(city, /floors = o\.floors \|\| \(pickFloors < 0\.25 \? 3 : pickFloors < 0\.8 \? 4 : 5\)/, 'ground floor plus 3 to 5 floors, as in OpenStreetMap');
+  assert.match(city, /rng\(\) >= 0\.12 \? 'pombal'/, 'tiled fronts stay the exception');
+  for (const landmark of ['teatro(cx, cz)', 'estacao(cx, cz)', 'torreao(', 'liftTower(cx, cz)', 'arco(80)']) assert.ok(city.includes(landmark), landmark);
 });

@@ -333,8 +333,8 @@ function vehicleGlow(head, tail, i, x, z, h, front, back, y, off, on){
 // ---------- Facade textures ----------
 // ### All building textures are painted at start-up on <canvas> - no image files are downloaded. makeFacade draws brick,
 // ### office and glass-tower facades with lit or dark windows, curtains and blinds; a second canvas holds the light that the
-// ### windows emit (emissive map). pombal and azulejo are the plaster and tiled fronts of the Baixa, with iron balconies.
-// ### makeShops draws the ground-floor shop fronts with illuminated signs.
+// ### windows emit (emissive map). baixaFronts paints the Pombaline fronts of Lisbon (see below). makeShops draws the arched
+// ### stone ground floors with painted shop signs, makeArcade the arcades of the Praca do Comercio.
 const LIT_WARM = ['#ffd9a0', '#ffe6c4', '#ffc985', '#ffdfb0'];
 const LIT_COOL = ['#d8ecff', '#eaf4ff', '#cfe3ff'];
 const CURTAIN = ['rgba(150,60,60,.85)', 'rgba(70,90,140,.85)', 'rgba(200,170,120,.88)', 'rgba(90,110,80,.85)'];
@@ -388,50 +388,116 @@ function paneLit(g, ge, x, y, w, h, r, cool, ceiling){
   }
   ge.globalAlpha = 1;
 }
-// Tall stone-framed windows with an iron balcony, one per bay, on every floor of a Baixa front
-function balconyWindows(g, ge, S, n, r){
-  const B = S / n, f = B * 0.045;
+// ### A Pombaline front is plain and has a fixed order of floors: the first floor has the tallest windows and the balconies,
+// ### the floors above get smaller, the top floor has plain windows with a sill. So the texture has one row per kind of floor
+// ### (top of the texture first) and the builder picks the right row for each floor. Rows: 0-2 plain window, 3-5 tall window
+// ### with a small balcony, 6 first floor with a balcony per window, 7 first floor with one long balcony.
+const FRONT_ROWS = { sill: [0, 1, 2], sacada: [3, 4, 5], nobre: [6, 7] };
+const LIOZ = '#e7e1d2';
+// Windows and stonework; the same seed on every wall, so all fronts can share one light map and one tint mask
+function baixaWindows(g, ge, mask, S){
+  const r = mulberry32(61), n = 8, B = S / n, f = B * 0.038;
+  const stone = (x, y, w, h) => { g.fillStyle = LIOZ; g.fillRect(x, y, w, h); if (mask){ mask.fillStyle = '#000'; mask.fillRect(x, y, w, h); } };
   for (let j = 0; j < n; j++){
-    const floorLit = r() < 0.4 ? 0.45 : 0.12;
-    g.fillStyle = 'rgba(255,255,255,.4)'; g.fillRect(0, j * B + B * 0.93, S, B * 0.03);
-    g.fillStyle = 'rgba(30,25,20,.14)'; g.fillRect(0, j * B + B * 0.96, S, B * 0.015);
+    const kind = j < 3 ? 'sill' : j < 6 ? 'sacada' : 'nobre', y = j * B;
+    const litShare = r() < 0.3 ? 0.28 : 0.07; // it is 02:30: most people are asleep
+    const wh = (kind === 'sill' ? 0.5 : kind === 'sacada' ? 0.66 : 0.72) * B, wy = y + (kind === 'sill' ? 0.2 : kind === 'sacada' ? 0.12 : 0.1) * B, ww = B * 0.4;
     for (let i = 0; i < n; i++){
-      const wx = i * B + B * 0.27, wy = j * B + B * 0.13, ww = B * 0.46, wh = B * 0.7;
-      g.fillStyle = 'rgba(40,30,25,.22)'; g.fillRect(wx - f * 1.4, wy - f * 1.8, ww + f * 2.8, f * 0.8);
-      g.fillStyle = '#efe8d8'; g.fillRect(wx - f, wy - f, ww + f * 2, wh + f);
-      if (r() < floorLit) paneLit(g, ge, wx, wy, ww, wh, r, false, false); else paneUnlit(g, wx, wy, ww, wh);
-      g.fillStyle = '#efe8d8'; g.fillRect(wx + ww / 2 - f / 2, wy, f, wh);
-      // the balcony: a stone slab with its shadow and an iron railing that also blocks the window light
-      g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(wx - f * 1.6, wy + wh + f * 0.5, ww + f * 3.2, f);
-      g.fillStyle = '#6d6a66'; g.fillRect(wx - f * 1.8, wy + wh - f * 0.1, ww + f * 3.6, f * 0.7);
-      const top = wy + wh * 0.66, bars = 7, bw = Math.max(1, f * 0.3);
-      for (const c of [g, ge]){
-        c.fillStyle = c === g ? '#1b1c21' : '#000';
-        c.fillRect(wx - f * 1.5, top, ww + f * 3, bw * 1.4);
-        for (let k = 0; k <= bars; k++) c.fillRect(wx - f * 1.5 + k * (ww + f * 3 - bw) / bars, top, bw, wy + wh - top);
+      const wx = i * B + (B - ww) / 2, lit = r() < litShare, shut = r() < 0.3, warm = LIT_WARM[Math.floor(r() * 4)], curtain = r() < 0.5;
+      // weather stains under the opening, on the plaster
+      const st = g.createLinearGradient(0, wy + wh, 0, wy + wh + B * 0.2);
+      st.addColorStop(0, 'rgba(50,42,34,.16)'); st.addColorStop(1, 'rgba(50,42,34,0)');
+      g.fillStyle = st; g.fillRect(wx, wy + wh, ww, B * 0.2);
+      // the stone frame, with a heavier lintel on the first floor
+      stone(wx - f, wy - f, ww + 2 * f, wh + 2 * f);
+      if (kind === 'nobre'){ stone(wx - f * 2.2, wy - f * 2.4, ww + f * 4.4, f * 1.4); g.fillStyle = 'rgba(30,25,20,.35)'; g.fillRect(wx - f * 2.2, wy - f, ww + f * 4.4, f * 0.35); }
+      // the glass: warm and dim when someone is awake, else dark, sometimes with the inner shutters closed
+      if (lit){
+        const gl = g.createLinearGradient(0, wy, 0, wy + wh); gl.addColorStop(0, '#f0c98c'); gl.addColorStop(1, '#a8703c');
+        g.fillStyle = gl; g.fillRect(wx, wy, ww, wh);
+        if (curtain){ g.fillStyle = 'rgba(240,226,200,.5)'; g.fillRect(wx, wy, ww * 0.26, wh); g.fillRect(wx + ww * 0.74, wy, ww * 0.26, wh); }
+        if (ge){ ge.globalAlpha = 0.5; ge.fillStyle = warm; ge.fillRect(wx, wy, ww, wh); ge.globalAlpha = 1; }
+      } else if (shut){
+        g.fillStyle = '#6d6556'; g.fillRect(wx, wy, ww, wh);
+        g.fillStyle = 'rgba(0,0,0,.25)'; for (let k = 1; k < 4; k++) g.fillRect(wx, wy + wh * k / 4, ww, Math.max(1, f * 0.2));
+      } else paneUnlit(g, wx, wy, ww, wh);
+      // white wooden sash with small panes
+      const bar = Math.max(1, f * 0.3), panes = kind === 'sill' ? 3 : 4;
+      for (const c of ge ? [g, ge] : [g]){
+        c.fillStyle = c === g ? '#ece6d8' : '#000';
+        c.fillRect(wx + ww / 2 - bar, wy, bar * 2, wh);
+        for (let k = 1; k < panes; k++) c.fillRect(wx, wy + wh * k / panes, ww, bar);
+      }
+      // sill, or a stone slab with an iron railing
+      if (kind === 'sill'){ stone(wx - f * 1.5, wy + wh, ww + f * 3, f * 1.1); continue; }
+      if (j === 7) continue;
+      stone(wx - f * 2.4, wy + wh, ww + f * 4.8, f * 0.9);
+      const top = wy + wh * 0.68, bw = Math.max(1, f * 0.22), x0 = wx - f * 2, W = ww + f * 4;
+      for (const c of ge ? [g, ge] : [g]){
+        c.fillStyle = c === g ? '#191a1e' : '#000';
+        c.fillRect(x0, top, W, bw * 1.6);
+        for (let k = 0; k <= 8; k++) c.fillRect(x0 + k * (W - bw) / 8, top, bw, wy + wh - top);
       }
     }
+    if (j === 7){ // the long balcony runs across the whole front
+      const by = wy + wh, top = wy + wh * 0.68, bw = Math.max(1, f * 0.22);
+      stone(0, by, S, f * 0.9);
+      for (const c of ge ? [g, ge] : [g]){
+        c.fillStyle = c === g ? '#191a1e' : '#000';
+        c.fillRect(0, top, S, bw * 1.6);
+        for (let k = 0; k < n * 11; k++) c.fillRect(k * B / 11, top, bw, by - top);
+      }
+    }
+    // a thin stone course between the floors
+    stone(0, y + B - f * 0.5, S, f * 0.5);
   }
+}
+function baixaWall(g, S, r){
+  const n = 90;
+  for (let k = 0; k < n; k++){ // old lime plaster is never one even colour
+    const x = r() * S, y = r() * S, R = S * (0.03 + r() * 0.08), a = g.createRadialGradient(x, y, 0, x, y, R), dark = r() < 0.6;
+    a.addColorStop(0, dark ? 'rgba(60,50,40,.05)' : 'rgba(255,255,255,.06)'); a.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = a; g.fillRect(x - R, y - R, R * 2, R * 2);
+  }
+  speckle(g, S, S, r, S * 2);
+}
+// 19th-century facade tiles: a small four-tile pattern, glazed, so the whole wall shines a little
+function tilePattern(g, t, ink, ink2){
+  const c = document.createElement('canvas'); c.width = c.height = Math.max(4, Math.round(t * 2));
+  const p = c.getContext('2d'), w = c.width, h = w / 2;
+  p.fillStyle = '#f4f2ea'; p.fillRect(0, 0, w, w);
+  p.fillStyle = ink;
+  for (const [x, y] of [[0, 0], [w, 0], [0, w], [w, w]]){ p.beginPath(); p.arc(x, y, h * 0.72, 0, Math.PI * 2); p.fill(); }
+  p.fillStyle = '#f4f2ea';
+  for (const [x, y] of [[0, 0], [w, 0], [0, w], [w, w]]){ p.beginPath(); p.arc(x, y, h * 0.38, 0, Math.PI * 2); p.fill(); }
+  p.fillStyle = ink2;
+  p.beginPath(); p.moveTo(h, h * 0.45); p.lineTo(h * 1.55, h); p.lineTo(h, h * 1.55); p.lineTo(h * 0.45, h); p.closePath(); p.fill();
+  p.fillStyle = 'rgba(80,80,90,.28)'; p.fillRect(0, 0, w, Math.max(1, w * 0.012)); p.fillRect(0, h, w, Math.max(1, w * 0.012)); p.fillRect(0, 0, Math.max(1, w * 0.012), w); p.fillRect(h, 0, Math.max(1, w * 0.012), w);
+  g.fillStyle = g.createPattern(c, 'repeat'); g.fillRect(0, 0, g.canvas.width, g.canvas.height);
+}
+function baixaFronts(){
+  const S = TEX, B = S / 8;
+  const [m0, g0, e, ge] = canvasPair(S, S);
+  const maskC = document.createElement('canvas'); maskC.width = maskC.height = S / 2;
+  const mg = maskC.getContext('2d'); mg.scale(0.5, 0.5); mg.fillStyle = '#fff'; mg.fillRect(0, 0, S, S);
+  g0.fillStyle = '#f6f2e8'; g0.fillRect(0, 0, S, S);
+  baixaWall(g0, S, mulberry32(3));
+  baixaWindows(g0, ge, mg, S);
+  const tiled = (ink, ink2) => {
+    const c = document.createElement('canvas'); c.width = c.height = S;
+    const g = c.getContext('2d');
+    tilePattern(g, B / 14, ink, ink2);
+    baixaWindows(g, null, null, S);
+    return c;
+  };
+  const plaster = toTex(m0, e), blue = toTex(tiled('#2a5a9c', '#c98f2e'), e), green = toTex(tiled('#2f7a5a', '#2a5a9c'), e);
+  const mask = new THREE.CanvasTexture(maskC); mask.wrapS = mask.wrapT = THREE.RepeatWrapping;
+  return { plaster, blue, green, mask };
 }
 function makeFacade(style, seed){
   const S = TEX, n = 8, B = S / n, r = mulberry32(seed);
   const [m, g, e, ge] = canvasPair(S, S);
-  if (style === 'pombal'){
-    g.fillStyle = '#f1ece1'; g.fillRect(0, 0, S, S);
-    speckle(g, S, S, r, S * 3);
-    balconyWindows(g, ge, S, n, r);
-  } else if (style === 'azulejo'){
-    g.fillStyle = '#f3f1ea'; g.fillRect(0, 0, S, S);
-    const t = B / 6, rows = n * 6;
-    for (let iy = 0; iy < rows; iy++) for (let ix = 0; ix < rows; ix++){
-      const x = ix * t + t / 2, y = iy * t + t / 2, q = t * 0.36;
-      g.fillStyle = (ix + iy) % 2 ? 'rgba(34,84,158,.72)' : 'rgba(34,84,158,.3)';
-      g.beginPath(); g.moveTo(x, y - q); g.lineTo(x + q, y); g.lineTo(x, y + q); g.lineTo(x - q, y); g.closePath(); g.fill();
-    }
-    g.fillStyle = 'rgba(70,75,90,.2)';
-    for (let k = 0; k < rows; k++){ g.fillRect(k * t, 0, 1, S); g.fillRect(0, k * t, S, 1); }
-    balconyWindows(g, ge, S, n, r);
-  } else if (style === 'brick'){
+  if (style === 'brick'){
     g.fillStyle = '#ece6de'; g.fillRect(0, 0, S, S);
     g.fillStyle = 'rgba(80,50,40,.08)';
     const course = S / 128;
@@ -485,63 +551,100 @@ function makeFacade(style, seed){
   }
   return toTex(m, e);
 }
+// The arched ground floor of a Baixa house: limestone, old shop fronts of dark wood, a painted sign, most of it shut at night.
 function makeShops(seed){
   const W = TEX, H = TEX / 4, n = 8, B = W / n, r = mulberry32(seed);
   const [m, g, e, ge] = canvasPair(W, H);
-  g.fillStyle = '#23262f'; g.fillRect(0, 0, W, H);
-  const SIGN = ['#ff4fa3', '#55ecff', '#ffb547', '#a77bff', '#4ef0a0', '#ff6b4a', '#f4f1ea'];
-  const AWN = ['#7a2333', '#1f4f6e', '#2f5a3a', '#6b4f2a'];
-  for (let s = 0; s < n; s += 2){
-    const x = s * B, w = 2 * B, sc = SIGN[Math.floor(r() * SIGN.length)];
-    g.fillStyle = '#15171d'; g.fillRect(x + 4, 4, w - 8, H * 0.2);
-    const lw = w * (0.35 + r() * 0.3), lx = x + (w - lw) / 2, ly = H * 0.065, lh = H * 0.085;
-    for (let cx = lx; cx < lx + lw;){
-      const cw = lh * (0.4 + r() * 0.45);
-      g.fillStyle = sc; g.fillRect(cx, ly, cw, lh);
-      ge.fillStyle = sc; ge.fillRect(cx, ly, cw, lh);
-      cx += cw + lh * 0.22;
+  const TRADES = ['Retrosaria', 'Pastelaria', 'Farmácia', 'Ourivesaria', 'Café', 'Livraria', 'Chapelaria', 'Luvaria', 'Conservas', 'Tasca', 'Ginjinha', 'Sapataria', 'Relojoaria', 'Papelaria', 'Tabacaria', 'Mercearia'];
+  const WOOD = ['#2c3a2e', '#3a2a20', '#25324a', '#4a2224', '#2b2b2b'];
+  g.fillStyle = '#d4cdbc'; g.fillRect(0, 0, W, H);
+  speckle(g, W, H, r, W);
+  g.fillStyle = 'rgba(60,52,44,.22)';
+  for (let y = H / 7; y < H; y += H / 7) g.fillRect(0, y, W, Math.max(1, H * 0.006));
+  for (let i = 0; i < n; i++){
+    const x = i * B + B * 0.09, w = B * 0.82, top = H * 0.1, rad = w / 2, wood = WOOD[Math.floor(r() * WOOD.length)], word = TRADES[Math.floor(r() * TRADES.length)];
+    const open = r() < 0.3, door = r() < 0.5;
+    const arch = c => { c.beginPath(); c.moveTo(x, H); c.lineTo(x, top + rad * 0.55); c.quadraticCurveTo(x, top, x + rad, top); c.quadraticCurveTo(x + w, top, x + w, top + rad * 0.55); c.lineTo(x + w, H); c.closePath(); };
+    g.fillStyle = '#efe9da'; g.save(); g.translate(x + rad, H); g.scale(1.09, 1.03); g.translate(-x - rad, -H); arch(g); g.fill(); g.restore();
+    g.fillStyle = wood; arch(g); g.fill();
+    // the sign board inside the arch, painted by hand
+    const sy = top + H * 0.2, sh = H * 0.12;
+    g.fillStyle = '#17171a'; g.fillRect(x + w * 0.06, sy, w * 0.88, sh);
+    g.fillStyle = '#d9b667'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    let fs = sh * 0.6; g.font = '600 ' + fs + 'px Georgia, serif';
+    const tw = g.measureText(word).width; if (tw > w * 0.8){ fs *= w * 0.8 / tw; g.font = '600 ' + fs + 'px Georgia, serif'; }
+    g.fillText(word, x + rad, sy + sh * 0.54);
+    const gy = sy + sh + H * 0.03, gh = H - gy - H * 0.1, gw = door ? w * 0.56 : w * 0.82, gx = x + w * 0.09;
+    if (open){
+      const gl = g.createLinearGradient(0, gy, 0, gy + gh); gl.addColorStop(0, '#f2cf96'); gl.addColorStop(1, '#a9743f');
+      g.fillStyle = gl; g.fillRect(gx, gy, gw, gh);
+      g.fillStyle = 'rgba(40,28,20,.55)';
+      for (let k = 0; k < 2; k++) g.fillRect(gx, gy + gh * (0.42 + k * 0.42), gw, Math.max(1, gh * 0.04));
+      for (let k = 0; k < 7; k++) g.fillRect(gx + r() * gw * 0.88, gy + gh * (0.2 + 0.42 * Math.floor(r() * 2)), gw * 0.07, gh * 0.2);
+      ge.globalAlpha = 0.55; ge.fillStyle = '#ffcf8e'; ge.fillRect(gx, gy, gw, gh); ge.globalAlpha = 1;
+    } else {
+      // a rolled-down steel shutter
+      g.fillStyle = '#3d3f43'; g.fillRect(gx, gy, gw, gh);
+      g.fillStyle = 'rgba(0,0,0,.3)'; for (let k = 0; k < 14; k++) g.fillRect(gx, gy + gh * k / 14, gw, Math.max(1, gh * 0.012));
     }
-    const lit = r() < 0.82, cool = r() < 0.35;
-    for (let b = 0; b < 2; b++){
-      const bx = x + b * B + B * 0.05, by = H * 0.28, bw = B * 0.9, bh = H * 0.68;
-      if (lit){
-        const col = (cool ? LIT_COOL : LIT_WARM)[Math.floor(r() * 3)];
-        g.fillStyle = col; g.fillRect(bx, by, bw, bh);
-        const sh = g.createLinearGradient(0, by, 0, by + bh); sh.addColorStop(0, 'rgba(255,255,255,.2)'); sh.addColorStop(1, 'rgba(60,30,10,.4)');
-        g.fillStyle = sh; g.fillRect(bx, by, bw, bh);
-        g.fillStyle = 'rgba(40,30,30,.35)';
-        for (let k = 0; k < 3; k++) g.fillRect(bx + bw * 0.08, by + bh * (0.3 + k * 0.22), bw * 0.84, bh * 0.05);
-        for (let k = 0; k < 4; k++) g.fillRect(bx + r() * bw * 0.8, by + bh * (0.15 + r() * 0.6), bw * 0.08, bh * 0.12);
-        ge.globalAlpha = 0.75; ge.fillStyle = col; ge.fillRect(bx, by, bw, bh); ge.globalAlpha = 1;
-      } else paneUnlit(g, bx, by, bw, bh);
-      if (b === 1 && r() < 0.5){ g.fillStyle = 'rgba(10,12,16,.75)'; g.fillRect(bx + bw * 0.55, by, bw * 0.4, bh); g.fillStyle = '#3a3e4a'; g.fillRect(bx + bw * 0.55, by, 4, bh); }
-      g.strokeStyle = '#3a3e4a'; g.lineWidth = 5; g.strokeRect(bx, by, bw, bh);
-    }
-    if (r() < 0.35){
-      const ac = AWN[Math.floor(r() * AWN.length)], k = 10, sw = (w - 8) / k;
-      for (let q = 0; q < k; q++){ g.fillStyle = q % 2 ? ac : '#e8e2d6'; g.fillRect(x + 4 + q * sw, H * 0.205, sw, H * 0.065); }
-    }
+    g.strokeStyle = '#121214'; g.lineWidth = Math.max(1, B * 0.012); g.strokeRect(gx, gy, gw, gh);
+    if (door){ g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(gx + gw + w * 0.04, gy, w * 0.2, H - gy); }
+    g.fillStyle = '#b9b1a0'; g.fillRect(x, H - H * 0.1, w, H * 0.1);
   }
   return toTex(m, e);
 }
-const FAC = { brick: makeFacade('brick', 11), office: makeFacade('office', 17), glass: makeFacade('glass', 23), pombal: makeFacade('pombal', 29), azulejo: makeFacade('azulejo', 37), shop: makeShops(31) };
+// The arcades of the Praca do Comercio: yellow piers, stone arches, dark walkways with a few lamps
+function makeArcade(){
+  const W = TEX, H = TEX / 4, n = 6, A = W / n;
+  const [m, g, e, ge] = canvasPair(W, H);
+  g.fillStyle = '#dbbe39'; g.fillRect(0, 0, W, H);
+  for (let i = 0; i < n; i++){
+    const x = i * A + A * 0.13, w = A * 0.74, rad = w / 2, top = H * 0.08, spring = top + rad * (H / A) * 0.9;
+    const arch = c => { c.beginPath(); c.moveTo(x, H); c.lineTo(x, spring); c.quadraticCurveTo(x, top, x + rad, top); c.quadraticCurveTo(x + w, top, x + w, spring); c.lineTo(x + w, H); c.closePath(); };
+    g.fillStyle = LIOZ; g.save(); g.translate(x + rad, H); g.scale(1.1, 1.05); g.translate(-x - rad, -H); arch(g); g.fill(); g.restore();
+    const d = g.createLinearGradient(0, top, 0, H); d.addColorStop(0, '#1a1712'); d.addColorStop(0.5, '#2c251a'); d.addColorStop(1, '#14120e');
+    g.fillStyle = d; arch(g); g.fill();
+    const ly = spring + H * 0.06, lg = g.createRadialGradient(x + rad, ly, 0, x + rad, ly, w * 0.5);
+    lg.addColorStop(0, 'rgba(255,205,140,.8)'); lg.addColorStop(1, 'rgba(255,205,140,0)');
+    g.save(); arch(g); g.clip(); g.fillStyle = lg; g.fillRect(x, top, w, H - top); g.restore();
+    const le = ge.createRadialGradient(x + rad, ly, 0, x + rad, ly, w * 0.3);
+    le.addColorStop(0, 'rgba(255,205,140,.7)'); le.addColorStop(1, 'rgba(255,205,140,0)');
+    ge.fillStyle = le; ge.fillRect(x, top, w, H - top);
+  }
+  return toTex(m, e);
+}
+const FRONTS = baixaFronts();
+const FAC = { brick: makeFacade('brick', 11), office: makeFacade('office', 17), glass: makeFacade('glass', 23), shop: makeShops(31), arcade: makeArcade() };
 const facMat = (f, o) => new THREE.MeshStandardMaterial(Object.assign({ map: f.map, emissiveMap: f.emissive, emissive: 0xffffff, emissiveIntensity: 1.1, vertexColors: true }, o));
+// Paints only the plaster in the house colour: the mask keeps the limestone frames, the iron and the glass as they are
+function frontMat(f, o){
+  const m = facMat(f, o);
+  m.onBeforeCompile = sh => {
+    sh.uniforms.tintMask = { value: FRONTS.mask };
+    sh.fragmentShader = 'uniform sampler2D tintMask;\n' + sh.fragmentShader.replace('#include <color_fragment>', 'diffuseColor.rgb *= mix(vec3(1.0), vColor, texture2D(tintMask, vUv).r);');
+  };
+  return m;
+}
 const MAT = {
   brick: facMat(FAC.brick, { roughness: 0.88 }),
   office: facMat(FAC.office, { roughness: 0.62, metalness: 0.1 }),
   glass: facMat(FAC.glass, { roughness: 0.12, metalness: 0.7 }),
-  pombal: facMat(FAC.pombal, { roughness: 0.9 }),
-  azulejo: facMat(FAC.azulejo, { roughness: 0.32, metalness: 0.05 }),
-  shop: facMat(FAC.shop, { roughness: 0.45, metalness: 0.2 })
+  pombal: frontMat(FRONTS.plaster, { roughness: 0.92, emissiveIntensity: 0.85 }),
+  tileB: frontMat(FRONTS.blue, { roughness: 0.3, metalness: 0.05, emissiveIntensity: 0.85 }),
+  tileG: frontMat(FRONTS.green, { roughness: 0.3, metalness: 0.05, emissiveIntensity: 0.85 }),
+  shop: facMat(FAC.shop, { roughness: 0.75, emissiveIntensity: 0.8 }),
+  arcade: facMat(FAC.arcade, { roughness: 0.85, emissiveIntensity: 0.8 })
 };
 MAT.glass.userData.env = 1.3;
-MAT.azulejo.userData.env = 1.0;
+MAT.tileB.userData.env = 1.0; MAT.tileG.userData.env = 1.0;
 const PAL = {
   brick: [0xc98f7a, 0xd9c3a5, 0xe6dccd, 0xb07a63, 0xa9b0bb, 0xd6b48f, 0x9c6b5c],
   office: [0xd0d3d9, 0xc2c6cc, 0xb9b2a6, 0xdcd8cf, 0xa9adb6],
   glass: [0x9fb4d4, 0x8fa8c0, 0xa9c3c9, 0x8f98b8, 0xb5c2d6],
-  pombal: [0xeccb74, 0xe7ae9f, 0xa9cbe0, 0xefe2c6, 0xdcae68, 0xb7d6bc, 0xf4efe4, 0xdf9f86],
-  azulejo: [0xffffff, 0xdcefe2, 0xf8e6c8, 0xd4e5f6, 0xf1d9d4]
+  // muted lime washes: ochre, sand, rose, salmon, grey-blue, sage and off-white
+  pombal: [0xd9b45f, 0xe2c88d, 0xe3b9a8, 0xd99f8c, 0xb4c4c9, 0xa8bfa6, 0xf0e9da, 0xc98f62, 0xe8dcc0, 0xf2eee4],
+  tileB: [0xffffff, 0xf4f0e6],
+  tileG: [0xffffff, 0xf4f0e6]
 };
 
 // ---------- Procedural surfaces: wet asphalt, calçada, grass ----------
@@ -608,6 +711,19 @@ const WAVES = surfaceSet(COARSE ? 256 : 512, 21, calcadaColour, h => 0.55 + h * 
   }
 })();
 cobbleJoints(WAVES);
+// Barrel roof tiles in rows, tinted per roof
+const roofTiles = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d'), r = mulberry32(8), rows = 8, cols = 10, h = 256 / rows, w = 256 / cols;
+  for (let j = 0; j < rows; j++) for (let i = 0; i <= cols; i++){
+    const x = (i + (j % 2) * 0.5) * w - w / 2, v = 190 + r() * 65, gr = g.createLinearGradient(x, 0, x + w, 0);
+    gr.addColorStop(0, 'rgb(' + v * 0.55 + ',' + v * 0.55 + ',' + v * 0.55 + ')'); gr.addColorStop(0.5, 'rgb(' + v + ',' + v + ',' + v + ')'); gr.addColorStop(1, 'rgb(' + v * 0.55 + ',' + v * 0.55 + ',' + v * 0.55 + ')');
+    g.fillStyle = gr; g.fillRect(x, j * h, w, h);
+    g.fillStyle = 'rgba(0,0,0,.4)'; g.fillRect(x, j * h + h - 2, w, 2);
+  }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.encoding = THREE.sRGBEncoding; t.anisotropy = ANISO;
+  return t;
+})();
 const GRASS = surfaceSet(COARSE ? 256 : 512, 13,
   (h, p) => [40 + h * 40 + p * 30, 70 + h * 60 + p * 40, 38 + h * 30], () => 0.95, 2.2);
 function surfaceMat(set, repeat, opts){
@@ -635,9 +751,11 @@ const BEAM_MAT = new THREE.MeshBasicMaterial({ map: coneTex, color: 0xe8f0ff, tr
 // ### Each map is a "world" object: a scene group, a list of colliders (boxes, circles, walls) and radar shapes.
 // ### groundH returns the ground height at any point (kerbs in the city, the hill height field in the countryside).
 // ### Traffic lights: every corner lamp post carries one signal head; two groups of intersections switch in turn.
-// ### buildCity lays out Lisbon's Baixa as a 6x6 block grid: low pastel and tiled houses with terracotta roofs, the Rossio and
-// ### the Praca da Figueira in the north, the Praca do Comercio with the Arco da Rua Augusta and the river Tejo in the south,
-// ### the Santa Justa lift, hills with the castle on both sides and the 25 de Abril bridge and Cristo Rei beyond the water.
+// ### buildCity lays out Lisbon's Baixa as a 6x6 grid of closed blocks of Pombaline houses, plain and even in height, with
+// ### arched ground floors and tile roofs with dormers; heights come from OpenStreetMap (most have 5 levels). In the north the
+// ### Rossio with the National Theatre and the station, and the Praca da Figueira; in the south the yellow arcades and towers
+// ### of the Praca do Comercio, the Arco da Rua Augusta and the river Tejo. Beyond them the Santa Justa lift, the cathedral,
+// ### the castle on its hill, the 25 de Abril bridge and Cristo Rei.
 // ### The grid is simplified: real blocks are longer than wide, here they are square. x grows east, z grows south.
 const CITY = { group: new THREE.Group(), colliders: [], radar: [], built: false };
 const HWY = { group: new THREE.Group(), colliders: [], radar: [], built: false };
@@ -687,12 +805,12 @@ function updateSignals(){
 function buildCity(){
   const grp = CITY.group, colliders = CITY.colliders, radarRects = CITY.radar;
   const rng = mulberry32(2026);
-  const FB = { pombal: new Batch(), azulejo: new Batch(), shop: new Batch() };
+  const FB = { pombal: new Batch(), tileB: new Batch(), tileG: new Batch(), shop: new Batch(), arcade: new Batch() };
   const roofs = new Batch(), trim = new Batch(), slabs = new Batch(), grass = new Batch(), marks = new Batch(),
         neon = new Batch(), poles = new Batch(), pools = new Batch(), ao = new Batch(), housings = new Batch(), waves = new Batch(), lift = new Batch();
   const lampB = {}, lampP = {};
   for (const g of [0, 1]) for (const a of ['x', 'z']) for (const c of ['r', 'y', 'g']){ lampB[g + a + c] = new Batch(); lampP[g + a + c] = []; }
-  const slabSide = C(0x8d8a84), slabTop = C(0xb2afa6), plazaTop = C(0xd8d3c6), stoneCol = C(0xd6ccb4), TILE_ROOFS = [0xa45a3d, 0x8e4c34, 0xb0664a, 0x98503a];
+  const slabSide = C(0x8d8a84), slabTop = C(0xb2afa6), plazaTop = C(0xd8d3c6), stoneCol = C(0xd6ccb4), TILE_ROOFS = [0xbf5d24, 0xa9552c, 0xc26a3a, 0x9c4f2c];
   const trees = [];
   const pick = style => C(PAL[style][Math.floor(rng() * PAL[style].length)]);
 
@@ -703,22 +821,23 @@ function buildCity(){
   grp.add(ground);
 
   // i runs west to east, j north to south; the four blocks around the start stay ordinary houses
-  const types = new Map([['-3,-1', 'park'], ['2,-2', 'park'], ['2,1', 'park'], ['-1,-3', 'rossio'], ['0,-3', 'figueira'], ['-1,2', 'praca'], ['0,2', 'praca'], ['-3,-3', 'lift']]);
-  // The yellow arcaded houses around the Praca do Comercio; the two blocks beside the arch are one solid front
-  const YELLOW = new Set(['-2,2', '1,2', '-1,1', '0,1']), SOLID = new Set(['-1,1', '0,1']);
+  const types = new Map([['-3,-1', 'park'], ['2,-2', 'park'], ['2,1', 'park'], ['-1,-3', 'rossio'], ['0,-3', 'figueira'], ['-1,2', 'praca'], ['0,2', 'praca'], ['-3,-3', 'lift'], ['-1,-4', 'teatro'], ['-2,-4', 'estacao']]);
+  // The yellow arcaded houses around the Praca do Comercio
+  const YELLOW = new Set(['-2,2', '1,2', '-1,1', '0,1']);
 
   function facade(style, x0, x1, y0, y1, z0, z1, col){
     FB[style].sides(x0, x1, y0, y1, z0, z1, col, TU, TV, Math.floor(rng() * 8) / 8, Math.floor(rng() * 8) / 8);
   }
   function ledge(x0, x1, y, z0, z1, col, o){ trim.box(x0 - o, x1 + o, y, y + 0.3, z0 - o, z1 + o, col); }
-  // A terracotta hip roof: four slopes up to a short ridge
-  function hipRoof(x0, x1, y, z0, z1, h, col){
-    const q = Math.min(x1 - x0, z1 - z0) * 0.38, L = Math.hypot(q, h), ny = q / L, nh = h / L;
-    roofs.quad([x0, y, z1], [x1, y, z1], [x1 - q, y + h, z1 - q], [x0 + q, y + h, z1 - q], [0, ny, nh], [0, 0, 1, 1], col);
-    roofs.quad([x1, y, z0], [x0, y, z0], [x0 + q, y + h, z0 + q], [x1 - q, y + h, z0 + q], [0, ny, -nh], [0, 0, 1, 1], col);
-    roofs.quad([x1, y, z1], [x1, y, z0], [x1 - q, y + h, z0 + q], [x1 - q, y + h, z1 - q], [nh, ny, 0], [0, 0, 1, 1], col);
-    roofs.quad([x0, y, z0], [x0, y, z1], [x0 + q, y + h, z1 - q], [x0 + q, y + h, z0 + q], [-nh, ny, 0], [0, 0, 1, 1], col);
-    roofs.top(x0 + q, x1 - q, y + h, z0 + q, z1 - q, col);
+  // A tile roof: four steep slopes from the eaves, q metres inwards; tile rows run along the eaves
+  function hipRoof(x0, x1, y, z0, z1, h, col, inset){
+    const q = inset || Math.min(x1 - x0, z1 - z0) * 0.38, L = Math.hypot(q, h), ny = q / L, nh = h / L, lx = x1 - x0, lz = z1 - z0, slope = L / 2;
+    const uv = len => [0, 0, len / 2.5, 0, (len - q) / 2.5, slope, q / 2.5, slope];
+    roofs.quadUV([x0, y, z1], [x1, y, z1], [x1 - q, y + h, z1 - q], [x0 + q, y + h, z1 - q], [0, ny, nh], uv(lx), col);
+    roofs.quadUV([x1, y, z0], [x0, y, z0], [x0 + q, y + h, z0 + q], [x1 - q, y + h, z0 + q], [0, ny, -nh], uv(lx), col);
+    roofs.quadUV([x1, y, z1], [x1, y, z0], [x1 - q, y + h, z0 + q], [x1 - q, y + h, z1 - q], [nh, ny, 0], uv(lz), col);
+    roofs.quadUV([x0, y, z0], [x0, y, z1], [x0 + q, y + h, z1 - q], [x0 + q, y + h, z0 + q], [-nh, ny, 0], uv(lz), col);
+    roofs.top(x0 + q, x1 - q, y + h, z0 + q, z1 - q, col, [0, 0, (lx - 2 * q) / 2.5, (lz - 2 * q) / 2.5]);
   }
   const roofTile = () => C(TILE_ROOFS[Math.floor(rng() * TILE_ROOFS.length)]);
   function aoRect(x0, x1, z0, z1){
@@ -729,35 +848,140 @@ function buildCity(){
     ao.quadUV([x0 - s, y, z1], [x0, y, z1], [x0, y, z0], [x0 - s, y, z0], n, [0, 0, 0, 1, 0, 1, 0, 0], WHITE);
   }
 
-  function building(cx, cz, yellow, lotsFixed){
-    const r = rng(); let lots = lotsFixed;
-    if (lots) { /* given */ }
-    else if (r < 0.3) lots = [[-13, 13, -13, 13]];
-    else if (r < 0.5) lots = [[-13, -1, -13, 13], [1, 13, -13, 13]];
-    else if (r < 0.7) lots = [[-13, 13, -13, -1], [-13, 13, 1, 13]];
-    else lots = [[-13, -1, -13, -1], [1, 13, -13, -1], [-13, -1, 1, 13], [1, 13, 1, 13]];
-    for (const [a, b, c, d] of lots){
-      const w = Math.max(9, Math.floor((b - a - rng() * 3) / 3) * 3), dd = Math.max(9, Math.floor((d - c - rng() * 3) / 3) * 3);
-      const mx = cx + (a + b) / 2, mz = cz + (c + d) / 2;
-      const x0 = mx - w / 2, x1 = mx + w / 2, z0 = mz - dd / 2, z1 = mz + dd / 2;
-      colliders.push({ t: 'b', x0, x1, z0, z1 });
-      radarRects.push({ x0, x1, z0, z1, c: 'rgba(255,255,255,.17)' });
-      aoRect(x0, x1, z0, z1);
-      // the Baixa is low and even: four to six floors, no towers
-      const floors = yellow ? 5 : 4 + Math.floor(rng() * 3);
-      const style = yellow || rng() < 0.62 ? 'pombal' : 'azulejo';
-      const trimCol = C(0xeae3d3);
-      let y = 0.18;
-      FB.shop.sides(x0, x1, y, y + GROUND, z0, z1, WHITE, TU, GROUND, Math.floor(rng() * 4) / 4, 0);
-      y += GROUND;
-      ledge(x0, x1, y, z0, z1, trimCol, 0.35); y += 0.3;
-      facade(style, x0, x1, y, y + floors * FLOOR, z0, z1, yellow ? C(0xe8bb45) : pick(style));
-      y += floors * FLOOR;
-      ledge(x0, x1, y - 0.1, z0, z1, trimCol, 0.4);
-      hipRoof(x0 - 0.3, x1 + 0.3, y + 0.2, z0 - 0.3, z1 + 0.3, 3.2 + rng() * 1.2, roofTile());
-      const chx = mx + (rng() - 0.5) * w * 0.4, chz = mz + (rng() - 0.5) * dd * 0.4;
-      trim.box(chx - 0.5, chx + 0.5, y + 0.2, y + 5.2, chz - 0.4, chz + 0.4, C(0xcfc6b4));
+  // ### One city block: houses wall to wall around all four sides, each house 2 to 4 bays wide with its own colour. The block
+  // ### has one height, as the plan of 1758 wanted, with stone corners between the houses, a cornice, and dormers in the roof.
+  function block(cx, cz, o){
+    o = o || {};
+    const detail = o.detail && !COARSE; // phones get the same houses with painted slabs only
+    const x0 = o.x0 !== undefined ? o.x0 : cx - 13.5, x1 = o.x1 !== undefined ? o.x1 : cx + 13.5, z0 = cz - 13.5, z1 = cz + 13.5;
+    const pickFloors = rng(), floors = o.floors || (pickFloors < 0.25 ? 3 : pickFloors < 0.8 ? 4 : 5);
+    const ground = o.ground || GROUND, baseY = 0.18 + ground + 0.3, top = baseY + floors * FLOOR, lime = C(0xe7e1d2);
+    colliders.push({ t: 'b', x0, x1, z0, z1 });
+    radarRects.push({ x0, x1, z0, z1, c: 'rgba(255,255,255,.17)' });
+    aoRect(x0, x1, z0, z1);
+    const sides = [{ s: [x0, z1], d: [1, 0], n: [0, 0, 1], L: x1 - x0 }, { s: [x1, z1], d: [0, -1], n: [1, 0, 0], L: z1 - z0 }, { s: [x1, z0], d: [-1, 0], n: [0, 0, -1], L: x1 - x0 }, { s: [x0, z0], d: [0, 1], n: [-1, 0, 0], L: z1 - z0 }];
+    for (const { s, d, n, L } of sides){
+      const bays = Math.max(2, Math.round(L / BAY)), bw = L / bays;
+      const P = (t, y) => [s[0] + d[0] * t, y, s[1] + d[1] * t];
+      const paneAt = (t, out, y) => [s[0] + d[0] * t + n[0] * out, y, s[1] + d[1] * t + n[2] * out];
+      // a box along this side, from t0 to t1, nA to nB metres out from the wall (minus is inwards)
+      const boxAt = (batch, t0, t1, nA, nB, y0, y1, col, under) => {
+        const xs = [s[0] + d[0] * t0 + n[0] * nA, s[0] + d[0] * t1 + n[0] * nB], zs = [s[1] + d[1] * t0 + n[2] * nA, s[1] + d[1] * t1 + n[2] * nB];
+        const xa = Math.min(...xs), xb = Math.max(...xs), za = Math.min(...zs), zb = Math.max(...zs);
+        batch.box(xa, xb, y0, y1, za, zb, col);
+        if (under) batch.quad([xa, y0, za], [xb, y0, za], [xb, y0, zb], [xa, y0, zb], [0, -1, 0], [0, 0, 0, 0], col);
+      };
+      for (let k = 0; k < bays;){
+        let w = Math.min(bays - k, 2 + Math.floor(rng() * 3));
+        if (bays - k - w === 1) w++;
+        const t0 = k * bw, t1 = (k + w) * bw;
+        const style = o.yellow || rng() >= 0.12 ? 'pombal' : rng() < 0.7 ? 'tileB' : 'tileG'; // tiles stayed the exception in the Baixa
+        const col = o.yellow ? C(0xdbbe39) : pick(style), u0 = Math.floor(rng() * 8) / 8;
+        const us = o.yellow ? Math.floor(rng() * 6) / 6 : Math.floor(rng() * 8) / 8, ub = o.yellow ? w * bw / 24 : w / 8;
+        FB[o.yellow ? 'arcade' : 'shop'].quad(P(t0, 0.18), P(t1, 0.18), P(t1, 0.18 + ground), P(t0, 0.18 + ground), n, [us, 0, us + ub, 1], WHITE);
+        let y = baseY;
+        for (let f = 0; f < floors; f++){
+          const kind = f === 0 ? 'nobre' : f === floors - 1 ? 'sill' : 'sacada', list = FRONT_ROWS[kind], row = list[Math.floor(rng() * list.length)];
+          FB[style].quad(P(t0, y), P(t1, y), P(t1, y + FLOOR), P(t0, y + FLOOR), n, [u0, 1 - (row + 1) / 8, u0 + w / 8, 1 - row / 8], col);
+          // real stone slabs under the balconies, close by only
+          if (detail && kind !== 'sill'){
+            const sy = y + FLOOR * (kind === 'nobre' ? 0.18 : 0.22);
+            if (row === 7) boxAt(trim, t0 + 0.2, t1 - 0.2, 0, 0.6, sy - 0.13, sy, lime, true);
+            else for (let b = 0; b < w; b++){ const tc = t0 + (b + 0.5) * bw; boxAt(trim, tc - 0.8, tc + 0.8, 0, 0.55, sy - 0.12, sy, lime, true); }
+          }
+          y += FLOOR;
+        }
+        // the stone corner of the house, and dormers in the roof above it
+        boxAt(trim, t0 - 0.22, t0 + 0.22, -0.02, 0.1, 0.18 + ground, top, lime);
+        if (o.detail){
+          const dn = detail ? Math.max(1, w - 1) : 1;
+          for (let q = 0; q < dn; q++){
+            const tc = t0 + (t1 - t0) * (q + 0.5) / dn, dy = top + 0.9;
+            boxAt(trim, tc - 0.65, tc + 0.65, -2.0, -0.95, dy, dy + 1.45, lime);
+            const pane = rng() < 0.12, n0 = -0.93;
+            (pane ? neon : housings).quad(paneAt(tc - 0.42, n0, dy + 0.15), paneAt(tc + 0.42, n0, dy + 0.15), paneAt(tc + 0.42, n0, dy + 1.25), paneAt(tc - 0.42, n0, dy + 1.25), n, [0, 0, 0, 0], pane ? C(0xffc98a) : C(0x171a24));
+            boxAt(roofs, tc - 0.85, tc + 0.85, -2.2, -0.8, dy + 1.45, dy + 1.65, C(0x8e4c34));
+          }
+        }
+        k += w;
+      }
     }
+    // base course, cornice and roof run around the whole block
+    ledge(x0, x1, 0.18 + ground, z0, z1, lime, 0.12);
+    ledge(x0, x1, top - 0.12, z0, z1, lime, 0.42);
+    trim.box(x0 - 0.42, x1 + 0.42, top + 0.18, top + 0.3, z0 - 0.42, z1 + 0.42, lime);
+    hipRoof(x0 - 0.35, x1 + 0.35, top + 0.3, z0 - 0.35, z1 + 0.35, 3.3, roofTile(), 3.6);
+    for (let k = 0; k < 4; k++){
+      const a = rng(), onX = rng() < 0.5, sx = onX ? x0 + 2 + a * (x1 - x0 - 4) : (rng() < 0.5 ? x0 + 3.4 : x1 - 3.4), sz = onX ? (rng() < 0.5 ? z0 + 3.4 : z1 - 3.4) : z0 + 2 + a * (z1 - z0 - 4);
+      trim.box(sx - 0.45, sx + 0.45, top + 2.4, top + 5, sz - 0.3, sz + 0.3, C(0xdcd5c6));
+    }
+    return { top };
+  }
+  // A corner tower of the Praca do Comercio: one floor higher, with a steep lead-grey roof
+  function torreao(x0, x1, z0, z1, top){
+    const h = top + FLOOR + 1.2;
+    FB.pombal.sides(x0, x1, top - 0.4, h, z0, z1, C(0xdbbe39), TU, TV, 0, 0.25);
+    trim.box(x0 - 0.45, x1 + 0.45, h, h + 0.4, z0 - 0.45, z1 + 0.45, stoneCol);
+    hipRoof(x0 - 0.3, x1 + 0.3, h + 0.4, z0 - 0.3, z1 + 0.3, 6.5, C(0x5e625f));
+  }
+
+  // The National Theatre closes the north of the Rossio: white neoclassical body, six columns, a pediment
+  function teatro(cx, cz){
+    const front = cz + 12, parts = [boxG(30, 16, 24, cx, 8.18, cz - 1.5), boxG(44, 11, 20, cx, 5.68, cz - 2), boxG(31.4, 0.8, 25.4, cx, 16.4, cz - 1.5), boxG(45.2, 0.7, 21.2, cx, 11.4, cz - 2)];
+    for (let k = -3; k < 3; k++){
+      const c = new THREE.CylinderGeometry(0.62, 0.74, 9.4, 14); c.translate(cx + (k + 0.5) * 3.6, 6.1, front + 2.8); parts.push(c);
+      parts.push(boxG(1.6, 0.5, 1.6, cx + (k + 0.5) * 3.6, 1.2, front + 2.8), boxG(1.6, 0.4, 1.6, cx + (k + 0.5) * 3.6, 11, front + 2.8));
+    }
+    parts.push(boxG(22.4, 1.5, 6.6, cx, 11.95, front + 1.4), boxG(23.2, 0.5, 7, cx, 12.95, front + 1.4), boxG(23, 0.45, 7.4, cx, 0.42, front + 1.4), boxG(22, 0.45, 6.8, cx, 0.87, front + 1.4));
+    const tri = new THREE.Shape(); tri.moveTo(-11.6, 0); tri.lineTo(11.6, 0); tri.lineTo(0, 3.9); tri.closePath();
+    const ped = new THREE.ExtrudeGeometry(tri, { depth: 6.8, bevelEnabled: false }); ped.translate(cx, 13.2, front - 2); parts.push(ped);
+    parts.push(boxG(0.9, 2.6, 0.8, cx, 18.3, front + 2));
+    const body = new THREE.Mesh(mergeGeos(parts), stone); body.castShadow = true; grp.add(body);
+    for (let k = -2; k <= 2; k++){
+      neon.box(cx + k * 3.6 - 0.8, cx + k * 3.6 + 0.8, 1.1, 5.4, front - 0.05, front + 0.02, C(0xe0a868));
+      neon.box(cx + k * 3.6 - 0.55, cx + k * 3.6 + 0.55, 7, 10, front - 0.05, front + 0.02, C(0x38261a));
+    }
+    for (const sx of [-1, 1]) for (let k = 0; k < 2; k++){
+      const wx = cx + sx * (17.5 + k * 3.2);
+      neon.box(wx - 0.6, wx + 0.6, 2, 5, cz + 8, cz + 8.06, C(0x2c2a2c));
+      neon.box(wx - 0.6, wx + 0.6, 6.6, 9.4, cz + 8, cz + 8.06, C(0x2c2a2c));
+    }
+    hipRoof(cx - 15.4, cx + 15.4, 16.8, cz - 13.8, cz + 10.8, 3.2, C(0x8f8d86), 4);
+  }
+  // Rossio station: neo-Manueline, two intertwined horseshoe portals, a niche between them, a clock in a small turret
+  function estacao(cx, cz){
+    const [m, g, e, ge] = canvasPair(512, 512);
+    g.fillStyle = '#d8ceb6'; g.fillRect(0, 0, 512, 512);
+    speckle(g, 512, 512, mulberry32(4), 900);
+    g.fillStyle = 'rgba(70,60,48,.2)'; for (let y = 28; y < 512; y += 28) g.fillRect(0, y, 512, 2);
+    const horse = (c, x, y, R) => { c.beginPath(); c.moveTo(x - R * 0.72, 512); c.lineTo(x - R * 0.72, y + R * 0.72); c.arc(x, y, R, Math.PI * 0.75, Math.PI * 0.25); c.lineTo(x + R * 0.72, 512); c.closePath(); };
+    for (const x of [165, 347]){
+      g.fillStyle = '#efe6cf'; horse(g, x, 262, 104); g.fill();
+      g.strokeStyle = '#8f8263'; g.lineWidth = 7; g.setLineDash([9, 7]); horse(g, x, 262, 98); g.stroke(); g.setLineDash([]);
+      for (const c of [g, ge]){ c.fillStyle = c === g ? '#d7a15a' : '#8a6234'; horse(c, x, 262, 86); c.fill(); }
+      g.fillStyle = '#2b2118'; g.fillRect(x - 54, 340, 108, 172);
+      g.strokeStyle = '#3d3020'; g.lineWidth = 5; g.beginPath(); g.moveTo(x, 182); g.lineTo(x, 340); g.moveTo(x - 60, 262); g.lineTo(x + 60, 262); g.stroke();
+    }
+    g.fillStyle = '#6f6248'; g.beginPath(); g.moveTo(236, 512); g.lineTo(236, 300); g.quadraticCurveTo(256, 258, 276, 300); g.lineTo(276, 512); g.closePath(); g.fill();
+    g.fillStyle = '#d9d1bb'; g.fillRect(246, 330, 20, 72); g.beginPath(); g.arc(256, 322, 10, 0, 7); g.fill();
+    g.fillStyle = '#8f8263';
+    for (let x = 12; x < 512; x += 46) g.fillRect(x, 92, 22, 26);
+    g.fillStyle = 'rgba(70,60,48,.4)'; g.fillRect(0, 122, 512, 7);
+    const tex = toTex(m, e);
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(26, 26), new THREE.MeshStandardMaterial({ map: tex.map, emissiveMap: tex.emissive, emissive: 0xffffff, roughness: 0.85 }));
+    const fz = cz + 15.2; face.position.set(cx, 13, fz); grp.add(face);
+    const parts = [boxG(26, 26, 22, cx, 13, fz - 11.05), boxG(5.4, 8, 5.4, cx, 29.5, fz - 2.8)];
+    for (let k = -6; k <= 6; k++) parts.push(boxG(1.1, 1.8, 1, cx + k * 2.1, 26.9, fz - 0.4), boxG(1.1, 1.8, 1, cx + k * 2.1, 26.9, fz - 21.6));
+    for (let k = -1; k <= 1; k++) parts.push(boxG(1.1, 1.3, 1, cx + k * 1.9, 34.1, fz - 0.5));
+    const body = new THREE.Mesh(mergeGeos(parts), stone); body.castShadow = true; grp.add(body);
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const cg = c.getContext('2d');
+    cg.fillStyle = '#fff4d8'; cg.beginPath(); cg.arc(64, 64, 60, 0, 7); cg.fill();
+    cg.strokeStyle = '#2d2a24'; cg.lineWidth = 5; cg.stroke(); cg.lineCap = 'round';
+    const hand = (a, l, w) => { cg.lineWidth = w; cg.beginPath(); cg.moveTo(64, 64); cg.lineTo(64 + Math.sin(a) * l, 64 - Math.cos(a) * l); cg.stroke(); };
+    hand(2.5 / 12 * Math.PI * 2, 30, 6); hand(Math.PI, 46, 4);
+    const ct = new THREE.CanvasTexture(c); ct.encoding = THREE.sRGBEncoding;
+    const clock = new THREE.Mesh(new THREE.CircleGeometry(1.9, 24), new THREE.MeshBasicMaterial({ map: ct })); clock.position.set(cx, 30, fz - 0.05); grp.add(clock);
   }
 
   function park(cx, cz){
@@ -821,7 +1045,7 @@ function buildCity(){
     shp.moveTo(-15, 0); shp.lineTo(-7.2, 0); shp.lineTo(-7.2, 10.5); shp.absarc(0, 10.5, 7.2, Math.PI, 0, true); shp.lineTo(7.2, 0);
     shp.lineTo(15, 0); shp.lineTo(15, 24); shp.lineTo(-15, 24); shp.closePath();
     const body = new THREE.ExtrudeGeometry(shp, { depth: 6, bevelEnabled: false, curveSegments: 20 }); body.translate(0, 0, z0);
-    const zm = z0 + 3, zF = z0 + 6.4;
+    const zm = z0 + 3, zF = z0 + 6.2;
     const extra = [boxG(31.4, 0.9, 7.2, 0, 18.1, zm), boxG(31.8, 0.9, 7.6, 0, 24.3, zm), boxG(18, 3.2, 5, 0, 26.2, zm), boxG(9, 2.4, 3.6, 0, 29, zm), boxG(1.6, 4.4, 1.3, 0, 32.4, zm), boxG(5.6, 0.5, 0.7, 0, 33.2, zm)];
     for (const sx of [-1, 1]) for (const dz of [0, 1]) for (const x of [8.4, 13.4]){
       const c = new THREE.CylinderGeometry(0.62, 0.72, 14.4, 12); c.translate(sx * x, 9.4, dz ? zF : z0 - 0.4); extra.push(c);
@@ -893,15 +1117,27 @@ function buildCity(){
       if (type === 'figueira') equestrian(cx, cz, 1);
       shardSpots.push({ x: cx + 10.5, z: cz }, { x: cx - 10.5, z: cz });
     }
-    else if (type === 'lift'){ building(cx, cz, false, [[-13, 0, -13, 13]]); liftTower(cx, cz); }
-    else building(cx, cz, YELLOW.has(key), SOLID.has(key) ? [[-13, 13, -13, 13]] : null);
+    else if (type === 'teatro') teatro(cx, cz);
+    else if (type === 'estacao') estacao(cx, cz);
+    else if (type === 'lift'){ block(cx, cz, { x1: cx + 2, detail: true }); liftTower(cx, cz); }
+    else if (YELLOW.has(key)){
+      const { top } = block(cx, cz, { yellow: true, floors: 3, ground: 6, detail: true });
+      // the towers stand where the wings meet the river
+      if (key === '-2,2') torreao(cx + 1.5, cx + 13.8, cz + 1.5, cz + 13.8, top);
+      if (key === '1,2') torreao(cx - 13.8, cx - 1.5, cz + 1.5, cz + 13.8, top);
+    }
+    else block(cx, cz, { detail: isInner });
     if (!isInner) continue;
     for (const sx of [-1, 1]) for (const sz of [-1, 1]){
       const x = cx + sx * 15.4, z = cz + sz * 15.4;
-      poles.sides(x - 0.13, x + 0.13, 0.18, 7.1, z - 0.13, z + 0.13, C(0x4a5063));
-      cones.push(coneGeo(x, z, 7.0, 3.8));
-      neon.box(x - 0.45, x + 0.45, 7.0, 7.3, z - 0.45, z + 0.45, C(0xffe1b0));
-      glowPts.push(x, 7.0, z);
+      // an old cast-iron street lantern; the traffic light hangs on the same post
+      poles.sides(x - 0.09, x + 0.09, 0.18, 4.95, z - 0.09, z + 0.09, C(0x23262c));
+      poles.sides(x - 0.2, x + 0.2, 0.18, 1.1, z - 0.2, z + 0.2, C(0x23262c));
+      cones.push(coneGeo(x, z, 5.1, 3.2));
+      neon.box(x - 0.19, x + 0.19, 4.95, 5.5, z - 0.19, z + 0.19, C(0xffd9a0));
+      housings.box(x - 0.27, x + 0.27, 5.5, 5.62, z - 0.27, z + 0.27, C(0x1d2027));
+      housings.box(x - 0.12, x + 0.12, 5.62, 5.82, z - 0.12, z + 0.12, C(0x1d2027));
+      glowPts.push(x, 5.2, z);
       pools.top(x - 8, x + 8, 0.21, z - 8, z + 8, C(0xffc98a));
       colliders.push({ t: 'c', x, z, r: 0.3 });
       // signal head for the approach whose right-hand corner this is
@@ -916,7 +1152,7 @@ function buildCity(){
   // The square is one surface: the stretch of Rua Augusta that crosses it is paved like the rest
   slabs.top(-7, 7, 0.012, 103, 137, plazaTop, [-7 / 4, 137 / 4, 7 / 4, 103 / 4]);
   equestrian(0, 120, 1.25);
-  arco(78);
+  arco(80);
 
   // Quay, Cais das Colunas and the river Tejo
   trim.box(-700, 700, 0, 0.35, 151, 157, stoneCol);
@@ -935,20 +1171,37 @@ function buildCity(){
   grp.add(new THREE.Mesh(mergeGeos(HILLS.map(([cx, cz, rx, ry, rz]) => new THREE.SphereGeometry(1, 24, 14).scale(rx, ry, rz).translate(cx, 0, cz))), new THREE.MeshStandardMaterial({ color: 0x2a3142, roughness: 1 })));
   for (let n = 0; n < 240; n++){
     const a = rng() * Math.PI * 2, r = 205 + rng() * 240, x = Math.cos(a) * r, z = Math.sin(a) * r;
-    if (Math.max(Math.abs(x), Math.abs(z)) < 200 || z > 145) continue;
-    const base = hillH(x, z), w = 12 + Math.floor(rng() * 4) * 3, d = 12 + Math.floor(rng() * 4) * 3, h = (3 + Math.floor(rng() * 4)) * FLOOR;
-    const style = rng() < 0.7 ? 'pombal' : 'azulejo';
+    if (Math.max(Math.abs(x), Math.abs(z)) < 200 || z > 145 || (x > 186 && x < 220 && Math.abs(z) < 8)) continue;
+    const base = hillH(x, z), w = 12 + Math.floor(rng() * 4) * 3, d = 12 + Math.floor(rng() * 4) * 3, h = (3 + Math.floor(rng() * 3)) * FLOOR;
+    const style = rng() < 0.88 ? 'pombal' : 'tileB';
     facade(style, x - w / 2, x + w / 2, base - 4, base + h, z - d / 2, z + d / 2, pick(style).multiplyScalar(0.85));
     hipRoof(x - w / 2, x + w / 2, base + h, z - d / 2, z + d / 2, 3, roofTile());
   }
   // Houses climbing the hills, so the slopes are not empty at night
   for (const [hx, hz, rx, , rz] of HILLS) for (let n = 0; n < 130; n++){
     const a = rng() * Math.PI * 2, q = Math.sqrt(rng()) * 0.96, x = hx + Math.cos(a) * q * rx, z = hz + Math.sin(a) * q * rz;
-    if (Math.max(Math.abs(x), Math.abs(z)) < 200 || z > 145) continue;
+    if (Math.max(Math.abs(x), Math.abs(z)) < 200 || z > 145 || (x > 186 && x < 220 && Math.abs(z) < 8)) continue;
     const base = hillH(x, z), w = 10 + Math.floor(rng() * 3) * 3, d = 10 + Math.floor(rng() * 3) * 3, h = (2 + Math.floor(rng() * 3)) * FLOOR;
-    const style = rng() < 0.7 ? 'pombal' : 'azulejo';
+    const style = rng() < 0.88 ? 'pombal' : 'tileG';
     facade(style, x - w / 2, x + w / 2, base - 5, base + h, z - d / 2, z + d / 2, pick(style).multiplyScalar(0.85));
     hipRoof(x - w / 2, x + w / 2, base + h, z - d / 2, z + d / 2, 2.6, roofTile());
+  }
+  // The Se, Lisbon's cathedral, on the slope at the end of Rua da Conceicao: two crenellated towers and a rose window, facing west
+  {
+    const x = 222, b = hillH(x, 0) - 3, tw = [];
+    for (const sz of [-8.5, 8.5]){
+      tw.push(boxG(11, 34, 10, x + 5, b + 17, sz));
+      for (let k = -1; k <= 1; k++){ tw.push(boxG(1.6, 2, 1.6, x + 0.4, b + 35, sz + k * 3.4), boxG(1.6, 2, 1.6, x + 9.6, b + 35, sz + k * 3.4)); }
+      for (const dz of [-4.2, 4.2]) tw.push(boxG(1.6, 2, 1.6, x + 5, b + 35, sz + dz));
+    }
+    tw.push(boxG(9, 24, 7.6, x + 4, b + 12, 0), boxG(32, 18, 18, x + 26, b + 9, 0));
+    const se = new THREE.Mesh(mergeGeos(tw), new THREE.MeshStandardMaterial({ color: 0xc9b48c, roughness: 0.9, emissive: 0x4a3f2c })); grp.add(se);
+    // the terrace it stands on, lit from below, with the street climbing up to it
+    const terrace = new THREE.Mesh(boxG(46, b + 3, 40, x + 20, (b + 3) / 2, 0), new THREE.MeshStandardMaterial({ color: 0x7c6f58, roughness: 0.95, emissive: 0x2a241a }));
+    grp.add(terrace);
+    for (const sz of [-7, 7]) for (let k = 0; k < 5; k++) glowPts.push(x - 44 + k * 10, 4 + k * b / 5, sz);
+    const rose = new THREE.Mesh(new THREE.CircleGeometry(2.2, 20), new THREE.MeshBasicMaterial({ color: 0x4a3620 })); rose.rotation.y = -Math.PI / 2; rose.position.set(x - 0.56, b + 17, 0); grp.add(rose);
+    neon.box(x - 0.55, x - 0.5, b + 3, b + 10, -1.7, 1.7, C(0x2a1e14));
   }
   // The Castelo de Sao Jorge, floodlit like every night
   {
@@ -1066,9 +1319,9 @@ function buildCity(){
   }
 
   const add = (mesh, cast, recv) => { mesh.castShadow = !!cast; mesh.receiveShadow = !!recv; grp.add(mesh); return mesh; };
-  for (const s of ['pombal', 'azulejo', 'shop']) add(FB[s].mesh(MAT[s]), true, true);
+  for (const s of ['pombal', 'tileB', 'tileG', 'shop', 'arcade']) add(FB[s].mesh(MAT[s]), true, true);
   add(trim.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 })), true, true);
-  add(roofs.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide })), false, true);
+  add(roofs.mesh(new THREE.MeshStandardMaterial({ map: roofTiles, vertexColors: true, roughness: 0.85, side: THREE.DoubleSide })), false, true);
   add(slabs.mesh(surfaceMat(CALCADA, [1, 1], { vertexColors: true })), false, true);
   add(waves.mesh(surfaceMat(WAVES, [1, 1], { vertexColors: true })), false, true);
   add(trackBed.mesh(surfaceMat(CALCADA, [1, 1], { vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })), false, true);
@@ -1104,7 +1357,7 @@ function buildCity(){
   }
   grp.add(lightCones(cones));
   const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(glowPts, 3));
-  grp.add(new THREE.Points(pg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffd79a, size: 7, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
+  grp.add(new THREE.Points(pg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffd79a, size: 4.6, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
 
   const tTrunk = new THREE.CylinderGeometry(0.18, 0.26, 2.6, 6); tTrunk.translate(0, 1.3, 0);
   const tCrown = new THREE.IcosahedronGeometry(1.7, 0); tCrown.translate(0, 3.6, 0);
@@ -2246,7 +2499,7 @@ function placeRun(){
     const roads = shuffle(roadSpots.slice(), rnd);
     for (const s of roads){ if (chosen.length >= M.shards) break; const p = lane(s); if (Math.hypot(p.x, p.z) > 30 && far(p, chosen, 36)) chosen.push(p); }
     for (const s of roads){ if (kitSpots.length >= M.kits) break; const p = lane(s); if (far(p, chosen, 25) && far(p, kitSpots, 60) && Math.hypot(p.x, p.z) > 40) kitSpots.push(p); }
-    gp = { x: 0, z: 81 };
+    gp = { x: 0, z: 83 };
     gateR = 5.4; gateY = 5.8;
   } else if (mode === 'country'){
     for (let i = 0; i < M.shards; i++){ const s = 220 + i * (ROAD.len - 480) / (M.shards - 1), pt = roadPoint(s, (rnd() < 0.5 ? -1 : 1) * ROAD.lane); chosen.push({ x: pt.x, z: pt.z, s }); }

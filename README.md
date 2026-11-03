@@ -126,7 +126,7 @@ Writing the tests found two real bugs. Both are fixed:
 
 ## Limits
 
-- **Lisbon:** the map is a simplified Baixa: square blocks, 7 streets each way, flat, and some real streets left out. It is recognisable, not surveyed. The other two maps are not Lisbon yet.
+- **Lisbon:** the map is a simplified Baixa: square blocks, 7 streets each way, flat, and some real streets left out. The houses follow the Pombaline pattern and the landmarks are modelled freely from descriptions, not from plans. It is recognisable, not surveyed. The other two maps are not Lisbon yet.
 - **Look and sound:** procedural geometry and synthesised engines are stylised; they do not look or sound like photos or recordings.
 - **Performance:** Ultra graphics (bloom, large shadow maps) needs a decent GPU; phones start in Balanced.
 - **AI:** traffic never changes lanes; police ignore traffic lights and can take detours in the city.
