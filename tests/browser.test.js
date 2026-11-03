@@ -82,6 +82,8 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
   };
   await send('Runtime.enable'); await send('Log.enable'); await send('Page.enable'); await send('Network.enable');
   await send('Emulation.setFocusEmulationEnabled', { enabled: true });
+  // Software rendering is slow, so start in Balanced graphics unless a test sets something else on purpose
+  await send('Page.addScriptToEvaluateOnNewDocument', { source: "try { if (!localStorage.getItem('shard-heist-gfx')) localStorage.setItem('shard-heist-gfx', 'balanced'); } catch (e) {}" });
 
   try {
     await t.test('the menu loads with all three maps, three vehicles and the story mode', async () => {
@@ -108,7 +110,8 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       await key('keydown', 'KeyW');
       await waitFor("parseInt(document.getElementById('speed').textContent) > 20", 30000, 'speed above 20 km/h');
       await key('keyup', 'KeyW');
-      await waitFor(`document.getElementById('time').textContent !== ${JSON.stringify(t0)}`, 15000, 'timer to count down');
+      // the clock advances at most 50 ms per frame, so on a slow software renderer this can take a while
+      await waitFor(`document.getElementById('time').textContent !== ${JSON.stringify(t0)}`, 120000, 'timer to count down');
       assert.deepEqual(errors, []);
     });
 
