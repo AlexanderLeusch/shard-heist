@@ -1,11 +1,13 @@
-/* ### STYLES for room 1: design tokens on :root, then the HUD, the hotspot markers, the overlay cards (briefing, lock,
+/* ### Shares its design system with room 2 (../styles.css): same background, glass, lines, fonts, buttons and cards;
+   ### the accent here is orange, in room 2 it is cyan.
+   ### STYLES for room 1: design tokens on :root, then the HUD, the hotspot markers, the overlay cards (briefing, lock,
    ### clues, endings) and the error screen. Prison look: cold concrete, fluorescent green-grey, jumpsuit orange. */
 :root{
-  --bg:#0b0e0f;
-  --ink:#eef1ea;
-  --muted:rgba(238,241,234,.6);
-  --glass:rgba(12,16,17,.72);
-  --glass-strong:rgba(10,13,14,.92);
+  --bg:#0b0e10;
+  --ink:#f0f2ee;
+  --muted:rgba(240,242,238,.62);
+  --glass:rgba(12,16,18,.72);
+  --glass-strong:rgba(10,13,15,.92);
   --line:rgba(255,255,255,.13);
   --orange:#ff7a1a;
   --orange-ink:#241002;
@@ -14,6 +16,7 @@
   --paper:#efe6cf;
   --paper-ink:#2a2418;
   --f-display:"Big Shoulders Display","Arial Narrow","Segoe UI",system-ui,sans-serif;
+  --f-body:"Segoe UI",system-ui,-apple-system,sans-serif;
   --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
   color-scheme:dark;
 }
@@ -83,7 +86,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-display)
 .card h1{margin:0;font-size:clamp(46px,10vw,72px);line-height:.88;font-weight:900;text-transform:uppercase;letter-spacing:.005em}
 .card h1 em,.card h2 em{font-style:normal;color:var(--orange)}
 .card h2{margin:0;font-size:36px;line-height:.95;font-weight:800;text-transform:uppercase}
-.card p{margin:0;font-family:"Segoe UI",system-ui,sans-serif;font-size:15.5px;line-height:1.55;color:var(--muted)}
+.card p{margin:0;font-family:var(--f-body);font-size:15.5px;line-height:1.55;color:var(--muted)}
 .card p b{color:var(--ink)}
 .steps{display:flex;gap:6px}
 .steps i{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.12)}
@@ -118,7 +121,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-display)
 .fatal{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:16px;background:rgba(5,7,8,.9)}
 .fatal-card{width:min(480px,100%);display:grid;gap:14px;padding:26px;border-radius:18px;background:var(--glass-strong);border:1px solid rgba(255,77,77,.5)}
 .fatal-card h2{margin:0;font-size:32px;line-height:1;font-weight:800;text-transform:uppercase}
-.fatal-card p{margin:0;font-family:"Segoe UI",system-ui,sans-serif;font-size:15.5px;line-height:1.5;color:var(--muted)}
+.fatal-card p{margin:0;font-family:var(--f-body);font-size:15.5px;line-height:1.5;color:var(--muted)}
 .fatal-card .eyebrow{color:var(--alarm)}
 
 @media (max-width:640px){

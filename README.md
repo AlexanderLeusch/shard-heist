@@ -7,6 +7,8 @@ A two-room browser game. **Room 1, *Plot Twist: Cell Block D***, is a 3D prison 
 | 1 · Escape room | https://alexanderleusch.github.io/shard-heist/escape-room/ |
 | 2 · Police chase | https://alexanderleusch.github.io/shard-heist/ |
 
+Both rooms take place on the same night and share one design system (the same fonts, panels, buttons and cards), with orange as the accent of the prison and cyan as the accent of the chase. Room 2's story starts where room 1 ends: inmate 4471 is on the run, and Officer Hale helps over the radio.
+
 Both are published automatically from `main` once all tests pass. The rules of both rooms are written out in plain English in [rules/](rules/README.md).
 
 The folder `plot-twist/` holds the original solo project *Plot Twist: The Missing Necklace* (Python and Streamlit), which room 1 rebuilds in 3D. It is kept for reference, and CI tests it, but it is not part of the deployed game. Run it with `cd plot-twist && uv run streamlit run app.py`.
@@ -36,7 +38,7 @@ A 3D police-chase driving game that runs in any modern browser. Pick a map and a
 |---|---|
 | Maps | City traffic (traffic lights, 26 AI cars), Highway (4 km, 200 km/h, traffic both ways), Countryside (hills, farms, village) |
 | Vehicles | Muscle coupe (balanced), Superbike (fastest, most agile), Tractor unit (slowest, toughest, best at ramming) |
-| Story mode | *The Necklace Job*: 3 acts on the 3 maps, 2 story items (a hidden letter, a clasp), 3 endings. Which one you get depends on whether you found the letter in act 1 |
+| Story mode | *The Necklace Job*, after the escape: 3 acts on the 3 maps, Officer Hale on the radio, 2 story items (a hidden letter, a clasp), 3 endings. Which one you get depends on whether you found the letter in act 1 |
 | Systems | Police AI with a bust meter, crash damage and repair kits, synthesised engine sounds, map-boundary force field, radar, Ultra/Balanced graphics |
 | Controls | `W A S D` or arrow keys to drive, `Space` handbrake, `P` / `Esc` pause, `M` sound, `Enter` confirms. Touch pads on phones |
 

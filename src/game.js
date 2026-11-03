@@ -32,8 +32,8 @@ const WHITE = C(0xffffff);
 
 // ---------- Renderer & scene ----------
 // ### Creates the WebGL renderer, the scene, the camera and the sky. The sky is a gradient shader on a big sphere; the same
-// ### sphere is rendered once into a PMREM environment map so glass and car paint reflect the evening sky.
-// ### Lighting is a hemisphere light plus one low warm sun with soft shadows that follows the player.
+// ### sphere is rendered once into a PMREM environment map so glass and car paint reflect the night sky.
+// ### Lighting is a hemisphere light plus a cold moon with soft shadows that follows the player; it is night, like room 1.
 // ### Colours are authored in sRGB and converted to linear (see the Color patch at the top) for ACES filmic tone mapping.
 const canvas = $('game');
 let renderer;
@@ -44,17 +44,17 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = 1.12;
 const ANISO = renderer.capabilities.getMaxAnisotropy();
 
-const FOG = 0x4a4c7e;
+const FOG = 0x1d2142;   // night haze, the same night as room 1 (about 02:30)
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(FOG, 0.0031);
 renderer.setClearColor(FOG);
 const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 1000);
 
 const skyMat = new THREE.ShaderMaterial({
-  uniforms: { top: { value: C(0x0a1030) }, mid: { value: C(0x343a78) }, horizon: { value: C(0xf0a07a) }, fogc: { value: C(FOG) } },
+  uniforms: { top: { value: C(0x03050f) }, mid: { value: C(0x111735) }, horizon: { value: C(0x463352) }, fogc: { value: C(FOG) } },
   vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: 'uniform vec3 top; uniform vec3 mid; uniform vec3 horizon; uniform vec3 fogc; varying vec3 vP; void main(){ float t = vP.y; vec3 c = mix(horizon, mid, smoothstep(0.02, 0.22, t)); c = mix(c, top, smoothstep(0.22, 0.75, t)); c = mix(fogc, c, smoothstep(-0.03, 0.06, t)); gl_FragColor = linearToOutputTexel(vec4(c, 1.0)); }',
   side: THREE.BackSide, depthWrite: false, fog: false
@@ -78,8 +78,9 @@ function tuneEnv(root){
   });
 }
 
-scene.add(new THREE.HemisphereLight(0x8a93d6, 0x2b2a3c, 0.62));
-const sun = new THREE.DirectionalLight(0xffb27a, 0.8);
+scene.add(new THREE.HemisphereLight(0x6f7cc8, 0x1b1b28, 0.52));
+// the "sun" is the moon: cold, weak, high; street lamps, windows and headlights do the rest
+const sun = new THREE.DirectionalLight(0xaabfff, 0.42);
 sun.castShadow = true;
 sun.shadow.mapSize.set(COARSE ? 1024 : 2048, COARSE ? 1024 : 2048);
 Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 320 });
@@ -2646,7 +2647,7 @@ function startRun(m, v){
   hud.classList.remove('off');
   hideOverlay();
   state = 'play';
-  if (mode === 'city') toast('Grab 8 star shards and reach the gate. The police will come for you.', '', 4200);
+  if (mode === 'city') toast('Grab 8 star shards and reach the gate. Every police car is looking for inmate 4471.', '', 4200);
   else if (mode === 'country') toast('Follow the country road to the village. Shards add +4 s. Watch the oncoming traffic.', '', 4500);
   else toast(`Reach the finish 4 km ahead. Shards add +${M.bonus} s. Police incoming.`, '', 4500);
 }
@@ -2757,9 +2758,9 @@ const ICONS = {
   truck: '<svg viewBox="0 0 120 44" aria-hidden="true"><rect x="10" y="27" width="96" height="4" fill="#15171d"/><rect x="24" y="23" width="26" height="3" fill="#2a2d33"/><path d="M58 3h31c4.5 0 6.5 2.4 7.5 5.5L101 27H58z" fill="#a8c6bc"/><path d="M92 9h4.5l3 13H94z" fill="#1c2533"/><rect x="65" y="11" width="15" height="10" rx="1.5" fill="#1c2533"/><path d="M90 6.5h9" stroke="#0c0d10" stroke-width="2"/><rect x="95" y="22" width="9" height="6" fill="#0c0d10"/><rect x="100" y="24" width="5" height="1.6" fill="#eef6ff"/><circle cx="30" cy="33" r="7" fill="#111215"/><circle cx="30" cy="33" r="4.2" fill="#d9dde3"/><circle cx="88" cy="33" r="7" fill="#111215"/><circle cx="88" cy="33" r="4.2" fill="#d9dde3"/></svg>'
 };
 const MAP_THUMB = {
-  country: '<svg viewBox="0 0 52 38" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="tco" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a2050"/><stop offset="1" stop-color="#e0907a"/></linearGradient></defs><rect width="52" height="38" fill="url(#tco)"/><path d="M0 22c8-6 16-7 26-3s18 2 26-4v23H0z" fill="#2c4529"/><path d="M0 27c10-4 20-3 30 1s16 2 22-1v11H0z" fill="#5f7c3a"/><path d="M30 38c-2-6 4-9 0-13s-5-4-3-6" stroke="#2b2f3b" stroke-width="5" fill="none"/><path d="M30 38c-2-6 4-9 0-13s-5-4-3-6" stroke="#e6e8ee" stroke-width=".6" stroke-dasharray="1.5 1.5" fill="none"/><path d="M8 24l2-6 2 6z" fill="#1e3322"/><path d="M42 21l2-6 2 6z" fill="#1e3322"/></svg>',
-  city: '<svg viewBox="0 0 52 38" aria-hidden="true"><defs><linearGradient id="tc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a2050"/><stop offset="1" stop-color="#e0907a"/></linearGradient></defs><rect width="52" height="38" fill="url(#tc)"/><g fill="#141a2e"><rect x="3" y="12" width="9" height="26"/><rect x="14" y="5" width="8" height="33"/><rect x="24" y="16" width="10" height="22"/><rect x="36" y="9" width="12" height="29"/></g><g fill="#ffd59a"><rect x="16" y="9" width="2" height="2"/><rect x="39" y="14" width="2" height="2"/><rect x="6" y="17" width="2" height="2"/><rect x="27" y="20" width="2" height="2"/><rect x="18" y="20" width="2" height="2"/><rect x="43" y="24" width="2" height="2"/></g><circle cx="47" cy="34" r="1.5" fill="#2cff8a"/></svg>',
-  highway: '<svg viewBox="0 0 52 38" aria-hidden="true"><defs><linearGradient id="th" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a2050"/><stop offset="1" stop-color="#e0907a"/></linearGradient></defs><rect width="52" height="38" fill="url(#th)"/><path d="M0 18h52v20H0z" fill="#26332b"/><path d="M22 18h8l16 20H6z" fill="#2b2f3b"/><path d="M25.6 18h.8l1 20h-2.8z" fill="#b4b6c2"/><circle cx="19" cy="31" r="1.4" fill="#ff3344"/><circle cx="21.5" cy="31" r="1.4" fill="#ff3344"/><circle cx="33" cy="24" r="1.1" fill="#fff1cc"/><circle cx="34.6" cy="24" r="1.1" fill="#fff1cc"/></svg>'
+  country: '<svg viewBox="0 0 52 38" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="tco" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#060a1c"/><stop offset="1" stop-color="#463352"/></linearGradient></defs><rect width="52" height="38" fill="url(#tco)"/><path d="M0 22c8-6 16-7 26-3s18 2 26-4v23H0z" fill="#2c4529"/><path d="M0 27c10-4 20-3 30 1s16 2 22-1v11H0z" fill="#5f7c3a"/><path d="M30 38c-2-6 4-9 0-13s-5-4-3-6" stroke="#2b2f3b" stroke-width="5" fill="none"/><path d="M30 38c-2-6 4-9 0-13s-5-4-3-6" stroke="#e6e8ee" stroke-width=".6" stroke-dasharray="1.5 1.5" fill="none"/><path d="M8 24l2-6 2 6z" fill="#1e3322"/><path d="M42 21l2-6 2 6z" fill="#1e3322"/></svg>',
+  city: '<svg viewBox="0 0 52 38" aria-hidden="true"><defs><linearGradient id="tc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#060a1c"/><stop offset="1" stop-color="#463352"/></linearGradient></defs><rect width="52" height="38" fill="url(#tc)"/><g fill="#141a2e"><rect x="3" y="12" width="9" height="26"/><rect x="14" y="5" width="8" height="33"/><rect x="24" y="16" width="10" height="22"/><rect x="36" y="9" width="12" height="29"/></g><g fill="#ffd59a"><rect x="16" y="9" width="2" height="2"/><rect x="39" y="14" width="2" height="2"/><rect x="6" y="17" width="2" height="2"/><rect x="27" y="20" width="2" height="2"/><rect x="18" y="20" width="2" height="2"/><rect x="43" y="24" width="2" height="2"/></g><circle cx="47" cy="34" r="1.5" fill="#2cff8a"/></svg>',
+  highway: '<svg viewBox="0 0 52 38" aria-hidden="true"><defs><linearGradient id="th" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#060a1c"/><stop offset="1" stop-color="#463352"/></linearGradient></defs><rect width="52" height="38" fill="url(#th)"/><path d="M0 18h52v20H0z" fill="#26332b"/><path d="M22 18h8l16 20H6z" fill="#2b2f3b"/><path d="M25.6 18h.8l1 20h-2.8z" fill="#b4b6c2"/><circle cx="19" cy="31" r="1.4" fill="#ff3344"/><circle cx="21.5" cy="31" r="1.4" fill="#ff3344"/><circle cx="33" cy="24" r="1.1" fill="#fff1cc"/><circle cx="34.6" cy="24" r="1.1" fill="#fff1cc"/></svg>'
 };
 const STAT_NAMES = ['Top speed', 'Acceleration', 'Handling', 'Durability', 'Ramming'];
 const STAT_WORDS = ['', 'Low', 'Fair', 'Good', 'High', 'Max'];
@@ -2779,11 +2780,11 @@ function showMenu(){
   const bestNote = k => best[k] ? fmtTimeExact(best[k]) : 'no run yet';
   showCard(`
     <div class="m-top">
-      <div class="m-brand"><span class="m-dot"></span>Police chase · Night shift</div>
+      <div class="m-brand"><span class="m-dot"></span>Escaped · Inmate 4471 · 02:30</div>
       <h1 class="m-logo">Shard<br><em>Heist</em></h1>
-      <p class="m-lede">Grab the star shards before the police catch you. Ram them, outrun them or lose them in traffic, then escape through the gate.</p>
+      <p class="m-lede">You are out of Cell Block D, and every police car in town knows it. Grab the star shards, ram the police, outrun them or lose them in traffic, then escape through the gate.</p>
     </div>
-    <button class="story-card" data-action="story"><span class="sc-eyebrow">Story mode · 3 acts · 3 endings</span><b>The Necklace Job</b><span>Framed for the theft you were hired to solve. Recover the Starfall necklace across the city, the highway and the countryside.</span><em>Play the story →</em></button>
+    <button class="story-card" data-action="story"><span class="sc-eyebrow">Story mode · after the tunnel · 3 acts · 3 endings</span><b>The Necklace Job</b><span>You escaped. Now prove who framed you: recover the Starfall necklace across the city, the highway and the countryside, with Officer Hale on the radio.</span><em>Play the story →</em></button>
     <section class="m-sec">
       <div class="m-label"><span>01</span>Free ride · Map</div>
       <div class="maps">
@@ -3118,10 +3119,11 @@ function applyGfx(){
 }
 
 // ---------- Story mode: The Necklace Job ----------
-// ### A three-act campaign that continues "Plot Twist - The Missing Necklace". The detective is framed for stealing the
-// ### Starfall necklace and races across the city, the highway and the countryside to recover it. An optional sealed
+// ### A three-act campaign that follows room 1 (the escape room). The detective, framed for stealing the Starfall
+// ### necklace and jailed as inmate 4471, has escaped through the tunnel. Officer Hale, who opened the way, helps over
+// ### the radio. The police hunt the escaped inmate across the city, the highway and the countryside. An optional sealed
 // ### letter hidden downtown (not shown on the radar) decides the ending: with it the truth comes out (Ending A),
-// ### without it the detective is arrested at the mansion (Ending B). Getting busted or wrecked is Ending C.
+// ### without it the detective goes back to cell 4471 (Ending B). Busted, wrecked or out of time is Ending C.
 let story = null, courier = null;
 const STORY = {
   acts: [
@@ -3129,20 +3131,21 @@ const STORY = {
     { mode: 'highway', title: 'The Courier', goal: 'Catch the gold-marked courier lorry and take the clasp.' },
     { mode: 'country', title: 'Homecoming', goal: 'Drive back to the Ashford mansion.' }
   ],
+  // [seconds into the act, text, tone]: Hale's lines are orange (tone 'hale'), police dispatch is red
   radio: [
-    [[5, 'Eight shards are hidden somewhere downtown. Find them before the police find you.', ''],
-     [9, 'DISPATCH: All units, the suspect is the detective from the Ashford case. %V. Approach with caution.', 'red'],
-     [32, 'The crew used the parks as dead drops. Something else may be waiting there too.', ''],
-     [58, 'DISPATCH: Suspect still downtown. Roadblocks on the ring road.', 'red'],
-     [95, 'DISPATCH: Lady Ashford has been informed. Bring the suspect in.', 'red']],
-    [[5, 'The clasp is on a gold-marked courier lorry heading north. Catch it before the toll.', ''],
-     [12, 'DISPATCH: Suspect on the motorway, northbound. %V. All units intercept.', 'red'],
-     [38, 'Pull up right behind the lorry to grab the clasp.', ''],
-     [70, 'DISPATCH: Toll station on alert. Do not let the suspect through.', 'red']],
-    [[5, 'Back to the Ashford mansion. Whoever framed you is waiting there.', ''],
-     [15, 'DISPATCH: Suspect on the country road to Ashford village. Units, block the lane.', 'red'],
-     [45, 'The insurance claim was filed the morning after the theft, before anyone knew the necklace was gone.', ''],
-     [85, 'DISPATCH: Lady Ashford asks that the suspect be brought to the mansion.', 'red']]
+    [[5, 'HALE: You made it out. Eight shards of the Starfall necklace are hidden downtown. Find them before the police find you.', 'hale'],
+     [9, 'DISPATCH: All units, inmate 4471 has escaped from Cell Block D. %V. Approach with caution.', 'red'],
+     [32, 'HALE: Ashford’s people used the parks as dead drops. Look there. Not everything shows up on your radar.', 'hale'],
+     [58, 'DISPATCH: Escaped inmate still downtown. Roadblocks on the ring road.', 'red'],
+     [95, 'DISPATCH: Lady Ashford has been told about the escape. Bring 4471 in.', 'red']],
+    [[5, 'HALE: The clasp is on a gold-marked courier lorry heading north. Catch it before the toll.', 'hale'],
+     [12, 'DISPATCH: Inmate 4471 on the motorway, northbound. %V. All units intercept.', 'red'],
+     [38, 'HALE: Pull up right behind the lorry to grab the clasp.', 'hale'],
+     [70, 'DISPATCH: Toll station on alert. Do not let 4471 through.', 'red']],
+    [[5, 'HALE: Drive to the Ashford mansion. I will be there. Bring everything you found.', 'hale'],
+     [15, 'DISPATCH: 4471 on the country road to Ashford village. Units, block the lane.', 'red'],
+     [45, 'HALE: The insurance claim was filed the morning after the theft, before anyone knew the necklace was gone.', 'hale'],
+     [85, 'DISPATCH: Lady Ashford asks that the escaped inmate be brought to the mansion.', 'red']]
   ]
 };
 const VEH_DESC = { car: 'Steel-blue coupe', bike: 'Black superbike', truck: 'Green tractor unit' };
@@ -3150,12 +3153,12 @@ const VEH_DESC = { car: 'Steel-blue coupe', bike: 'Black superbike', truck: 'Gre
 function showStoryIntro(){
   story = Core.newStory();
   showCard(`
-    <div class="eyebrow">Story mode · Prologue</div>
+    <div class="eyebrow">Story mode · After the tunnel · 02:30</div>
     <h1>The Necklace <em>Job</em></h1>
-    <p>Three nights ago the Starfall necklace vanished from the Ashford mansion. You found the butler, but no proof, and he only smiled.</p>
-    <p>Tonight the necklace has been broken into eight star shards and scattered across downtown. An anonymous tip has told the police the thief is you.</p>
+    <p>The tunnel under Cell Block D ends in a lock-up garage. Officer Hale’s note was true: a vehicle is waiting, the keys in the ignition, a radio on the seat.</p>
+    <p>Three weeks ago you were framed for stealing the Starfall necklace. Tonight it has been broken into eight star shards and scattered across downtown. Hale believes you but cannot prove it. You can, if you recover the necklace before the police recover you.</p>
     <div class="acts">${STORY.acts.map((a, i) => `<div><span>Act ${i + 1}</span><b>${a.title}</b><small>${a.goal}</small></div>`).join('')}</div>
-    <p class="note">Look carefully. Not everything you need shows up on the radar.</p>
+    <p class="note">Hale helps over the radio. Look carefully: not everything you need shows up on the radar.</p>
     <div class="actions">
       <button class="btn" data-action="act">Start Act 1 <small class="desk-only">Enter</small></button>
       <button class="btn ghost" data-action="menu">Back</button>
@@ -3272,7 +3275,7 @@ function storyFinish(){
     showCard(`
       <div class="eyebrow">Act 1 complete · The Scatter</div>
       <h2>Eight shards, one necklace</h2>
-      <p>The shards are safe in your glovebox, but the necklace is not complete. A police scanner crackles: the clasp is on a courier lorry heading out of the city to a fence.</p>
+      <p>The shards are safe in your glovebox, but the necklace is not complete. Hale on the radio: the clasp is on a courier lorry heading out of the city to a fence.</p>
       ${story.letter ? '<p>The sealed letter lies on the passenger seat. Its wax seal bears the Ashford crest.</p>' : ''}
       ${stats}
       <div class="actions"><button class="btn" data-action="next-act">Start Act 2: The Courier <small class="desk-only">Enter</small></button><button class="btn ghost" data-action="menu">Main menu</button></div>`);
@@ -3297,14 +3300,14 @@ function showEnding(){
   showCard(good ? `
     <div class="eyebrow">Finale · Ending A of 3 · The truth</div>
     <h1>Case <em>closed</em></h1>
-    <p>The whole house is gathered in the hall. You lay the shards and the clasp on the table, then unfold the letter. It is in Lady Ashford's hand: <i>“Break it. Scatter it. Pin it on the detective.”</i></p>
-    <p>Next to the insurance claim, it leaves no doubt. The butler confesses that he only followed orders. Lady Ashford is led out in handcuffs, and the Starfall necklace is whole again.</p>
+    <p>The whole house is gathered in the hall, and Officer Hale stands at the door. You lay the shards and the clasp on the table, then unfold the letter. It is in Lady Ashford’s hand: <i>“Break it. Scatter it. Pin it on the detective.”</i></p>
+    <p>Next to the insurance claim, it leaves no doubt. The butler confesses that he only followed orders. Lady Ashford is led out in handcuffs, and the Starfall necklace is whole again. Hale hands you back your badge: “Took you long enough.”</p>
     ${stats}
     <div class="actions"><button class="btn" data-action="story">Play the story again <small class="desk-only">Enter</small></button><button class="btn ghost" data-action="menu">Main menu</button></div>` : `
     <div class="eyebrow">Finale · Ending B of 3 · Framed</div>
-    <h1>The thief <em>walks</em></h1>
-    <p>You lay the shards and the clasp on the table. “Thank you, detective,” says Lady Ashford, and turns to the officers behind you. “There is your thief.”</p>
-    <p>Without proof, the insurance claim is just paper. The handcuffs close around your wrists. Somewhere downtown, a sealed letter is still waiting in a park.</p>
+    <h1>Back in <em>4471</em></h1>
+    <p>You lay the shards and the clasp on the table. “Thank you, inmate 4471,” says Lady Ashford, and turns to the officers behind you. “There is your thief. Broke out of prison, too.”</p>
+    <p>Without proof, the insurance claim is just paper. By morning you are back in cell 4471, and Hale cannot help you twice. Somewhere downtown, a sealed letter is still waiting in a park.</p>
     ${stats}
     <div class="actions"><button class="btn" data-action="story">Try for the true ending <small class="desk-only">Enter</small></button><button class="btn ghost" data-action="menu">Main menu</button></div>`);
 }
@@ -3315,10 +3318,10 @@ function storyGameOver(reason){
   if (reason === 'wrecked'){ const fx = Math.sin(car.heading), fz = Math.cos(car.heading); burst(car.x + fx, car.y + 1.2, car.z + fz, SPARKS, 36, 0.9); }
   const A = STORY.acts[story.act];
   const text = reason === 'busted'
-    ? 'The police box you in. From the back of the squad car you hear the radio: “Suspect in custody. Lady Ashford has been informed.” The case is closed the wrong way.'
+    ? 'The police box you in. From the back of the squad car you hear the radio: “Inmate 4471 in custody. Lady Ashford has been informed.” Next stop: Cell Block D.'
     : reason === 'wrecked'
-      ? 'Your vehicle gives up. By the time the smoke clears, blue lights surround you, and the shards are evidence against you.'
-      : 'You ran out of time. The fence has the necklace, and the police have their suspect: you.';
+      ? 'Your vehicle gives up. By the time the smoke clears, blue lights surround you. The shards go into an evidence bag, and you go back to cell 4471.'
+      : 'You ran out of time. The fence has the necklace, and Cell Block D has its inmate back.';
   showCard(`
     <div class="eyebrow">Act ${story.act + 1} · ${A.title} · Ending C of 3</div>
     <h2>${reason === 'busted' ? 'Busted' : reason === 'wrecked' ? 'Wrecked' : 'Too late'}</h2>

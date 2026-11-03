@@ -2,6 +2,12 @@
 
 > Working draft. It describes the current code: the rules in `src/core.js`, and pickups and police in `src/game.js`.
 
+## Where room 2 starts
+
+Room 2 begins where room 1 ends. You (inmate 4471, the framed detective) have climbed out of the tunnel under Cell Block D. It is about 02:30 at night. In a lock-up garage, Officer Hale's getaway vehicle is waiting. Every police car in town is now hunting the escaped inmate.
+
+**Officer Hale is a secret ally.** He believes you were framed, but he cannot prove it. In the story mode he helps over the radio; his messages are shown in **orange**, the colour of room 1. Police dispatch messages are **red**.
+
 ## Two ways to play
 
 - **Free ride:** pick a map and a getaway vehicle, then escape.
@@ -92,13 +98,13 @@ Percentages are relative to the map's top speed and to the car. The menu shows t
 
 | Ending | When |
 |---|---|
-| **A · The truth** | You found the letter: it proves Lady Ashford staged the theft. |
-| **B · Framed** | No letter: you are arrested at the mansion. |
-| **C · Caught** | Busted, wrecked or out of time in any act; you can retry that act. |
+| **A · The truth** | You found the letter: it proves Lady Ashford staged the theft. Hale gives you your badge back. |
+| **B · Back in 4471** | No letter: Lady Ashford hands you to the police, and you go back to cell 4471. |
+| **C · Caught** | Busted, wrecked or out of time in any act: back to Cell Block D. You can retry that act. |
 
 **Retrying an act:** a letter found during the failed attempt does **not** count. A letter found in an earlier, finished act does.
 
-Radio and narrator messages appear at fixed times in each act, each only once.
+Radio messages (Hale in orange, police dispatch in red) appear at fixed times in each act, each only once.
 
 ## Menu actions (accepted and refused)
 

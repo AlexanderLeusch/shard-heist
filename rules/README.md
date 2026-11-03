@@ -13,6 +13,12 @@ The game has two rooms that are played one after the other. Until the group conn
 
 You were the detective on the Ashford necklace case. Now you are inmate 4471, convicted of stealing it. **Room 1:** you have ten minutes in a prison washroom to find the code for a hatch in the floor. If you get out (Ending A), a note shows that the guard wanted you out, and a car is waiting at the end of the tunnel. **Room 2:** the police chase begins. You drive a getaway vehicle through the city, on the highway and across the countryside, collecting star shards while up to three police cars try to box you in.
 
+## One night, one look
+
+- **Time:** both rooms are set on the same night: room 1 around 02:15, room 2 from about 02:30.
+- **Design:** both rooms share one design system: the same background, glass panels, fonts, buttons and cards. Each room keeps its own accent colour: **orange** in the prison, **cyan** on the run. Hale's radio messages in room 2 are orange because he comes from room 1.
+- A test (`tests/page.test.js`) checks that the shared design tokens and the story links between the rooms stay in place.
+
 ## How the two rooms will connect (planned, not built)
 
 - Ending A of room 1 shows a button that opens room 2.

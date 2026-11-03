@@ -1,12 +1,14 @@
 /* ### STYLES: design tokens (colours, fonts) on :root, then the HUD panels, cockpit, touch pads, menu cards and the
    ### showroom start screen. Everything is pure CSS; the 3D view itself is drawn on the <canvas>. */
-/* Layout: full-bleed 3D world at blue hour, glass HUD in the corners, pursuit panel under the clock, cockpit bottom-right, one centered card for menus. Single dark look by choice. */
+/* Shared design system with room 1 (escape-room/styles.css): same tokens for background, glass, lines and fonts,
+   same buttons, cards and error screen. Each room keeps its own accent: orange in the prison, cyan on the run.
+   Layout: full-bleed 3D world at night, glass HUD in the corners, pursuit panel under the clock, cockpit bottom-right, one centered card for menus. Single dark look by choice. */
 :root{
-  --bg:#12142a;
-  --ink:#f3f4fa;
-  --muted:rgba(243,244,250,.62);
-  --glass:rgba(14,16,34,.66);
-  --glass-strong:rgba(12,14,30,.88);
+  --bg:#0b0e10;
+  --ink:#f0f2ee;
+  --muted:rgba(240,242,238,.62);
+  --glass:rgba(12,16,18,.72);
+  --glass-strong:rgba(10,13,15,.92);
   --line:rgba(255,255,255,.13);
   --spark:#55ecff;
   --spark-ink:#04222b;
@@ -16,7 +18,9 @@
   --warn:#ffb547;
   --cop-red:#ff3344;
   --cop-blue:#2f6bff;
-  --f-display:"Bricolage Grotesque","Segoe UI",system-ui,sans-serif;
+  --orange:#ff7a1a;
+  --f-display:"Big Shoulders Display","Arial Narrow","Segoe UI",system-ui,sans-serif;
+  --f-body:"Segoe UI",system-ui,-apple-system,sans-serif;
   --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
   color-scheme:dark;
 }
@@ -136,7 +140,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-display);overflow
 .pedal.on .pv{color:var(--ink)}
 
 #toast{position:fixed;left:50%;top:calc(20px + env(safe-area-inset-top,0px));transform:translate(-50%,-8px);opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;
-  background:var(--glass-strong);border:1px solid var(--line);border-radius:999px;padding:9px 18px;font-weight:600;font-size:15px;white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+  background:var(--glass-strong);border:1px solid var(--line);border-radius:14px;padding:9px 18px;font-weight:600;font-size:15px;line-height:1.35;text-align:center;width:max-content;max-width:min(680px,calc(100% - 32px));backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 #toast.gold{color:var(--gold);border-color:rgba(255,200,87,.45)}
 #toast.green{color:var(--go);border-color:rgba(78,240,160,.45)}
@@ -150,6 +154,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-display);overflow
 .ew-banner small{display:block;font-family:var(--f-mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#ffb3ba}
 @media (prefers-reduced-motion:reduce){.ew-banner.show svg{animation:none}}
 #toast.red{color:var(--stop);border-color:rgba(255,93,108,.45)}
+#toast.hale{color:var(--orange);border-color:rgba(255,122,26,.5)}
 
 #touch{position:fixed;left:0;right:0;bottom:0;display:none;justify-content:space-between;align-items:flex-end;pointer-events:none;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 calc(16px + env(safe-area-inset-bottom,0px))}
@@ -311,3 +316,19 @@ kbd{font-family:var(--f-mono);font-size:12px;color:var(--ink);background:rgba(25
 .fatal-card h2{margin:0;font-size:28px;line-height:1.05;font-weight:780;letter-spacing:-.02em}
 .fatal-card p{margin:0;font-size:15.5px;line-height:1.5;color:var(--muted)}
 .fatal-card .eyebrow{color:var(--stop)}
+
+/* ### SHARED DESIGN SYSTEM: the same typography and components as room 1. Display type (Big Shoulders) for titles, numbers
+   ### and buttons, a plain system font for running text, mono for labels. */
+.card h1,.card h2{text-transform:uppercase;letter-spacing:.005em;font-weight:900}
+.card h2{font-weight:800}
+.card p,.m-lede,.vdetail p,.story-card span,.acts small,#toast,.ew-banner b{font-family:var(--f-body)}
+.story-card .sc-eyebrow{font-family:var(--f-mono)}
+.story-card b{font-family:var(--f-display);font-size:24px;text-transform:uppercase;letter-spacing:.01em}
+.card .m-logo{letter-spacing:.005em;font-weight:900}
+.show-name{letter-spacing:0}
+.btn{font-size:19px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;border-radius:10px}
+.btn.m-start{font-size:20px;border-radius:12px}
+.panel{border-radius:12px}
+.card{border-radius:18px}
+.fatal-card{border-radius:18px}
+.fatal-card h2{text-transform:uppercase;font-size:32px;font-weight:800}

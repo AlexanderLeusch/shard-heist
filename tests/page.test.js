@@ -163,3 +163,21 @@ test('escape room: texts from the story are inserted as text, not as HTML', () =
   assert.ok(escRoom.includes("b.querySelector('span').textContent = h.label"));
   assert.ok(/esc\(c\.text\)/.test(escRoom) && /esc\(E\.text\)/.test(escRoom));
 });
+
+// ---------- Both rooms: one design system ----------
+test('both rooms share one design system: the same tokens and the same fonts', () => {
+  const tokens = css => Object.fromEntries([...css.match(/:root\{([\s\S]*?)\}/)[1].matchAll(/--([\w-]+):([^;]+);/g)].map(m => [m[1], m[2].trim()]));
+  const a = tokens(read('styles.css')), b = tokens(read('escape-room/styles.css'));
+  for (const k of ['bg', 'ink', 'muted', 'glass', 'glass-strong', 'line', 'f-display', 'f-body', 'f-mono']) assert.equal(a[k], b[k], `--${k} differs between the rooms`);
+  assert.ok(a.spark && b.orange, 'each room keeps its own accent (cyan in room 2, orange in room 1)');
+  const font = h => h.match(/href="(https:\/\/fonts\.googleapis\.com\/css2[^"]+)"/)[1];
+  assert.equal(font(html), font(escHtml));
+});
+
+test('the story runs on from room 1 into room 2', () => {
+  const rules = require('../escape-room/src/rules.js');
+  assert.match(rules.ENDINGS.A.text, /car is waiting/, 'room 1 ends with the getaway car');
+  assert.match(game, /Cell Block D/, 'room 2 starts after the escape from Cell Block D');
+  assert.match(game, /inmate 4471/, 'the police hunt the same inmate');
+  assert.match(game, /'hale'/, 'Officer Hale helps over the radio');
+});
