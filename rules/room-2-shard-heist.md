@@ -27,13 +27,29 @@ Percentages are relative to the map's top speed and to the car. The menu shows t
 
 | Map | Goal | Time | Car top speed | Police top speed | Shards | Repair kits |
 |---|---|---|---|---|---|---|
-| **City traffic** | Collect **all 8 shards**, then drive into the golden gate that appears | 3:00 | 122 km/h | 119 km/h | 8 | 3 |
+| **Lisbon · Baixa** | Collect **all 8 shards**, then drive through the golden gate that appears under the Arco da Rua Augusta | 3:00 | 122 km/h | 119 km/h | 8 | 3 |
 | **Highway** | Reach the finish **4 km** ahead. Shards are optional: **+4 s** each | 1:40 | 200 km/h | 187 km/h | 12 | 2 |
 | **Countryside** | Reach the village at the end of the road. Shards: **+4 s** each | 2:30 | 158 km/h | 148 km/h | 10 | 3 |
 
 - A shard is picked up within 3.8 m; a repair kit within 3.6 m, and only when you have damage.
-- The city has traffic lights and other cars. On the highway traffic drives both ways. On country roads there is oncoming traffic, and driving off the road cuts your top speed to 55 %.
+- Lisbon has traffic lights, other cars and three yellow trams. The trams only run on their tracks, a stone track bed with two rails set into the road: a clockwise loop through Rua da Conceição, Rua da Prata, the north side of the Praça do Comércio and Rua Áurea. As on real Lisbon streets, cars and the player can drive over the tracks. The trams stop at red lights and behind other vehicles. On the highway traffic drives both ways. On country roads there is oncoming traffic, and driving off the road cuts your top speed to 55 %.
 - Each map has an edge you cannot cross. Near it the screen turns red and a "turn back" arrow appears.
+
+## The city map: Lisbon's Baixa
+
+The Baixa is the flat centre of Lisbon, rebuilt as a street grid after the 1755 earthquake. The map is a simplified version of it: the blocks are square, and the grid has 7 streets each way. The real Baixa has a few more, so some are left out.
+
+| Direction | Streets, in their real order |
+|---|---|
+| West to east | Rua do Crucifixo, Rua Áurea, Rua dos Sapateiros, **Rua Augusta**, Rua dos Correeiros, Rua da Prata, Rua dos Fanqueiros |
+| North to south | Rua de Santa Justa, Rua da Vitória, Rua de São Nicolau, Rua da Conceição, Rua do Comércio, Praça do Comércio (north side), Avenida Infante Dom Henrique |
+
+- In free ride, the panel at the top left shows the street or square you are on. In story mode it shows the act instead.
+- You start on Rua Augusta, facing south towards the Arco da Rua Augusta.
+- **Squares:** the Rossio and the Praça da Figueira in the north, the Praça do Comércio by the river in the south. The statue on the Praça do Comércio stands in the middle of the road, so traffic passes on both sides.
+- **Landmarks you can see but not reach:** the river Tejo, the 25 de Abril bridge, Cristo Rei and the castle hill. The Santa Justa lift stands on the map, and you can crash into it.
+- **Parks:** there are three, which the real Baixa does not have. The story needs them for the sealed letter.
+- It is always about 02:30 at night. The clock on the arch shows it.
 
 ## Driving
 
@@ -69,7 +85,7 @@ Percentages are relative to the map's top speed and to the car. The menu shows t
 
 | Result | When |
 |---|---|
-| **Clean getaway** | City: reach the gate. Highway: pass the 4 km mark. Countryside: reach the village |
+| **Clean getaway** | Lisbon: reach the gate under the arch. Highway: pass the 4 km mark. Countryside: reach the village |
 | **Busted** | the bust meter is full |
 | **Wrecked** | damage reaches 100 % |
 | **Time's up** | the clock reaches 0:00 |
@@ -92,7 +108,7 @@ Percentages are relative to the map's top speed and to the car. The menu shows t
 
 | Act | Map | Goal | Special rule |
 |---|---|---|---|
-| **1 · The Scatter** | City | Recover the 8 shards, then the gate | An optional **sealed letter** is hidden in a park. It is **not shown on the radar**. |
+| **1 · The Scatter** | Lisbon | Recover the 8 shards, then the gate | An optional **sealed letter** is hidden in a park. It is **not shown on the radar**. |
 | **2 · The Courier** | Highway | Catch the gold-marked courier lorry (get within 9 m) to take the **clasp**, then the finish | The **toll at the finish only opens with the clasp** |
 | **3 · Homecoming** | Countryside | Drive back to the Ashford mansion | The confrontation decides the ending |
 
@@ -122,7 +138,7 @@ Any other button or action is refused, and no card button works while you are dr
 
 ## Saved settings
 
-The last map and vehicle, the best times and the graphics setting are saved in the browser. Every saved value is checked when loaded; invalid values fall back to City, Car and the defaults.
+The last map and vehicle, the best times and the graphics setting are saved in the browser. Every saved value is checked when loaded; invalid values fall back to Lisbon, Car and the defaults.
 
 ## Controls
 

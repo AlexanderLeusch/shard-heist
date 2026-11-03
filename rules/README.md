@@ -11,7 +11,7 @@ The game has two rooms that are played one after the other. Until the group conn
 
 ## The whole game in one paragraph
 
-You were the detective on the Ashford necklace case. Now you are inmate 4471, convicted of stealing it. **Room 1:** you have ten minutes in a prison washroom to find the code for a hatch in the floor. If you get out (Ending A), a note shows that the guard wanted you out, and a car is waiting at the end of the tunnel. **Room 2:** the police chase begins. You drive a getaway vehicle through the city, on the highway and across the countryside, collecting star shards while up to three police cars try to box you in.
+You were the detective on the Ashford necklace case. Now you are inmate 4471, convicted of stealing it. **Room 1:** you have ten minutes in a prison washroom to find the code for a hatch in the floor. If you get out (Ending A), a note shows that the guard wanted you out, and a car is waiting at the end of the tunnel. **Room 2:** the police chase begins. You drive a getaway vehicle through Lisbon's Baixa, on the highway and across the countryside, collecting star shards while up to three police cars try to box you in.
 
 ## One night, one look
 

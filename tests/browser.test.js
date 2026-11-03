@@ -151,7 +151,7 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       await load();
       assert.equal(await evaluate("document.querySelector('[data-pick=\"mode\"][aria-pressed=\"true\"]').dataset.val"), 'city');
       assert.equal(await evaluate("document.querySelector('[data-pick=\"veh\"][aria-pressed=\"true\"]').dataset.val"), 'car');
-      assert.match(await text('.m-foot'), /City no run yet/);
+      assert.match(await text('.m-foot'), /Lisbon no run yet/);
       assert.deepEqual(errors, []);
       await evaluate('localStorage.clear(), true');
     });

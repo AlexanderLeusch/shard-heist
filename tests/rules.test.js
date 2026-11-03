@@ -180,3 +180,48 @@ test('seeded random is repeatable, so maps are always built the same way', () =>
   assert.deepEqual(Core.shuffle([1, 2, 3, 4, 5], Core.mulberry32(1)).sort(), [1, 2, 3, 4, 5]);
   for (const a0 of [-10, -Math.PI, 0, 3, 10]){ const w = Core.wrapAngle(a0); assert.ok(w >= -Math.PI && w < Math.PI); }
 });
+
+test('the city map carries the real streets of the Baixa, in their real order', () => {
+  assert.equal(Core.BAIXA.ns.length, 7);
+  assert.equal(Core.BAIXA.ew.length, 7);
+  // west to east and north to south, as on the map of Lisbon
+  assert.deepEqual([Core.BAIXA.ns[0], Core.BAIXA.ns[3], Core.BAIXA.ns[6]], ['Rua do Crucifixo', 'Rua Augusta', 'Rua dos Fanqueiros']);
+  assert.deepEqual([Core.BAIXA.ew[0], Core.BAIXA.ew[3], Core.BAIXA.ew[6]], ['Rua de Santa Justa', 'Rua da Conceição', 'Avenida Infante Dom Henrique']);
+  assert.equal(Core.streetAt(-3.5, -30, 0), 'Rua Augusta');
+  assert.equal(Core.streetAt(96, 20, 0), 'Rua da Prata');
+  assert.equal(Core.streetAt(30, 0, Math.PI / 2), 'Rua da Conceição');
+  assert.equal(Core.streetAt(0, 81, 0), 'Rua Augusta', 'the arch stands on Rua Augusta');
+});
+
+test('squares win over streets, a crossing follows your heading, and a pavement or bad input has no name', () => {
+  assert.equal(Core.streetAt(0, 120, 0), 'Praça do Comércio');
+  assert.equal(Core.streetAt(-24, -120, 0), 'Rossio');
+  assert.equal(Core.streetAt(24, -120, 0), 'Praça da Figueira');
+  assert.equal(Core.streetAt(0, 0, 0), 'Rua Augusta', 'driving north-south');
+  assert.equal(Core.streetAt(0, 0, Math.PI / 2), 'Rua da Conceição', 'driving east-west');
+  assert.equal(Core.streetAt(24, 24, 0), null, 'inside a block');
+  assert.equal(Core.streetAt(1000, 0, 0), null, 'outside the map');
+  assert.equal(Core.streetAt(NaN, 0, 0), null);
+  assert.equal(Core.streetAt(0, undefined, 0), null);
+  assert.equal(Core.streetAt(-3.5, -30), 'Rua Augusta', 'no heading is fine');
+});
+
+test('a tram never leaves its rails: from any crossing it stays on the loop and comes back round', () => {
+  const T = Core.TRAM_LOOP, P = Core.BAIXA.pitch, right = (dx, dz) => [-dz, dx];
+  const onLoop = (x, z) => x >= T.x0 && x <= T.x1 && z >= T.z0 && z <= T.z1 && (x === T.x0 || x === T.x1 || z === T.z0 || z === T.z1);
+  let x = T.x0, z = T.z0, dx = 1, dz = 0;
+  const start = x + ',' + z, seen = new Set();
+  for (let i = 0; i < 12; i++){
+    assert.ok(onLoop(x, z), x + ',' + z + ' is off the loop');
+    seen.add(x + ',' + z);
+    if (Core.tramNext(x, z, dx, dz) === 'r') [dx, dz] = right(dx, dz);
+    x += dx * P; z += dz * P;
+  }
+  assert.equal(x + ',' + z, start, 'twelve crossings bring it back to the start');
+  assert.equal(seen.size, 12, 'it passes every crossing of the loop once');
+  // the tracks run through real streets: Rua da Conceição, Rua da Prata, Praça do Comércio, Rua Áurea
+  assert.equal(Core.streetAt(0, T.z0, Math.PI / 2), 'Rua da Conceição');
+  assert.equal(Core.streetAt(T.x1, 24, 0), 'Rua da Prata');
+  assert.equal(Core.streetAt(24, T.z1, Math.PI / 2), 'Praça do Comércio');
+  assert.equal(Core.streetAt(T.x0, 24, 0), 'Rua Áurea');
+});

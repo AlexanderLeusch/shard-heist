@@ -169,7 +169,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-display);overflow
 
 #overlay{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(ellipse at center,rgba(8,8,22,.25),rgba(8,8,22,.66));
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:calc(16px + env(safe-area-inset-top,0px)) calc(16px + env(safe-area-inset-bottom,0px));overflow-y:auto}
-.card{width:min(560px,100%);background:var(--glass-strong);border:1px solid var(--line);border-radius:20px;padding:26px;display:grid;gap:15px;backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);box-shadow:0 30px 80px rgba(0,0,0,.45);animation:rise .45s cubic-bezier(.2,.8,.2,1)}
+.card{box-sizing:border-box;width:min(614px,100%);background:var(--glass-strong);border:1px solid var(--line);border-radius:20px;padding:26px;display:grid;gap:15px;backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);box-shadow:0 30px 80px rgba(0,0,0,.45);animation:rise .45s cubic-bezier(.2,.8,.2,1)}
 @keyframes rise{from{transform:translateY(14px);opacity:.4}}
 .card h1{margin:0;font-size:clamp(40px,9vw,58px);line-height:.92;font-weight:800;letter-spacing:-.03em;font-variation-settings:"opsz" 96;text-wrap:balance}
 .card h1 em{font-style:normal;color:var(--spark)}

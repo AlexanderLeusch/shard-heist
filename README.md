@@ -36,7 +36,7 @@ A 3D police-chase driving game that runs in any modern browser. Pick a map and a
 
 | | |
 |---|---|
-| Maps | City traffic (traffic lights, 26 AI cars), Highway (4 km, 200 km/h, traffic both ways), Countryside (hills, farms, village) |
+| Maps | Lisbon's Baixa (real street names, Arco da Rua Augusta, traffic lights, 26 AI cars, 3 trams), Highway (4 km, 200 km/h, traffic both ways), Countryside (hills, farms, village) |
 | Vehicles | Muscle coupe (balanced), Superbike (fastest, most agile), Tractor unit (slowest, toughest, best at ramming) |
 | Story mode | *The Necklace Job*, after the escape: 3 acts on the 3 maps, Officer Hale on the radio, 2 story items (a hidden letter, a clasp), 3 endings. Which one you get depends on whether you found the letter in act 1 |
 | Systems | Police AI with a bust meter, crash damage and repair kits, synthesised engine sounds, map-boundary force field, radar, Ultra/Balanced graphics |
@@ -126,13 +126,18 @@ Writing the tests found two real bugs. Both are fixed:
 
 ## Limits
 
+- **Lisbon:** the map is a simplified Baixa: square blocks, 7 streets each way, flat, and some real streets left out. It is recognisable, not surveyed. The other two maps are not Lisbon yet.
 - **Look and sound:** procedural geometry and synthesised engines are stylised; they do not look or sound like photos or recordings.
 - **Performance:** Ultra graphics (bloom, large shadow maps) needs a decent GPU; phones start in Balanced.
 - **AI:** traffic never changes lanes; police ignore traffic lights and can take detours in the city.
 - **Physics:** arcade model with collision circles; no tyre grip or mass transfer.
-- **Structure:** `game.js` is one large closure (about 3,400 lines) whose sections share variables, so it is harder to work on in parallel than separate modules would be.
+- **Structure:** `game.js` is one large closure (about 3,700 lines) whose sections share variables, so it is harder to work on in parallel than separate modules would be.
 - **Testing:** the browser test checks the main workflows, but not long play sessions, every map end to end, or sound quality, and the CI browser renders in software.
 - **Persistence:** best times live in one browser only and can be edited by the player.
+
+## Credits
+
+The street names and their order were checked against [OpenStreetMap](https://www.openstreetmap.org/copyright) (© OpenStreetMap contributors, ODbL). The game ships no map data and calls no map service.
 
 ## How it could change
 

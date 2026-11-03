@@ -14,7 +14,7 @@
   // ### acceleration and handling multipliers, damage taken (dmg), ramming power (ram) and the collision circles (samples, r).
   // ### Change a number here and the whole game, including the stat bars in the menu, follows it.
   const MODES = {
-    city: { key: 'city', title: 'City traffic', eyebrow: 'Downtown', mission: 'Star Shards', max: 34, police: 33, time: 180, gaugeMax: 160, redline: 140, radar: 70, shards: 8, kits: 3, store: 'shard-heist-city-best' },
+    city: { key: 'city', title: 'Lisbon · Baixa', eyebrow: 'Baixa · Lisbon', mission: 'Star Shards', max: 34, police: 33, time: 180, gaugeMax: 160, redline: 140, radar: 70, shards: 8, kits: 3, store: 'shard-heist-city-best' },
     highway: { key: 'highway', title: 'Highway', eyebrow: 'Highway', mission: 'Bonus Shards', max: 55.6, police: 52, time: 100, gaugeMax: 260, redline: 230, radar: 110, shards: 12, kits: 2, bonus: 4, store: 'shard-heist-highway-best', linear: true },
     country: { key: 'country', title: 'Countryside', eyebrow: 'Country roads', mission: 'Bonus Shards', max: 44, police: 41, time: 150, gaugeMax: 220, redline: 190, radar: 90, shards: 10, kits: 3, bonus: 4, store: 'shard-heist-country-best', linear: true }
   };
@@ -25,6 +25,39 @@
   };
   const REV_SPEED = -11, REPAIR_AMOUNT = 40, MAX_DT = 0.05, STORY_ACTS = 3;
   const KEY_MAP = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', Space: 'brake' };
+
+  // ---------- The city map: Lisbon's Baixa ----------
+  // ### The Baixa was rebuilt as a street grid after the 1755 earthquake, so it fits the game's 7 x 7 grid of roads. The names
+  // ### are real and in their real order (ns: west to east, ew: north to south), checked against OpenStreetMap; the Baixa has
+  // ### a few more streets than the grid has lines, so some are left out. x grows to the east, z grows to the south (the river).
+  const BAIXA = Object.freeze({
+    pitch: 48, halfRoad: 7,
+    ns: Object.freeze(['Rua do Crucifixo', 'Rua Áurea', 'Rua dos Sapateiros', 'Rua Augusta', 'Rua dos Correeiros', 'Rua da Prata', 'Rua dos Fanqueiros']),
+    ew: Object.freeze(['Rua de Santa Justa', 'Rua da Vitória', 'Rua de São Nicolau', 'Rua da Conceição', 'Rua do Comércio', 'Praça do Comércio', 'Avenida Infante Dom Henrique']),
+    squares: Object.freeze([
+      Object.freeze({ name: 'Praça do Comércio', x0: -41, x1: 41, z0: 103, z1: 137 }),
+      Object.freeze({ name: 'Rossio', x0: -41, x1: -7, z0: -137, z1: -103 }),
+      Object.freeze({ name: 'Praça da Figueira', x0: 7, x1: 41, z0: -137, z1: -103 })
+    ])
+  });
+  // ### Trams never leave their rails: a clockwise loop through Rua da Conceição, Rua da Prata, the north side of the Praça do
+  // ### Comércio and Rua Áurea. tramNext decides at each crossing: straight on while the next crossing is on the loop, else turn right.
+  const TRAM_LOOP = Object.freeze({ x0: -96, x1: 96, z0: 0, z1: 96, lane: 3.5 });
+  function tramNext(x, z, dx, dz){
+    const T = TRAM_LOOP, nx = x + dx * BAIXA.pitch, nz = z + dz * BAIXA.pitch;
+    return nx >= T.x0 && nx <= T.x1 && nz >= T.z0 && nz <= T.z1 ? 's' : 'r';
+  }
+  // The street or square at a point, or null on a pavement. On a crossing, the street you are driving along wins.
+  function streetAt(x, z, heading){
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
+    const square = BAIXA.squares.find(q => x >= q.x0 && x <= q.x1 && z >= q.z0 && z <= q.z1);
+    if (square) return square.name;
+    const kx = Math.round(x / BAIXA.pitch), kz = Math.round(z / BAIXA.pitch);
+    const onNs = Math.abs(kx) <= 3 && Math.abs(x - kx * BAIXA.pitch) <= BAIXA.halfRoad && Math.abs(z) <= 3 * BAIXA.pitch + BAIXA.halfRoad;
+    const onEw = Math.abs(kz) <= 3 && Math.abs(z - kz * BAIXA.pitch) <= BAIXA.halfRoad && Math.abs(x) <= 3 * BAIXA.pitch + BAIXA.halfRoad;
+    if (onNs && onEw) return Math.abs(Math.sin(heading || 0)) > Math.abs(Math.cos(heading || 0)) ? BAIXA.ew[kz + 3] : BAIXA.ns[kx + 3];
+    return onNs ? BAIXA.ns[kx + 3] : onEw ? BAIXA.ew[kz + 3] : null;
+  }
 
   // ---------- Small helpers ----------
   // ### own() only accepts real table keys, so "constructor" or "__proto__" from tampered storage can never pick a mode.
@@ -207,7 +240,7 @@
   }
 
   return Object.freeze({
-    MODES, VEH, REV_SPEED, REPAIR_AMOUNT, MAX_DT, STORY_ACTS, KEY_MAP,
+    MODES, VEH, REV_SPEED, REPAIR_AMOUNT, MAX_DT, STORY_ACTS, KEY_MAP, BAIXA, streetAt, TRAM_LOOP, tramNext,
     isMode, isVeh, clamp, wrapAngle, mulberry32, shuffle, fmtTime, fmtTimeExact, frameDt,
     parsePick, parseBest, applyPick, actionAllowed,
     vehStats, zeroTo80, topSpeed, stepSpeed, collidePoint,

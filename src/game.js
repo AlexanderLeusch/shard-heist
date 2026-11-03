@@ -264,7 +264,22 @@ function makeTruckParts(){
   const tail = mergeGeos([boxG(0.3, 0.2, 0.06, 1.05, 1.05, -5.33), boxG(0.3, 0.2, 0.06, -1.05, 1.05, -5.33)]);
   return { body: cab, glass, cargo, trim, chrome, tire: wheels.tire, head, tail };
 }
-const PARTS = { sedan: makeCarParts(false), suv: makeCarParts(true), truck: makeTruckParts() };
+// The yellow Lisbon tram: lit windows between white pillars, a yellow body and a trolley pole on the roof
+function makeTramParts(){
+  const pillars = [];
+  for (let z = -3.6; z <= 3.61; z += 1.2) pillars.push(boxG(2.26, 1.2, 0.16, 0, 2.25, z));
+  const wheels = wheelSet([[0.85, 1.5], [-0.85, 1.5], [0.85, -1.5], [-0.85, -1.5]], 0.38, 0.2);
+  return {
+    body: mergeGeos([boxG(2.2, 1.0, 8.4, 0, 1.15, 0), boxG(2.1, 0.16, 7.8, 0, 3.12, 0), boxG(2.24, 1.25, 0.12, 0, 2.25, 4.14), boxG(2.24, 1.25, 0.12, 0, 2.25, -4.14)]),
+    cargo: mergeGeos([boxG(2.24, 0.14, 8.4, 0, 1.6, 0), boxG(2.24, 0.26, 8.2, 0, 2.92, 0), ...pillars]),
+    lit: mergeGeos([boxG(2.16, 1.2, 8.1, 0, 2.25, 0), boxG(1.3, 0.72, 0.04, 0, 2.32, 4.21), boxG(1.3, 0.72, 0.04, 0, 2.32, -4.21)]),
+    trim: mergeGeos([boxG(1.9, 0.35, 7, 0, 0.5, 0), boxG(2.0, 0.2, 0.2, 0, 0.75, 4.25), boxG(2.0, 0.2, 0.2, 0, 0.75, -4.25), boxG(0.06, 0.06, 3.2, 0, 3.9, -0.9, -0.5)]),
+    chrome: wheels.rim, tire: wheels.tire,
+    head: boxG(0.34, 0.34, 0.06, 0, 1.3, 4.23),
+    tail: mergeGeos([boxG(0.3, 0.16, 0.06, 0.7, 1.3, -4.23), boxG(0.3, 0.16, 0.06, -0.7, 1.3, -4.23)])
+  };
+}
+const PARTS = { sedan: makeCarParts(false), suv: makeCarParts(true), truck: makeTruckParts(), tram: makeTramParts() };
 const SHARED = {
   glass: (() => { const m = new THREE.MeshStandardMaterial({ color: 0x1c2533, roughness: 0.08, metalness: 0.85 }); m.userData.env = 1.3; return m; })(),
   trim: new THREE.MeshStandardMaterial({ color: 0x15171d, roughness: 0.75 }),
@@ -273,6 +288,7 @@ const SHARED = {
   head: new THREE.MeshBasicMaterial({ color: 0xfff4d6 }),
   tail: new THREE.MeshBasicMaterial({ color: 0xff2a3a }),
   cargo: new THREE.MeshStandardMaterial({ color: 0xe6e8ee, roughness: 0.55, metalness: 0.15 }),
+  lit: new THREE.MeshBasicMaterial({ color: 0xe8bd78 }),
   lens: (() => { const m = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.28, clearcoat: 1, depthWrite: false }); m.userData.env = 1.4; return m; })(),
   paint: (() => { const m = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.5, clearcoat: 1, clearcoatRoughness: 0.07 }); m.userData.env = 1.0; return m; })()
 };
@@ -280,15 +296,15 @@ const CAR_COLS = [0xe8e8ec, 0x2b2f3a, 0x9c2d3a, 0x2f5d8c, 0xc9a24a, 0x5b6b5e, 0x
 
 // Instanced fleet of identical vehicles; each part one InstancedMesh
 class Fleet {
-  constructor(group, parts, n, rnd){
+  constructor(group, parts, n, rnd, color){
     this.meshes = [];
-    for (const k of ['body', 'glass', 'cargo', 'trim', 'chrome', 'tire', 'head', 'tail', 'lens']){
+    for (const k of ['body', 'glass', 'cargo', 'lit', 'trim', 'chrome', 'tire', 'head', 'tail', 'lens']){
       if (!parts[k]) continue;
       const m = new THREE.InstancedMesh(parts[k], k === 'body' ? SHARED.paint : SHARED[k], n);
       m.frustumCulled = false;
       m.castShadow = k === 'body' || k === 'cargo' || k === 'glass';
       m.receiveShadow = k === 'body' || k === 'cargo';
-      if (k === 'body') for (let i = 0; i < n; i++) m.setColorAt(i, tint.set(CAR_COLS[Math.floor((rnd ? rnd() : Math.random()) * CAR_COLS.length)]));
+      if (k === 'body') for (let i = 0; i < n; i++) m.setColorAt(i, tint.set(color || CAR_COLS[Math.floor((rnd ? rnd() : Math.random()) * CAR_COLS.length)]));
       group.add(m); this.meshes.push(m);
     }
   }
@@ -317,7 +333,8 @@ function vehicleGlow(head, tail, i, x, z, h, front, back, y, off, on){
 // ---------- Facade textures ----------
 // ### All building textures are painted at start-up on <canvas> - no image files are downloaded. makeFacade draws brick,
 // ### office and glass-tower facades with lit or dark windows, curtains and blinds; a second canvas holds the light that the
-// ### windows emit (emissive map). makeShops draws the ground-floor shop fronts with illuminated signs.
+// ### windows emit (emissive map). pombal and azulejo are the plaster and tiled fronts of the Baixa, with iron balconies.
+// ### makeShops draws the ground-floor shop fronts with illuminated signs.
 const LIT_WARM = ['#ffd9a0', '#ffe6c4', '#ffc985', '#ffdfb0'];
 const LIT_COOL = ['#d8ecff', '#eaf4ff', '#cfe3ff'];
 const CURTAIN = ['rgba(150,60,60,.85)', 'rgba(70,90,140,.85)', 'rgba(200,170,120,.88)', 'rgba(90,110,80,.85)'];
@@ -371,10 +388,50 @@ function paneLit(g, ge, x, y, w, h, r, cool, ceiling){
   }
   ge.globalAlpha = 1;
 }
+// Tall stone-framed windows with an iron balcony, one per bay, on every floor of a Baixa front
+function balconyWindows(g, ge, S, n, r){
+  const B = S / n, f = B * 0.045;
+  for (let j = 0; j < n; j++){
+    const floorLit = r() < 0.4 ? 0.45 : 0.12;
+    g.fillStyle = 'rgba(255,255,255,.4)'; g.fillRect(0, j * B + B * 0.93, S, B * 0.03);
+    g.fillStyle = 'rgba(30,25,20,.14)'; g.fillRect(0, j * B + B * 0.96, S, B * 0.015);
+    for (let i = 0; i < n; i++){
+      const wx = i * B + B * 0.27, wy = j * B + B * 0.13, ww = B * 0.46, wh = B * 0.7;
+      g.fillStyle = 'rgba(40,30,25,.22)'; g.fillRect(wx - f * 1.4, wy - f * 1.8, ww + f * 2.8, f * 0.8);
+      g.fillStyle = '#efe8d8'; g.fillRect(wx - f, wy - f, ww + f * 2, wh + f);
+      if (r() < floorLit) paneLit(g, ge, wx, wy, ww, wh, r, false, false); else paneUnlit(g, wx, wy, ww, wh);
+      g.fillStyle = '#efe8d8'; g.fillRect(wx + ww / 2 - f / 2, wy, f, wh);
+      // the balcony: a stone slab with its shadow and an iron railing that also blocks the window light
+      g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(wx - f * 1.6, wy + wh + f * 0.5, ww + f * 3.2, f);
+      g.fillStyle = '#6d6a66'; g.fillRect(wx - f * 1.8, wy + wh - f * 0.1, ww + f * 3.6, f * 0.7);
+      const top = wy + wh * 0.66, bars = 7, bw = Math.max(1, f * 0.3);
+      for (const c of [g, ge]){
+        c.fillStyle = c === g ? '#1b1c21' : '#000';
+        c.fillRect(wx - f * 1.5, top, ww + f * 3, bw * 1.4);
+        for (let k = 0; k <= bars; k++) c.fillRect(wx - f * 1.5 + k * (ww + f * 3 - bw) / bars, top, bw, wy + wh - top);
+      }
+    }
+  }
+}
 function makeFacade(style, seed){
   const S = TEX, n = 8, B = S / n, r = mulberry32(seed);
   const [m, g, e, ge] = canvasPair(S, S);
-  if (style === 'brick'){
+  if (style === 'pombal'){
+    g.fillStyle = '#f1ece1'; g.fillRect(0, 0, S, S);
+    speckle(g, S, S, r, S * 3);
+    balconyWindows(g, ge, S, n, r);
+  } else if (style === 'azulejo'){
+    g.fillStyle = '#f3f1ea'; g.fillRect(0, 0, S, S);
+    const t = B / 6, rows = n * 6;
+    for (let iy = 0; iy < rows; iy++) for (let ix = 0; ix < rows; ix++){
+      const x = ix * t + t / 2, y = iy * t + t / 2, q = t * 0.36;
+      g.fillStyle = (ix + iy) % 2 ? 'rgba(34,84,158,.72)' : 'rgba(34,84,158,.3)';
+      g.beginPath(); g.moveTo(x, y - q); g.lineTo(x + q, y); g.lineTo(x, y + q); g.lineTo(x - q, y); g.closePath(); g.fill();
+    }
+    g.fillStyle = 'rgba(70,75,90,.2)';
+    for (let k = 0; k < rows; k++){ g.fillRect(k * t, 0, 1, S); g.fillRect(0, k * t, S, 1); }
+    balconyWindows(g, ge, S, n, r);
+  } else if (style === 'brick'){
     g.fillStyle = '#ece6de'; g.fillRect(0, 0, S, S);
     g.fillStyle = 'rgba(80,50,40,.08)';
     const course = S / 128;
@@ -467,24 +524,29 @@ function makeShops(seed){
   }
   return toTex(m, e);
 }
-const FAC = { brick: makeFacade('brick', 11), office: makeFacade('office', 17), glass: makeFacade('glass', 23), shop: makeShops(31) };
+const FAC = { brick: makeFacade('brick', 11), office: makeFacade('office', 17), glass: makeFacade('glass', 23), pombal: makeFacade('pombal', 29), azulejo: makeFacade('azulejo', 37), shop: makeShops(31) };
 const facMat = (f, o) => new THREE.MeshStandardMaterial(Object.assign({ map: f.map, emissiveMap: f.emissive, emissive: 0xffffff, emissiveIntensity: 1.1, vertexColors: true }, o));
 const MAT = {
   brick: facMat(FAC.brick, { roughness: 0.88 }),
   office: facMat(FAC.office, { roughness: 0.62, metalness: 0.1 }),
   glass: facMat(FAC.glass, { roughness: 0.12, metalness: 0.7 }),
+  pombal: facMat(FAC.pombal, { roughness: 0.9 }),
+  azulejo: facMat(FAC.azulejo, { roughness: 0.32, metalness: 0.05 }),
   shop: facMat(FAC.shop, { roughness: 0.45, metalness: 0.2 })
 };
 MAT.glass.userData.env = 1.3;
+MAT.azulejo.userData.env = 1.0;
 const PAL = {
   brick: [0xc98f7a, 0xd9c3a5, 0xe6dccd, 0xb07a63, 0xa9b0bb, 0xd6b48f, 0x9c6b5c],
   office: [0xd0d3d9, 0xc2c6cc, 0xb9b2a6, 0xdcd8cf, 0xa9adb6],
-  glass: [0x9fb4d4, 0x8fa8c0, 0xa9c3c9, 0x8f98b8, 0xb5c2d6]
+  glass: [0x9fb4d4, 0x8fa8c0, 0xa9c3c9, 0x8f98b8, 0xb5c2d6],
+  pombal: [0xeccb74, 0xe7ae9f, 0xa9cbe0, 0xefe2c6, 0xdcae68, 0xb7d6bc, 0xf4efe4, 0xdf9f86],
+  azulejo: [0xffffff, 0xdcefe2, 0xf8e6c8, 0xd4e5f6, 0xf1d9d4]
 };
 
-// ---------- Procedural surfaces: wet asphalt, concrete paving, grass ----------
+// ---------- Procedural surfaces: wet asphalt, calçada, grass ----------
 // ### surfaceSet generates tileable colour, roughness and normal maps from noise: wet asphalt with puddles (low roughness),
-// ### concrete paving with joints, grass and a neutral detail texture. Cones and beams are fake volumetric light under lamps
+// ### calçada cobbles, grass and a neutral detail texture. Cones and beams are fake volumetric light under lamps
 // ### and in front of headlights (additive, no real lighting cost).
 function tileNoise(n, r){ const a = new Float32Array(n * n); for (let i = 0; i < a.length; i++) a[i] = r(); return a; }
 function sampleTile(L, n, u, v){
@@ -523,10 +585,29 @@ function surfaceSet(S, seed, colorFn, roughFn, bump){
 const ASPHALT = surfaceSet(COARSE ? 256 : 1024, 41,
   (h, p) => { const k = 54 + h * 34 - (p < 0.34 ? 12 : 0) + (h > 0.97 ? 40 : 0); return [k, k, k + 5]; },
   (h, p) => p < 0.34 ? 0.06 + (0.34 - p) * 0.15 : 0.6 + h * 0.32, 2.4);
-const PAVING = surfaceSet(COARSE ? 256 : 512, 7,
-  (h, p) => { const k = 200 + h * 45 - p * 25; return [k, k, k]; },
-  h => 0.72 + h * 0.25, 1.4);
-(() => { const c = PAVING.map.image, g = c.getContext('2d'), n = 4, s = c.width / n; g.fillStyle = 'rgba(40,40,50,.5)'; for (let k = 0; k < n; k++){ g.fillRect(k * s, 0, 2, c.width); g.fillRect(0, k * s, c.width, 2); } })();
+// Calçada: the small limestone cobbles of Lisbon's pavements, and the black waves of the Rossio on top of them
+function cobbleJoints(set){
+  const c = set.map.image, g = c.getContext('2d'), r = mulberry32(5), n = 16, s = c.width / n;
+  g.fillStyle = 'rgba(58,52,46,.6)';
+  for (let j = 0; j < n; j++){
+    g.fillRect(0, j * s, c.width, Math.max(1, s * 0.09));
+    for (let i = 0; i < n; i++) g.fillRect((i + (j % 2) * 0.5 + (r() - 0.5) * 0.2) * s, j * s, Math.max(1, s * 0.09), s);
+  }
+}
+const calcadaColour = (h, p) => { const k = 205 + h * 40 - p * 20; return [k, k - 2, k - 8]; };
+const CALCADA = surfaceSet(COARSE ? 256 : 512, 19, calcadaColour, h => 0.55 + h * 0.3, 2);
+cobbleJoints(CALCADA);
+const WAVES = surfaceSet(COARSE ? 256 : 512, 21, calcadaColour, h => 0.55 + h * 0.3, 2);
+(() => {
+  const c = WAVES.map.image, g = c.getContext('2d'), w = c.width;
+  g.strokeStyle = '#1c1d22'; g.lineWidth = w * 0.14;
+  for (let y = -w; y <= 2 * w; y += w / 2){
+    g.beginPath();
+    for (let x = -8; x <= w + 8; x += 8){ const v = y + Math.sin(x / w * Math.PI * 2) * w * 0.14; if (x < 0) g.moveTo(x, v); else g.lineTo(x, v); }
+    g.stroke();
+  }
+})();
+cobbleJoints(WAVES);
 const GRASS = surfaceSet(COARSE ? 256 : 512, 13,
   (h, p) => [40 + h * 40 + p * 30, 70 + h * 60 + p * 40, 38 + h * 30], () => 0.95, 2.2);
 function surfaceMat(set, repeat, opts){
@@ -554,7 +635,10 @@ const BEAM_MAT = new THREE.MeshBasicMaterial({ map: coneTex, color: 0xe8f0ff, tr
 // ### Each map is a "world" object: a scene group, a list of colliders (boxes, circles, walls) and radar shapes.
 // ### groundH returns the ground height at any point (kerbs in the city, the hill height field in the countryside).
 // ### Traffic lights: every corner lamp post carries one signal head; two groups of intersections switch in turn.
-// ### buildCity lays out a 6x6 block grid with towers, parks, a plaza, lamps, markings, parked cars and the skyline.
+// ### buildCity lays out Lisbon's Baixa as a 6x6 block grid: low pastel and tiled houses with terracotta roofs, the Rossio and
+// ### the Praca da Figueira in the north, the Praca do Comercio with the Arco da Rua Augusta and the river Tejo in the south,
+// ### the Santa Justa lift, hills with the castle on both sides and the 25 de Abril bridge and Cristo Rei beyond the water.
+// ### The grid is simplified: real blocks are longer than wide, here they are square. x grows east, z grows south.
 const CITY = { group: new THREE.Group(), colliders: [], radar: [], built: false };
 const HWY = { group: new THREE.Group(), colliders: [], radar: [], built: false };
 scene.add(CITY.group, HWY.group);
@@ -603,47 +687,40 @@ function updateSignals(){
 function buildCity(){
   const grp = CITY.group, colliders = CITY.colliders, radarRects = CITY.radar;
   const rng = mulberry32(2026);
-  const FB = { brick: new Batch(), office: new Batch(), glass: new Batch(), shop: new Batch() };
+  const FB = { pombal: new Batch(), azulejo: new Batch(), shop: new Batch() };
   const roofs = new Batch(), trim = new Batch(), slabs = new Batch(), grass = new Batch(), marks = new Batch(),
-        neon = new Batch(), poles = new Batch(), pools = new Batch(), ao = new Batch(), housings = new Batch();
+        neon = new Batch(), poles = new Batch(), pools = new Batch(), ao = new Batch(), housings = new Batch(), waves = new Batch(), lift = new Batch();
   const lampB = {}, lampP = {};
   for (const g of [0, 1]) for (const a of ['x', 'z']) for (const c of ['r', 'y', 'g']){ lampB[g + a + c] = new Batch(); lampP[g + a + c] = []; }
-  const roofCol = C(0x343947), slabSide = C(0x5d6274), slabTop = C(0x737889), plazaTop = C(0x8e8a9f);
+  const slabSide = C(0x8d8a84), slabTop = C(0xb2afa6), plazaTop = C(0xd8d3c6), stoneCol = C(0xd6ccb4), TILE_ROOFS = [0xa45a3d, 0x8e4c34, 0xb0664a, 0x98503a];
   const trees = [];
   const pick = style => C(PAL[style][Math.floor(rng() * PAL[style].length)]);
 
+  const stone = new THREE.MeshStandardMaterial({ color: 0xc6bda6, roughness: 0.85, emissive: 0x2a261b });
+  const bronze = new THREE.MeshStandardMaterial({ color: 0x4e6a5e, roughness: 0.55, metalness: 0.45, emissive: 0x141e1a });
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(1400, 1400), surfaceMat(ASPHALT, [175, 175], { color: 0xb8bcc8 }));
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
   grp.add(ground);
 
-  const inner = [];
-  for (let i = -3; i <= 2; i++) for (let j = -3; j <= 2; j++){ if ((i === -1 || i === 0) && (j === -1 || j === 0)) continue; inner.push([i, j]); }
-  shuffle(inner, rng);
-  const types = new Map();
-  inner.slice(0, 3).forEach(([i, j]) => types.set(i + ',' + j, 'park'));
-  types.set(inner[3][0] + ',' + inner[3][1], 'plaza');
+  // i runs west to east, j north to south; the four blocks around the start stay ordinary houses
+  const types = new Map([['-3,-1', 'park'], ['2,-2', 'park'], ['2,1', 'park'], ['-1,-3', 'rossio'], ['0,-3', 'figueira'], ['-1,2', 'praca'], ['0,2', 'praca'], ['-3,-3', 'lift']]);
+  // The yellow arcaded houses around the Praca do Comercio; the two blocks beside the arch are one solid front
+  const YELLOW = new Set(['-2,2', '1,2', '-1,1', '0,1']), SOLID = new Set(['-1,1', '0,1']);
 
   function facade(style, x0, x1, y0, y1, z0, z1, col){
     FB[style].sides(x0, x1, y0, y1, z0, z1, col, TU, TV, Math.floor(rng() * 8) / 8, Math.floor(rng() * 8) / 8);
   }
   function ledge(x0, x1, y, z0, z1, col, o){ trim.box(x0 - o, x1 + o, y, y + 0.3, z0 - o, z1 + o, col); }
-  function parapet(x0, x1, y, z0, z1, col, h){
-    const t = 0.35;
-    trim.box(x0 - 0.05, x1 + 0.05, y, y + h, z0 - 0.05, z0 + t, col);
-    trim.box(x0 - 0.05, x1 + 0.05, y, y + h, z1 - t, z1 + 0.05, col);
-    trim.box(x0 - 0.05, x0 + t, y, y + h, z0 + t, z1 - t, col);
-    trim.box(x1 - t, x1 + 0.05, y, y + h, z0 + t, z1 - t, col);
+  // A terracotta hip roof: four slopes up to a short ridge
+  function hipRoof(x0, x1, y, z0, z1, h, col){
+    const q = Math.min(x1 - x0, z1 - z0) * 0.38, L = Math.hypot(q, h), ny = q / L, nh = h / L;
+    roofs.quad([x0, y, z1], [x1, y, z1], [x1 - q, y + h, z1 - q], [x0 + q, y + h, z1 - q], [0, ny, nh], [0, 0, 1, 1], col);
+    roofs.quad([x1, y, z0], [x0, y, z0], [x0 + q, y + h, z0 + q], [x1 - q, y + h, z0 + q], [0, ny, -nh], [0, 0, 1, 1], col);
+    roofs.quad([x1, y, z1], [x1, y, z0], [x1 - q, y + h, z0 + q], [x1 - q, y + h, z1 - q], [nh, ny, 0], [0, 0, 1, 1], col);
+    roofs.quad([x0, y, z0], [x0, y, z1], [x0 + q, y + h, z1 - q], [x0 + q, y + h, z0 + q], [-nh, ny, 0], [0, 0, 1, 1], col);
+    roofs.top(x0 + q, x1 - q, y + h, z0 + q, z1 - q, col);
   }
-  function rooftop(x0, x1, y, z0, z1){
-    const w = x1 - x0, d = z1 - z0;
-    if (w < 8 || d < 8) return;
-    const n = 1 + Math.floor(rng() * 3);
-    for (let k = 0; k < n; k++){
-      const uw = 1.6 + rng() * 2.4, ud = 1.4 + rng() * 2, uh = 0.9 + rng() * 1.4;
-      const ux = x0 + 1.5 + rng() * (w - 3 - uw), uz = z0 + 1.5 + rng() * (d - 3 - ud);
-      trim.box(ux, ux + uw, y, y + uh, uz, uz + ud, C(0x80858f));
-    }
-  }
+  const roofTile = () => C(TILE_ROOFS[Math.floor(rng() * TILE_ROOFS.length)]);
   function aoRect(x0, x1, z0, z1){
     const y = 0.19, s = 2.6, n = [0, 1, 0];
     ao.quadUV([x0, y, z1 + s], [x1, y, z1 + s], [x1, y, z1], [x0, y, z1], n, [0, 0, 1, 0, 1, 1, 0, 1], WHITE);
@@ -652,54 +729,34 @@ function buildCity(){
     ao.quadUV([x0 - s, y, z1], [x0, y, z1], [x0, y, z0], [x0 - s, y, z0], n, [0, 0, 0, 1, 0, 1, 0, 0], WHITE);
   }
 
-  function building(cx, cz, isInner){
-    const hMax = isInner ? 18 + 64 * Math.exp(-(cx * cx + cz * cz) / (80 * 80)) : 14 + rng() * 30;
-    const r = rng(); let lots;
-    if (r < 0.3) lots = [[-13, 13, -13, 13]];
+  function building(cx, cz, yellow, lotsFixed){
+    const r = rng(); let lots = lotsFixed;
+    if (lots) { /* given */ }
+    else if (r < 0.3) lots = [[-13, 13, -13, 13]];
     else if (r < 0.5) lots = [[-13, -1, -13, 13], [1, 13, -13, 13]];
     else if (r < 0.7) lots = [[-13, 13, -13, -1], [-13, 13, 1, 13]];
     else lots = [[-13, -1, -13, -1], [1, 13, -13, -1], [-13, -1, 1, 13], [1, 13, 1, 13]];
     for (const [a, b, c, d] of lots){
       const w = Math.max(9, Math.floor((b - a - rng() * 3) / 3) * 3), dd = Math.max(9, Math.floor((d - c - rng() * 3) / 3) * 3);
       const mx = cx + (a + b) / 2, mz = cz + (c + d) / 2;
-      let x0 = mx - w / 2, x1 = mx + w / 2, z0 = mz - dd / 2, z1 = mz + dd / 2;
+      const x0 = mx - w / 2, x1 = mx + w / 2, z0 = mz - dd / 2, z1 = mz + dd / 2;
       colliders.push({ t: 'b', x0, x1, z0, z1 });
       radarRects.push({ x0, x1, z0, z1, c: 'rgba(255,255,255,.17)' });
       aoRect(x0, x1, z0, z1);
-      let floors = Math.max(2, Math.round((hMax * (0.45 + 0.55 * rng()) - GROUND) / FLOOR));
-      const style = floors > 11 ? (rng() < 0.75 ? 'glass' : 'office') : (rng() < 0.6 ? 'brick' : 'office');
-      const trimCol = C(style === 'brick' ? 0xe6dfd2 : 0xb9bec8);
+      // the Baixa is low and even: four to six floors, no towers
+      const floors = yellow ? 5 : 4 + Math.floor(rng() * 3);
+      const style = yellow || rng() < 0.62 ? 'pombal' : 'azulejo';
+      const trimCol = C(0xeae3d3);
       let y = 0.18;
       FB.shop.sides(x0, x1, y, y + GROUND, z0, z1, WHITE, TU, GROUND, Math.floor(rng() * 4) / 4, 0);
       y += GROUND;
       ledge(x0, x1, y, z0, z1, trimCol, 0.35); y += 0.3;
-      if (floors > 12 && w >= 18 && dd >= 18 && rng() < 0.7){
-        const ps = rng() < 0.5 ? 'office' : 'brick';
-        facade(ps, x0, x1, y, y + 3 * FLOOR, z0, z1, pick(ps));
-        y += 3 * FLOOR; floors -= 3;
-        roofs.top(x0, x1, y, z0, z1, roofCol);
-        parapet(x0, x1, y, z0, z1, trimCol, 0.8);
-        x0 += 3; x1 -= 3; z0 += 3; z1 -= 3;
-      }
-      facade(style, x0, x1, y, y + floors * FLOOR, z0, z1, pick(style));
+      facade(style, x0, x1, y, y + floors * FLOOR, z0, z1, yellow ? C(0xe8bb45) : pick(style));
       y += floors * FLOOR;
-      if (style === 'glass' && floors > 16 && rng() < 0.65 && x1 - x0 >= 12 && z1 - z0 >= 12){
-        roofs.top(x0, x1, y, z0, z1, roofCol);
-        parapet(x0, x1, y, z0, z1, C(0x8f97a8), 0.5);
-        const cf = 2 + Math.floor(rng() * 3);
-        x0 += 3; x1 -= 3; z0 += 3; z1 -= 3;
-        facade('glass', x0, x1, y, y + cf * FLOOR, z0, z1, pick('glass'));
-        y += cf * FLOOR;
-      }
-      if (style !== 'glass') ledge(x0, x1, y - 0.35, z0, z1, trimCol, 0.25);
-      roofs.top(x0, x1, y, z0, z1, roofCol);
-      parapet(x0, x1, y, z0, z1, style === 'glass' ? C(0x8f97a8) : trimCol, style === 'glass' ? 0.5 : 1.0);
-      rooftop(x0, x1, y, z0, z1);
-      if (y > 70){
-        const ax = (x0 + x1) / 2, az = (z0 + z1) / 2;
-        trim.box(ax - 0.15, ax + 0.15, y, y + 10, az - 0.15, az + 0.15, C(0x9aa0aa));
-        neon.box(ax - 0.3, ax + 0.3, y + 10, y + 10.6, az - 0.3, az + 0.3, C(0xff3b4e));
-      }
+      ledge(x0, x1, y - 0.1, z0, z1, trimCol, 0.4);
+      hipRoof(x0 - 0.3, x1 + 0.3, y + 0.2, z0 - 0.3, z1 + 0.3, 3.2 + rng() * 1.2, roofTile());
+      const chx = mx + (rng() - 0.5) * w * 0.4, chz = mz + (rng() - 0.5) * dd * 0.4;
+      trim.box(chx - 0.5, chx + 0.5, y + 0.2, y + 5.2, chz - 0.4, chz + 0.4, C(0xcfc6b4));
     }
   }
 
@@ -720,22 +777,93 @@ function buildCity(){
     radarRects.push({ x0: cx - 13, x1: cx + 13, z0: cz - 13, z1: cz + 13, c: 'rgba(78,240,160,.16)' });
   }
 
-  function plaza(cx, cz){
-    const stone = new THREE.MeshStandardMaterial({ color: 0xa3a6b6, flatShading: true, roughness: 0.7 });
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.4, 0.8, 24), stone); base.position.set(cx, 0.58, cz);
-    const water = new THREE.Mesh(new THREE.CylinderGeometry(3.8, 3.8, 0.1, 24), new THREE.MeshStandardMaterial({ color: 0x2f9fd0, emissive: 0x1a6c98, roughness: 0.1, metalness: 0.2 }));
+  const glowPts = [], cones = [];
+  function fountain(cx, cz){
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(3.0, 3.2, 0.8, 24), stone); base.position.set(cx, 0.58, cz);
+    const water = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.7, 0.1, 24), new THREE.MeshStandardMaterial({ color: 0x2f9fd0, emissive: 0x1a6c98, roughness: 0.1, metalness: 0.2 }));
     water.position.set(cx, 0.95, cz);
-    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.6, 2.8, 10), stone); col.position.set(cx, 2.0, cz);
-    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 0.6, 0.5, 16), stone); bowl.position.set(cx, 3.4, cz);
+    const col = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.5, 2.8, 10), stone); col.position.set(cx, 2.0, cz);
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 0.5, 0.5, 16), stone); bowl.position.set(cx, 3.4, cz);
     [base, col, bowl].forEach(m => { m.castShadow = true; m.receiveShadow = true; });
     grp.add(base, water, col, bowl);
-    colliders.push({ t: 'c', x: cx, z: cz, r: 4.4 });
-    for (const sx of [-9, 9]) for (const sz of [-9, 9]){
-      neon.box(cx + sx - 0.3, cx + sx + 0.3, 0.18, 4.6, cz + sz - 0.3, cz + sz + 0.3, C(0x55ecff));
-      colliders.push({ t: 'c', x: cx + sx, z: cz + sz, r: 0.45 });
+    colliders.push({ t: 'c', x: cx, z: cz, r: 3.2 });
+    radarRects.push({ x0: cx - 3.2, x1: cx + 3.2, z0: cz - 3.2, z1: cz + 3.2, c: 'rgba(85,236,255,.25)' });
+  }
+  // Rossio: the wave pavement, the column of Dom Pedro IV and two fountains
+  function rossio(cx, cz){
+    const column = new THREE.Mesh(mergeGeos([new THREE.CylinderGeometry(1.5, 1.8, 2.2, 16).translate(0, 1.3, 0), new THREE.CylinderGeometry(0.55, 0.65, 15, 12).translate(0, 9.5, 0), new THREE.BoxGeometry(1.5, 0.6, 1.5).translate(0, 17.3, 0)]), stone);
+    column.position.set(cx, 0, cz); column.castShadow = true;
+    const figure = new THREE.Mesh(mergeGeos([boxG(0.8, 1.9, 0.6, 0, 18.5, 0), boxG(0.5, 0.5, 0.5, 0, 19.7, 0)]), bronze);
+    figure.position.set(cx, 0, cz);
+    grp.add(column, figure);
+    colliders.push({ t: 'c', x: cx, z: cz, r: 1.8 });
+    radarRects.push({ x0: cx - 1.8, x1: cx + 1.8, z0: cz - 1.8, z1: cz + 1.8, c: 'rgba(255,255,255,.3)' });
+    fountain(cx - 10, cz); fountain(cx + 10, cz);
+    shardSpots.push({ x: cx, z: cz + 10.5 }, { x: cx, z: cz - 10.5 });
+  }
+  // A horse and rider on a stone pedestal: Dom Jose I on the Praca do Comercio, Dom Joao I on the Praca da Figueira
+  function equestrian(x, z, s){
+    const ped = new THREE.Mesh(mergeGeos([new THREE.CylinderGeometry(2.2, 2.2, 1.2, 16).translate(0, 0.6, 0), new THREE.CylinderGeometry(1.5, 1.9, 5.2, 16).translate(0, 3.8, 0)]), stone);
+    ped.position.set(x, 0, z); ped.castShadow = true;
+    const parts = [boxG(1.1, 1.2, 3.0, 0, 3.0, 0), boxG(0.7, 1.5, 0.8, 0, 4.0, 1.5, -0.5), boxG(0.5, 0.6, 1.1, 0, 4.75, 2.05, 0.4),
+      boxG(0.3, 2.0, 0.3, 0.4, 1.3, -1.2), boxG(0.3, 2.0, 0.3, -0.4, 1.3, -1.2), boxG(0.3, 2.0, 0.3, 0.4, 1.3, 1.2), boxG(0.3, 1.1, 0.3, -0.4, 2.6, 1.7, 1.0),
+      boxG(0.2, 1.8, 0.3, 0, 2.6, -1.8, -0.3), boxG(0.8, 1.5, 0.6, 0, 4.35, -0.2), boxG(0.45, 0.5, 0.45, 0, 5.4, -0.2), boxG(1.1, 0.14, 0.6, 0, 5.7, -0.2), boxG(0.18, 2.0, 0.18, 0.62, 4.5, 0.2)];
+    const statue = new THREE.Mesh(mergeGeos(parts), bronze);
+    statue.scale.setScalar(s); statue.position.set(x, 6.4, z); statue.castShadow = true;
+    grp.add(ped, statue);
+    pools.top(x - 9, x + 9, 0.21, z - 9, z + 9, C(0xffc98a));
+    colliders.push({ t: 'c', x, z, r: 2.2 });
+    radarRects.push({ x0: x - 2.2, x1: x + 2.2, z0: z - 2.2, z1: z + 2.2, c: 'rgba(255,255,255,.3)' });
+  }
+  // The Arco da Rua Augusta closes the south end of the street; the clock shows the hour of the escape
+  function arco(z0){
+    const shp = new THREE.Shape();
+    shp.moveTo(-15, 0); shp.lineTo(-7.2, 0); shp.lineTo(-7.2, 10.5); shp.absarc(0, 10.5, 7.2, Math.PI, 0, true); shp.lineTo(7.2, 0);
+    shp.lineTo(15, 0); shp.lineTo(15, 24); shp.lineTo(-15, 24); shp.closePath();
+    const body = new THREE.ExtrudeGeometry(shp, { depth: 6, bevelEnabled: false, curveSegments: 20 }); body.translate(0, 0, z0);
+    const zm = z0 + 3, zF = z0 + 6.4;
+    const extra = [boxG(31.4, 0.9, 7.2, 0, 18.1, zm), boxG(31.8, 0.9, 7.6, 0, 24.3, zm), boxG(18, 3.2, 5, 0, 26.2, zm), boxG(9, 2.4, 3.6, 0, 29, zm), boxG(1.6, 4.4, 1.3, 0, 32.4, zm), boxG(5.6, 0.5, 0.7, 0, 33.2, zm)];
+    for (const sx of [-1, 1]) for (const dz of [0, 1]) for (const x of [8.4, 13.4]){
+      const c = new THREE.CylinderGeometry(0.62, 0.72, 14.4, 12); c.translate(sx * x, 9.4, dz ? zF : z0 - 0.4); extra.push(c);
+      extra.push(boxG(1.8, 2.2, 1.8, sx * x, 1.1, dz ? zF : z0 - 0.4));
     }
-    shardSpots.push({ x: cx + 10.5, z: cz }, { x: cx - 10.5, z: cz });
-    radarRects.push({ x0: cx - 4.4, x1: cx + 4.4, z0: cz - 4.4, z1: cz + 4.4, c: 'rgba(85,236,255,.25)' });
+    const arch = new THREE.Mesh(mergeGeos([body, ...extra]), stone);
+    arch.castShadow = true; arch.receiveShadow = true; grp.add(arch);
+    // inscription and clock, painted once and shown on both faces
+    const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+    const g = c.getContext('2d');
+    g.fillStyle = '#d6ccb4'; g.fillRect(0, 0, 512, 256);
+    g.fillStyle = '#2d2a24'; g.font = '700 30px Georgia, serif'; g.textAlign = 'center'; g.fillText('VIRTVTIBVS MAIORVM', 256, 232);
+    g.fillStyle = '#fff4d8'; g.beginPath(); g.arc(256, 96, 88, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#2d2a24'; g.lineWidth = 7; g.stroke();
+    g.lineCap = 'round';
+    for (let k = 0; k < 12; k++){ const a = k / 12 * Math.PI * 2; g.beginPath(); g.moveTo(256 + Math.sin(a) * 72, 96 - Math.cos(a) * 72); g.lineTo(256 + Math.sin(a) * 82, 96 - Math.cos(a) * 82); g.stroke(); }
+    const hand = (a, l, w) => { g.lineWidth = w; g.beginPath(); g.moveTo(256, 96); g.lineTo(256 + Math.sin(a) * l, 96 - Math.cos(a) * l); g.stroke(); };
+    hand(2.5 / 12 * Math.PI * 2, 46, 9); hand(Math.PI, 68, 6);
+    const tex = new THREE.CanvasTexture(c); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = ANISO;
+    const plate = new THREE.MeshBasicMaterial({ map: tex });
+    for (const [pz, rot] of [[z0 + 6.03, 0], [z0 - 0.03, Math.PI]]){
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(12, 6), plate);
+      m.position.set(0, 21, pz); m.rotation.y = rot; grp.add(m);
+    }
+    for (const sx of [-1, 1]){
+      colliders.push({ t: 'b', x0: sx < 0 ? -15 : 7.2, x1: sx < 0 ? -7.2 : 15, z0, z1: z0 + 6 });
+      radarRects.push({ x0: sx < 0 ? -15 : 7.2, x1: sx < 0 ? -7.2 : 15, z0, z1: z0 + 6, c: 'rgba(255,226,160,.5)' });
+      cones.push(coneGeo(sx * 9.5, z0 + 8, 12, 5));
+    }
+  }
+  // The Santa Justa lift: an iron tower with a walkway across the houses to the Carmo hill
+  function liftTower(cx, cz){
+    const x0 = cx + 5, x1 = cx + 11, z0 = cz - 3, z1 = cz + 3, top = 42, iron = C(0x2a2c33);
+    lift.sides(x0, x1, 0.18, top, z0, z1, WHITE, 6, 14);
+    trim.box(x0 - 0.4, x1 + 0.4, top, top + 0.5, z0 - 0.4, z1 + 0.4, iron);
+    lift.sides(x0 + 1, x1 - 1, top + 0.5, top + 5, z0 + 1, z1 - 1, WHITE, 4, 7);
+    trim.box(x0 + 0.6, x1 - 0.6, top + 5, top + 5.5, z0 + 0.6, z1 - 0.6, iron);
+    trim.box(cx - 40, x0, top - 3, top - 1.9, cz - 1.8, cz + 1.8, iron);
+    trim.box(cx - 40, x0, top - 1.9, top - 0.9, cz - 1.8, cz - 1.6, iron);
+    trim.box(cx - 40, x0, top - 1.9, top - 0.9, cz + 1.6, cz + 1.8, iron);
+    colliders.push({ t: 'b', x0, x1, z0, z1 });
+    radarRects.push({ x0, x1, z0, z1, c: 'rgba(255,255,255,.3)' });
   }
 
   function signalHead(px, pz, fx, fz, axis, g){
@@ -751,16 +879,22 @@ function buildCity(){
     });
   }
 
-  const glowPts = [], cones = [];
   for (let i = -4; i <= 3; i++) for (let j = -4; j <= 3; j++){
     const cx = (i + 0.5) * PITCH, cz = (j + 0.5) * PITCH;
     const isInner = i >= -3 && i <= 2 && j >= -3 && j <= 2;
-    const type = types.get(i + ',' + j) || 'build';
+    if (j === 3) continue; // south of the waterfront road lies the river
+    const key = i + ',' + j, type = types.get(key) || 'build', open = type === 'praca' || type === 'figueira';
     slabs.sides(cx - HALF_BLOCK, cx + HALF_BLOCK, 0, 0.18, cz - HALF_BLOCK, cz + HALF_BLOCK, slabSide);
-    slabs.top(cx - HALF_BLOCK, cx + HALF_BLOCK, 0.18, cz - HALF_BLOCK, cz + HALF_BLOCK, type === 'plaza' ? plazaTop : slabTop, [(cx - HALF_BLOCK) / 4, (cz + HALF_BLOCK) / 4, (cx + HALF_BLOCK) / 4, (cz - HALF_BLOCK) / 4]);
+    if (type === 'rossio') waves.top(cx - HALF_BLOCK, cx + HALF_BLOCK, 0.18, cz - HALF_BLOCK, cz + HALF_BLOCK, plazaTop, [(cx - HALF_BLOCK) / 11, (cz + HALF_BLOCK) / 11, (cx + HALF_BLOCK) / 11, (cz - HALF_BLOCK) / 11]);
+    else slabs.top(cx - HALF_BLOCK, cx + HALF_BLOCK, 0.18, cz - HALF_BLOCK, cz + HALF_BLOCK, open ? plazaTop : slabTop, [(cx - HALF_BLOCK) / 4, (cz + HALF_BLOCK) / 4, (cx + HALF_BLOCK) / 4, (cz - HALF_BLOCK) / 4]);
     if (type === 'park') park(cx, cz);
-    else if (type === 'plaza') plaza(cx, cz);
-    else building(cx, cz, isInner);
+    else if (type === 'rossio') rossio(cx, cz);
+    else if (open){
+      if (type === 'figueira') equestrian(cx, cz, 1);
+      shardSpots.push({ x: cx + 10.5, z: cz }, { x: cx - 10.5, z: cz });
+    }
+    else if (type === 'lift'){ building(cx, cz, false, [[-13, 0, -13, 13]]); liftTower(cx, cz); }
+    else building(cx, cz, YELLOW.has(key), SOLID.has(key) ? [[-13, 13, -13, 13]] : null);
     if (!isInner) continue;
     for (const sx of [-1, 1]) for (const sz of [-1, 1]){
       const x = cx + sx * 15.4, z = cz + sz * 15.4;
@@ -779,26 +913,88 @@ function buildCity(){
     }
   }
 
-  // Skyline beyond downtown
-  for (let n = 0; n < 110; n++){
-    const a = rng() * Math.PI * 2, r = 215 + rng() * 170;
-    const x = Math.cos(a) * r, z = Math.sin(a) * r;
-    if (Math.max(Math.abs(x), Math.abs(z)) < 200) continue;
-    const w = 12 + Math.floor(rng() * 6) * 3, d = 12 + Math.floor(rng() * 6) * 3, h = 24 + Math.floor(rng() * 26) * FLOOR;
-    const style = rng() < 0.55 ? 'glass' : 'office';
-    facade(style, x - w / 2, x + w / 2, 0, h, z - d / 2, z + d / 2, pick(style).multiplyScalar(0.8));
-    roofs.top(x - w / 2, x + w / 2, h, z - d / 2, z + d / 2, roofCol);
+  // The square is one surface: the stretch of Rua Augusta that crosses it is paved like the rest
+  slabs.top(-7, 7, 0.012, 103, 137, plazaTop, [-7 / 4, 137 / 4, 7 / 4, 103 / 4]);
+  equestrian(0, 120, 1.25);
+  arco(78);
+
+  // Quay, Cais das Colunas and the river Tejo
+  trim.box(-700, 700, 0, 0.35, 151, 157, stoneCol);
+  const pillars = mergeGeos([-6, 6].flatMap(x => [new THREE.CylinderGeometry(0.5, 0.6, 6, 12).translate(x, 3.3, 155), new THREE.BoxGeometry(1.5, 0.6, 1.5).translate(x, 6.5, 155)]));
+  const colunas = new THREE.Mesh(pillars, stone); colunas.castShadow = true; grp.add(colunas);
+  const ripple = GRASS.normal.clone(); ripple.needsUpdate = true; ripple.repeat.set(70, 40);
+  const river = new THREE.Mesh(new THREE.PlaneGeometry(1400, 640), new THREE.MeshStandardMaterial({ color: 0x12304c, roughness: 0.24, metalness: 0.6, normalMap: ripple, normalScale: new THREE.Vector2(0.3, 0.3) }));
+  river.material.userData.env = 1.5;
+  river.rotation.x = -Math.PI / 2; river.position.set(0, 0.08, 157 + 320); river.receiveShadow = true;
+  grp.add(river); CITY.water = river;
+  radarRects.push({ x0: -300, x1: 300, z0: 157, z1: 340, c: 'rgba(70,140,230,.28)' });
+
+  // The hills around the valley: Bairro Alto in the west, the castle hill in the east, the Avenida in the north
+  const HILLS = [[330, -110, 175, 64, 240], [-345, -60, 150, 60, 320], [0, -470, 340, 45, 190]];
+  const hillH = (x, z) => Math.max(0, ...HILLS.map(([cx, cz, rx, ry, rz]) => ry * Math.sqrt(Math.max(0, 1 - ((x - cx) / rx) ** 2 - ((z - cz) / rz) ** 2))));
+  grp.add(new THREE.Mesh(mergeGeos(HILLS.map(([cx, cz, rx, ry, rz]) => new THREE.SphereGeometry(1, 24, 14).scale(rx, ry, rz).translate(cx, 0, cz))), new THREE.MeshStandardMaterial({ color: 0x2a3142, roughness: 1 })));
+  for (let n = 0; n < 240; n++){
+    const a = rng() * Math.PI * 2, r = 205 + rng() * 240, x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (Math.max(Math.abs(x), Math.abs(z)) < 200 || z > 145) continue;
+    const base = hillH(x, z), w = 12 + Math.floor(rng() * 4) * 3, d = 12 + Math.floor(rng() * 4) * 3, h = (3 + Math.floor(rng() * 4)) * FLOOR;
+    const style = rng() < 0.7 ? 'pombal' : 'azulejo';
+    facade(style, x - w / 2, x + w / 2, base - 4, base + h, z - d / 2, z + d / 2, pick(style).multiplyScalar(0.85));
+    hipRoof(x - w / 2, x + w / 2, base + h, z - d / 2, z + d / 2, 3, roofTile());
   }
+  // Houses climbing the hills, so the slopes are not empty at night
+  for (const [hx, hz, rx, , rz] of HILLS) for (let n = 0; n < 130; n++){
+    const a = rng() * Math.PI * 2, q = Math.sqrt(rng()) * 0.96, x = hx + Math.cos(a) * q * rx, z = hz + Math.sin(a) * q * rz;
+    if (Math.max(Math.abs(x), Math.abs(z)) < 200 || z > 145) continue;
+    const base = hillH(x, z), w = 10 + Math.floor(rng() * 3) * 3, d = 10 + Math.floor(rng() * 3) * 3, h = (2 + Math.floor(rng() * 3)) * FLOOR;
+    const style = rng() < 0.7 ? 'pombal' : 'azulejo';
+    facade(style, x - w / 2, x + w / 2, base - 5, base + h, z - d / 2, z + d / 2, pick(style).multiplyScalar(0.85));
+    hipRoof(x - w / 2, x + w / 2, base + h, z - d / 2, z + d / 2, 2.6, roofTile());
+  }
+  // The Castelo de Sao Jorge, floodlit like every night
+  {
+    const cx = 300, cz = -115, b = hillH(cx, cz) - 3, W2 = 40, D2 = 28, wall = C(0xd8a868), H = 13;
+    neon.box(cx - W2, cx + W2, b, b + H, cz - D2, cz - D2 + 3, wall); neon.box(cx - W2, cx + W2, b, b + H, cz + D2 - 3, cz + D2, wall);
+    neon.box(cx - W2, cx - W2 + 3, b, b + H, cz - D2, cz + D2, wall); neon.box(cx + W2 - 3, cx + W2, b, b + H, cz - D2, cz + D2, wall);
+    for (const [tx, tz] of [[-W2, -D2], [W2, -D2], [-W2, D2], [W2, D2], [0, D2], [-W2 / 2, -D2]]) neon.box(cx + tx - 5, cx + tx + 5, b, b + H + 8, cz + tz - 5, cz + tz + 5, C(0xe0b274));
+    for (let x = -W2; x < W2; x += 6){ neon.box(cx + x, cx + x + 3, b + H, b + H + 2, cz + D2 - 2, cz + D2, wall); neon.box(cx + x, cx + x + 3, b + H, b + H + 2, cz - D2, cz - D2 + 2, wall); }
+    for (let z = -D2; z < D2; z += 6) neon.box(cx - W2, cx - W2 + 2, b + H, b + H + 2, cz + z, cz + z + 3, wall);
+  }
+  // Far across the water (no fog, or the night would swallow them): the south bank, Cristo Rei and the 25 de Abril bridge
+  const farMat = c => new THREE.MeshBasicMaterial({ color: c, fog: false });
+  const bank = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 12).scale(1200, 46, 130).translate(0, 0, 770), farMat(0x070a18));
+  const cristo = new THREE.Mesh(mergeGeos([boxG(9, 42, 9, -170, 62, 690), boxG(5.5, 19, 4, -170, 92, 690), boxG(22, 2.8, 3, -170, 98, 690), boxG(3, 3.4, 3, -170, 103, 690)]), farMat(0xa9aec4));
+  const bridge = new THREE.Group();
+  {
+    const seg = (x0, y0, x1, y1, t) => { const l = Math.hypot(x1 - x0, y1 - y0), g = new THREE.BoxGeometry(l, t, t); g.rotateZ(Math.atan2(y1 - y0, x1 - x0)); g.translate((x0 + x1) / 2, (y0 + y1) / 2, 0); return g; };
+    const steel = [new THREE.BoxGeometry(700, 4, 9).translate(0, 40, 0)];
+    for (const tx of [-150, 150]) steel.push(new THREE.BoxGeometry(7, 112, 5).translate(tx, 56, -6), new THREE.BoxGeometry(7, 112, 5).translate(tx, 56, 6), new THREE.BoxGeometry(7, 5, 16).translate(tx, 108, 0), new THREE.BoxGeometry(7, 5, 16).translate(tx, 72, 0));
+    const main = x => 46 + 62 * (x / 150) ** 2;
+    for (let x = -150; x < 150; x += 12.5){ steel.push(seg(x, main(x), x + 12.5, main(x + 12.5), 1.4)); steel.push(new THREE.BoxGeometry(0.5, main(x) - 42, 0.5).translate(x, (main(x) + 42) / 2, 0)); }
+    for (const sx of [-1, 1]) steel.push(seg(sx * 150, 108, sx * 350, 42, 1.4));
+    bridge.add(new THREE.Mesh(mergeGeos(steel), farMat(0x93422c)));
+    const lamps = [];
+    for (let x = -345; x <= 345; x += 12) lamps.push(x, 43.5, 0);
+    const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lamps, 3));
+    bridge.add(new THREE.Points(lg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffcf8c, size: 7, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
+    const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute([-150, 114, 0, 150, 114, 0], 3));
+    bridge.add(new THREE.Points(rg, new THREE.PointsMaterial({ map: glowTexture, color: 0xff3344, size: 15, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
+    bridge.position.set(-400, 0, 410); bridge.rotation.y = -1.2;
+  }
+  const bl = [];
+  for (let n = 0; n < 260; n++){ const x = (rng() - 0.5) * 1700, k = rng(); bl.push(x, 5 + k * 28, 655 + k * 55); }
+  const blg = new THREE.BufferGeometry(); blg.setAttribute('position', new THREE.Float32BufferAttribute(bl, 3));
+  grp.add(bank, cristo, bridge, new THREE.Points(blg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffd9a0, size: 3.4, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
 
   // Road markings, crosswalks and stop lines
-  const yel = C(0xe2b94f), wht = C(0xd8dbe4);
+  const wht = C(0xd8dbe4);
   for (let k = -3; k <= 3; k++){
     const c = k * PITCH;
     for (let s = -186; s < 186; s += 6){
       const mid = s + 1.5;
       if (Math.abs(mid - Math.round(mid / PITCH) * PITCH) < 14) continue;
-      marks.top(s, s + 3, 0.02, c - 0.12, c + 0.12, yel);
-      marks.top(c - 0.12, c + 0.12, 0.02, s, s + 3, yel);
+      if (k < 3) marks.top(s, s + 3, 0.02, c - 0.12, c + 0.12, wht);
+      // no lane line where Rua Augusta crosses the square, and none in the river
+      if (s < 148 && !(k === 0 && s > 100 && s < 137)) marks.top(c - 0.12, c + 0.12, 0.02, s, s + 3, wht);
     }
     for (let m = -3; m <= 3; m++){
       const ix = m * PITCH, iz = c;
@@ -820,6 +1016,34 @@ function buildCity(){
     }
   }
 
+  // The tram tracks, along the exact path the trams drive: a stone track bed set into the asphalt, a dark groove and a
+  // bright steel rail on each side, with a curve at each corner of the loop and straight through the crossings
+  const trackBed = new Batch(), bedCol = C(0x8a8780), grooveCol = C(0x17181c), railCol = C(0xd5d9e2);
+  const flat = (batch, a, b, c, d, col) => {
+    const area = [a, b, c, d].reduce((t, p, i, q) => { const n = q[(i + 1) % 4]; return t + p[0] * n[2] - n[0] * p[2]; }, 0);
+    const pts = area < 0 ? [a, b, c, d] : [d, c, b, a], uv = pts.flatMap(p => [p[0] / 4, p[2] / 4]);
+    batch.quadUV(pts[0], pts[1], pts[2], pts[3], [0, 1, 0], uv, col);
+  };
+  // one strip offset from the lane centre by `off`, half as wide as `half`, height y, along a straight run and its corner curve
+  const strip = (batch, off, half, y, col) => {
+    const T = TRAM_LOOP, corners = [[T.x0, T.z0], [T.x1, T.z0], [T.x1, T.z1], [T.x0, T.z1]], LANE = T.lane;
+    corners.forEach((A, q) => {
+      const B = corners[(q + 1) % 4], L = Math.hypot(B[0] - A[0], B[1] - A[1]), dx = (B[0] - A[0]) / L, dz = (B[1] - A[1]) / L, [rx, rz] = rightOf(dx, dz);
+      const o0 = LANE + off - half, o1 = LANE + off + half;
+      const p = (t, o) => [A[0] + dx * t + rx * o, y, A[1] + dz * t + rz * o];
+      flat(batch, p(7, o0), p(L - 7, o0), p(L - 7, o1), p(7, o1), col);
+      // the same centre and radius the tram turns around (startTurn): the kerb corner, radius 3.5
+      const Cx = B[0] - dx * 7 + rx * 7, Cz = B[1] - dz * 7 + rz * 7, a0 = Math.atan2(-rz, -rx), delta = wrapAngle(Math.atan2(dz, dx) - a0), ARC = 10;
+      const arc = (ang, o) => [Cx + Math.cos(ang) * (7 - o), y, Cz + Math.sin(ang) * (7 - o)];
+      for (let i = 0; i < ARC; i++){
+        const a = a0 + delta * i / ARC, b = a0 + delta * (i + 1) / ARC;
+        flat(batch, arc(a, o0), arc(b, o0), arc(b, o1), arc(a, o1), col);
+      }
+    });
+  };
+  strip(trackBed, 0, 1.15, 0.012, bedCol);
+  for (const side of [-0.72, 0.72]){ strip(marks, side, 0.15, 0.03, grooveCol); strip(marks, side, 0.075, 0.045, railCol); }
+
   // Parked cars along the curbs
   const parked = [];
   for (let k = -3; k <= 3; k++) for (let m = -3; m <= 2; m++) for (const side of [-1, 1]) for (const slot of [14, 34]){
@@ -827,7 +1051,7 @@ function buildCity(){
       if (rng() > 0.35) continue;
       const along = m * PITCH + slot + (rng() - 0.5) * 2, across = k * PITCH + side * 5.6;
       const x = axis === 'x' ? along : across, z = axis === 'x' ? across : along;
-      if (Math.hypot(x, z) < 24) continue;
+      if (Math.hypot(x, z) < 24 || (Math.abs(x) < 8 && z > 66 && z < 137)) continue;
       parked.push({ x, z, h: (axis === 'x' ? Math.PI / 2 : 0) + (rng() < 0.5 ? Math.PI : 0), suv: rng() < 0.3 });
       const hx = axis === 'x' ? 2.3 : 0.95, hz = axis === 'x' ? 0.95 : 2.3;
       colliders.push({ t: 'p', x0: x - hx, x1: x + hx, z0: z - hz, z1: z + hz });
@@ -842,10 +1066,27 @@ function buildCity(){
   }
 
   const add = (mesh, cast, recv) => { mesh.castShadow = !!cast; mesh.receiveShadow = !!recv; grp.add(mesh); return mesh; };
-  for (const s of ['brick', 'office', 'glass', 'shop']) add(FB[s].mesh(MAT[s]), true, true);
+  for (const s of ['pombal', 'azulejo', 'shop']) add(FB[s].mesh(MAT[s]), true, true);
   add(trim.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 })), true, true);
-  add(roofs.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })), false, true);
-  add(slabs.mesh(surfaceMat(PAVING, [1, 1], { vertexColors: true })), false, true);
+  add(roofs.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side: THREE.DoubleSide })), false, true);
+  add(slabs.mesh(surfaceMat(CALCADA, [1, 1], { vertexColors: true })), false, true);
+  add(waves.mesh(surfaceMat(WAVES, [1, 1], { vertexColors: true })), false, true);
+  add(trackBed.mesh(surfaceMat(CALCADA, [1, 1], { vertexColors: true, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })), false, true);
+  add(lift.mesh(facMat(toTex(...(() => {
+    const [m, g, e, ge] = canvasPair(128, 256);
+    g.fillStyle = '#25272e'; g.fillRect(0, 0, 128, 256);
+    g.strokeStyle = '#6f7380'; g.lineWidth = 4;
+    for (let i = 0; i < 2; i++) for (let j = 0; j < 3; j++){
+      const x = 12 + i * 58, y = 12 + j * 82, w = 46, h = 70;
+      for (const c of [g, ge]){
+        c.fillStyle = c === g ? '#927349' : '#4e3c24';
+        c.beginPath(); c.moveTo(x, y + h); c.lineTo(x, y + 22); c.quadraticCurveTo(x + 4, y + 6, x + w / 2, y); c.quadraticCurveTo(x + w - 4, y + 6, x + w, y + 22); c.lineTo(x + w, y + h); c.closePath(); c.fill();
+      }
+      g.beginPath(); g.moveTo(x, y + h); g.lineTo(x, y + 22); g.quadraticCurveTo(x + 4, y + 6, x + w / 2, y); g.quadraticCurveTo(x + w - 4, y + 6, x + w, y + 22); g.lineTo(x + w, y + h); g.closePath(); g.stroke();
+      g.beginPath(); g.moveTo(x + w / 2, y); g.lineTo(x + w / 2, y + h); g.moveTo(x, y + h * 0.55); g.lineTo(x + w, y + h * 0.55); g.stroke();
+    }
+    return [m, e];
+  })()), { roughness: 0.6, metalness: 0.4 })), true, false);
   add(ao.mesh(new THREE.MeshBasicMaterial({ map: aoTexture, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })), false, false);
   add(grass.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })), false, true);
   add(marks.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 })), false, true);
@@ -878,21 +1119,31 @@ function buildCity(){
 // ### Each city car drives in the right-hand lane towards the next intersection (node), decides straight/left/right there,
 // ### and follows a circular arc through the turn. It stops at red lights, keeps distance to the car ahead and to the player,
 // ### and is stunned for a moment when hit. Leftover distance is carried over between straight and arc so motion stays smooth.
+// ### Trams use the same logic, but Core.tramNext keeps them on the loop, which is where buildCity lays the tracks.
 const npcs = [];
 let npcFleets = null, npcHead = null, npcTail = null;
-const N_NPC = 26, NPC_SUV = 8;
+const N_NPC = 26, NPC_SUV = 8, N_TRAM = 3;
+const { TRAM_LOOP } = Core;
+const TRAM_SEGS = (() => {
+  const T = TRAM_LOOP, out = [];
+  for (let x = T.x0; x < T.x1; x += PITCH) out.push({ x, z: T.z0, dx: 1, dz: 0 }, { x: x + PITCH, z: T.z1, dx: -1, dz: 0 });
+  for (let z = T.z0; z < T.z1; z += PITCH) out.push({ x: T.x1, z, dx: 0, dz: 1 }, { x: T.x0, z: z + PITCH, dx: 0, dz: -1 });
+  return out;
+})();
 const rightOf = (dx, dz) => [-dz, dx];
 const inGrid = (x, z) => Math.abs(x) <= 3 * PITCH + 1 && Math.abs(z) <= 3 * PITCH + 1;
 function initCityTraffic(){
   const grp = CITY.group, rnd = mulberry32(99);
-  npcFleets = { sedan: new Fleet(grp, PARTS.sedan, N_NPC - NPC_SUV, rnd), suv: new Fleet(grp, PARTS.suv, NPC_SUV, rnd) };
-  npcHead = new GlowPts(grp, N_NPC * 2, 0xfff1cc, 2.6); npcTail = new GlowPts(grp, N_NPC * 2, 0xff3344, 1.8);
+  npcFleets = { sedan: new Fleet(grp, PARTS.sedan, N_NPC - NPC_SUV, rnd), suv: new Fleet(grp, PARTS.suv, NPC_SUV, rnd), tram: new Fleet(grp, PARTS.tram, N_TRAM, rnd, 0xf2bd1c) };
+  npcHead = new GlowPts(grp, (N_NPC + N_TRAM) * 2, 0xfff1cc, 2.6); npcTail = new GlowPts(grp, (N_NPC + N_TRAM) * 2, 0xff3344, 1.8);
   for (let i = 0; i < N_NPC; i++){
     const suv = i >= N_NPC - NPC_SUV;
     npcs.push({ fleet: suv ? 'suv' : 'sedan', fi: suv ? i - (N_NPC - NPC_SUV) : i, x: 0, z: 0, dx: 0, dz: 1, node: null, next: 's', speed: 0, cruise: 10, turn: null, stun: 0, on: false, h: 0 });
   }
+  for (let i = 0; i < N_TRAM; i++) npcs.push({ fleet: 'tram', tram: true, fi: i, x: 0, z: 0, dx: 1, dz: 0, node: null, next: 's', speed: 0, cruise: 8, turn: null, stun: 0, on: false, h: 0 });
 }
 function chooseNext(n){
+  if (n.tram) return Core.tramNext(n.node.x, n.node.z, n.dx, n.dz);
   const [rx, rz] = rightOf(n.dx, n.dz), opts = [];
   if (inGrid(n.node.x + n.dx * PITCH, n.node.z + n.dz * PITCH)) opts.push(['s', 0.55]);
   if (inGrid(n.node.x + rx * PITCH, n.node.z + rz * PITCH)) opts.push(['r', 0.25]);
@@ -903,18 +1154,25 @@ function chooseNext(n){
 }
 function spawnNpc(n, minDist){
   for (let k = 0; k < 30; k++){
-    const line = (Math.floor(Math.random() * 7) - 3) * PITCH, seg = (Math.floor(Math.random() * 6) - 3) * PITCH;
-    const along = seg + 12 + Math.random() * 24, axisX = Math.random() < 0.5, dir = Math.random() < 0.5 ? 1 : -1;
-    const dx = axisX ? dir : 0, dz = axisX ? 0 : dir;
+    let dx, dz, along, sx, sz;
+    if (n.tram){
+      const S = TRAM_SEGS[Math.floor(Math.random() * TRAM_SEGS.length)];
+      dx = S.dx; dz = S.dz; sx = S.x; sz = S.z; along = 12 + Math.random() * 24;
+    } else {
+      const line = (Math.floor(Math.random() * 7) - 3) * PITCH, seg = (Math.floor(Math.random() * 6) - 3) * PITCH, axisX = Math.random() < 0.5, dir = Math.random() < 0.5 ? 1 : -1;
+      dx = axisX ? dir : 0; dz = axisX ? 0 : dir;
+      // the node this segment starts from: the far end of the block when driving against the axis
+      sx = axisX ? (dir > 0 ? seg : seg + PITCH) : line; sz = axisX ? line : (dir > 0 ? seg : seg + PITCH);
+      along = 12 + Math.random() * 24;
+    }
     const [rx, rz] = rightOf(dx, dz);
-    const x = (axisX ? along : line) + rx * 3.5, z = (axisX ? line : along) + rz * 3.5;
-    if (Math.hypot(x - car.x, z - car.z) < minDist) continue;
-    if (npcs.some(o => o !== n && o.on && Math.hypot(o.x - x, o.z - z) < 12)) continue;
-    const nodeAlong = dir > 0 ? seg + PITCH : seg;
+    const x = sx + dx * along + rx * 3.5, z = sz + dz * along + rz * 3.5;
+    if (Math.hypot(x - car.x, z - car.z) < minDist + (n.tram ? 4 : 0)) continue;
+    if (npcs.some(o => o !== n && o.on && Math.hypot(o.x - x, o.z - z) < (n.tram || o.tram ? 16 : 12))) continue;
     n.x = x; n.z = z; n.dx = dx; n.dz = dz;
-    n.node = axisX ? { x: nodeAlong, z: line } : { x: line, z: nodeAlong };
+    n.node = { x: sx + dx * PITCH, z: sz + dz * PITCH };
     n.next = chooseNext(n); n.turn = null; n.stun = 0; n.on = true;
-    n.cruise = 9 + Math.random() * 4; n.speed = n.cruise * 0.6;
+    n.cruise = n.tram ? 8 : 9 + Math.random() * 4; n.speed = n.cruise * 0.6;
     return;
   }
   n.on = false;
@@ -942,7 +1200,7 @@ function npcGap(n, fx, fz){
     if (rel <= 0 || rel > 40) return;
     if (Math.abs((x - n.x) * rx + (z - n.z) * rz) < lat && rel < gap) gap = rel;
   };
-  for (const o of npcs) if (o !== n && o.on) test(o.x, o.z, 2.2);
+  for (const o of npcs) if (o !== n && o.on) test(o.x, o.z, o.tram ? 2.6 : 2.2);
   test(car.x, car.z, 2.6);
   for (const p of police) if (p.active) test(p.x, p.z, 2.4);
   return gap;
@@ -955,7 +1213,7 @@ function updateNpcs(dt){
       const T = n.turn;
       const fx0 = -Math.sin(T.a0 + T.delta * T.t) * Math.sign(T.delta), fz0 = Math.cos(T.a0 + T.delta * T.t) * Math.sign(T.delta);
       const gap = npcGap(n, fx0, fz0);
-      const desired = n.stun > 0 ? 0 : Math.min(6.5, Math.max(0, (gap - 6) * 1.0));
+      const desired = n.stun > 0 ? 0 : Math.min(n.tram ? 4 : 6.5, Math.max(0, (gap - (n.tram ? 8.5 : 6)) * 1.0));
       n.speed += clamp((desired - n.speed) * Math.min(1, dt * 3), -14 * dt, 4 * dt);
       const tNext = T.t + Math.max(0, n.speed) * dt / T.len;
       if (tNext >= 1){
@@ -977,7 +1235,7 @@ function updateNpcs(dt){
       if (toNode > 11.6 && toNode < 45 && st !== 'g' && !(st === 'y' && toNode < 17)) desired = Math.min(desired, Math.max(0, (toNode - 12.2) * 0.8));
       if (n.next !== 's' && toNode < 22) desired = Math.min(desired, 7);
       const gap = npcGap(n, n.dx, n.dz);
-      desired = Math.min(desired, Math.max(0, (gap - 6.5) * 1.0));
+      desired = Math.min(desired, Math.max(0, (gap - (n.tram ? 8.5 : 6.5)) * 1.0));
       n.speed += clamp((desired - n.speed) * Math.min(1, dt * 3), -14 * dt, 4 * dt);
       n.x += n.dx * n.speed * dt; n.z += n.dz * n.speed * dt;
       n.h = Math.atan2(n.dx, n.dz);
@@ -990,9 +1248,10 @@ function updateNpcs(dt){
   }
   for (const n of npcs){
     npcFleets[n.fleet].set(n.fi, n.x, 0, n.z, n.h, n.on);
-    vehicleGlow(npcHead, npcTail, npcs.indexOf(n), n.x, n.z, n.h, 2.3, 2.3, 0.75, 0.62, n.on);
+    vehicleGlow(npcHead, npcTail, npcs.indexOf(n), n.x, n.z, n.h, n.tram ? 4.25 : 2.3, n.tram ? 4.25 : 2.3, n.tram ? 1.3 : 0.75, n.tram ? 0.1 : 0.62, n.on);
   }
-  npcFleets.sedan.commit(); npcFleets.suv.commit(); npcHead.commit(); npcTail.commit();
+  npcFleets.sedan.commit(); npcFleets.suv.commit(); npcFleets.tram.commit(); npcHead.commit(); npcTail.commit();
+  if (CITY.water) CITY.water.material.normalMap.offset.x += dt * 0.012;
 }
 function resetNpcs(){ npcs.forEach(n => { n.on = false; }); npcs.forEach(n => spawnNpc(n, 25)); }
 
@@ -1939,6 +2198,10 @@ function buildObstacles(){
   for (const n of npcs){
     if (!n.on) continue;
     const fx = Math.sin(n.h), fz = Math.cos(n.h);
+    if (n.tram){
+      for (const o of [-2.9, 0, 2.9]) out.push({ x: n.x + fx * o, z: n.z + fz * o, r: 1.3, npc: n, vx: fx * n.speed, vz: fz * n.speed });
+      continue;
+    }
     out.push({ x: n.x + fx * 1.15, z: n.z + fz * 1.15, r: 1.05, npc: n, vx: fx * n.speed, vz: fz * n.speed });
     out.push({ x: n.x - fx * 1.15, z: n.z - fz * 1.15, r: 1.05, npc: n, vx: fx * n.speed, vz: fz * n.speed });
   }
@@ -1947,7 +2210,7 @@ function buildObstacles(){
 
 // ---------- Pickups (placed fresh every run) ----------
 // ### placeRun places the star shards, the green repair kits and the finish gate for the current map.
-// ### City: shards in parks, on the plaza and on roads, gate on the ring road. Highway/countryside: shards along the route,
+// ### City: shards in parks, on the squares and on roads, gate under the Arco da Rua Augusta. Highway/countryside: shards along the route,
 // ### each worth +4 s, gate at the end.
 const gemGeo = new THREE.OctahedronGeometry(0.9, 0); gemGeo.scale(1, 1.45, 1);
 const gemMat = new THREE.MeshStandardMaterial({ color: 0x9ff6ff, emissive: SPARK, emissiveIntensity: 1.4, flatShading: true, roughness: 0.2, metalness: 0.3 });
@@ -1983,9 +2246,7 @@ function placeRun(){
     const roads = shuffle(roadSpots.slice(), rnd);
     for (const s of roads){ if (chosen.length >= M.shards) break; const p = lane(s); if (Math.hypot(p.x, p.z) > 30 && far(p, chosen, 36)) chosen.push(p); }
     for (const s of roads){ if (kitSpots.length >= M.kits) break; const p = lane(s); if (far(p, chosen, 25) && far(p, kitSpots, 60) && Math.hypot(p.x, p.z) > 40) kitSpots.push(p); }
-    const edge = intersections.filter(p => Math.max(Math.abs(p.x), Math.abs(p.z)) === 3 * PITCH && Math.hypot(p.x, p.z) > 120);
-    gp = edge[Math.floor(rnd() * edge.length)];
-    gateRot = Math.abs(gp.x) === 3 * PITCH ? 0 : Math.PI / 2;
+    gp = { x: 0, z: 81 };
     gateR = 5.4; gateY = 5.8;
   } else if (mode === 'country'){
     for (let i = 0; i < M.shards; i++){ const s = 220 + i * (ROAD.len - 480) / (M.shards - 1), pt = roadPoint(s, (rnd() < 0.5 ? -1 : 1) * ROAD.lane); chosen.push({ x: pt.x, z: pt.z, s }); }
@@ -2417,8 +2678,13 @@ function renderChips(){
     `<span class="count">${collected}/${items.length}</span>`;
 }
 const pedal = { thr: 0, brk: 0 };
-const last = { time: '', speed: -1, rpm: -1, sig: '', gear: '', hb: null, thr: -1, brk: -1, dmg: -1, km: '', pur: '', bust: -1 };
+const last = { street: '', time: '', speed: -1, rpm: -1, sig: '', gear: '', hb: null, thr: -1, brk: -1, dmg: -1, km: '', pur: '', bust: -1 };
 function updateHud(dt){
+  // in story mode this line names the act instead
+  if (mode === 'city' && !story){
+    const street = Core.streetAt(car.x, car.z, car.heading);
+    if (street && street !== last.street){ ui.eye.textContent = street; last.street = street; }
+  }
   const tt = fmtTime(timeLeft);
   if (tt !== last.time){ ui.time.textContent = tt; ui.time.classList.toggle('low', timeLeft <= 20 && state === 'play'); last.time = tt; }
   const sp = Math.abs(car.speed), kmh = Math.round(sp * 3.6);
@@ -2616,7 +2882,7 @@ function setMode(m){
   ui.eye.textContent = M.eyebrow;
   ui.mission.textContent = M.mission;
   ui.prog.hidden = !M.linear;
-  last.km = '';
+  last.km = ''; last.street = '';
   initGauge();
   buildBoundary();
 }
@@ -2647,7 +2913,7 @@ function startRun(m, v){
   hud.classList.remove('off');
   hideOverlay();
   state = 'play';
-  if (mode === 'city') toast('Grab 8 star shards and reach the gate. Every police car is looking for inmate 4471.', '', 4200);
+  if (mode === 'city') toast('Grab 8 star shards, then escape through the Arco da Rua Augusta. Every police car is looking for inmate 4471.', '', 4200);
   else if (mode === 'country') toast('Follow the country road to the village. Shards add +4 s. Watch the oncoming traffic.', '', 4500);
   else toast(`Reach the finish 4 km ahead. Shards add +${M.bonus} s. Police incoming.`, '', 4500);
 }
@@ -2676,7 +2942,7 @@ function collect(it){
   if (collected >= items.length){
     gate.active = true; gate.group.visible = true; gate.grow = 0;
     sfx.gate();
-    toast('All shards found! The getaway gate is open, follow the golden beam.', 'gold', 4500);
+    toast('All shards found! Escape through the Arco da Rua Augusta: follow the golden beam.', 'gold', 4500);
   } else if (collected % 3 === 0) toast(`Shard ${collected} / ${items.length}. More police are joining the chase!`, 'red', 2400);
   else toast(`Star shard ${collected} / ${items.length}`, '', 1800);
 }
@@ -2759,7 +3025,7 @@ const ICONS = {
 };
 const MAP_THUMB = {
   country: '<svg viewBox="0 0 52 38" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="tco" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#060a1c"/><stop offset="1" stop-color="#463352"/></linearGradient></defs><rect width="52" height="38" fill="url(#tco)"/><path d="M0 22c8-6 16-7 26-3s18 2 26-4v23H0z" fill="#2c4529"/><path d="M0 27c10-4 20-3 30 1s16 2 22-1v11H0z" fill="#5f7c3a"/><path d="M30 38c-2-6 4-9 0-13s-5-4-3-6" stroke="#2b2f3b" stroke-width="5" fill="none"/><path d="M30 38c-2-6 4-9 0-13s-5-4-3-6" stroke="#e6e8ee" stroke-width=".6" stroke-dasharray="1.5 1.5" fill="none"/><path d="M8 24l2-6 2 6z" fill="#1e3322"/><path d="M42 21l2-6 2 6z" fill="#1e3322"/></svg>',
-  city: '<svg viewBox="0 0 52 38" aria-hidden="true"><defs><linearGradient id="tc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#060a1c"/><stop offset="1" stop-color="#463352"/></linearGradient></defs><rect width="52" height="38" fill="url(#tc)"/><g fill="#141a2e"><rect x="3" y="12" width="9" height="26"/><rect x="14" y="5" width="8" height="33"/><rect x="24" y="16" width="10" height="22"/><rect x="36" y="9" width="12" height="29"/></g><g fill="#ffd59a"><rect x="16" y="9" width="2" height="2"/><rect x="39" y="14" width="2" height="2"/><rect x="6" y="17" width="2" height="2"/><rect x="27" y="20" width="2" height="2"/><rect x="18" y="20" width="2" height="2"/><rect x="43" y="24" width="2" height="2"/></g><circle cx="47" cy="34" r="1.5" fill="#2cff8a"/></svg>',
+  city: '<svg viewBox="0 0 52 38" aria-hidden="true"><defs><linearGradient id="tc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#060a1c"/><stop offset="1" stop-color="#463352"/></linearGradient></defs><rect width="52" height="38" fill="url(#tc)"/><path d="M0 24h13v14H0zM39 24h13v14H39z" fill="#e8bb45"/><path d="M13 38V11h26v27h-6V25a7 7 0 0 0-14 0v13z" fill="#d6ccb4"/><path d="M19 11V7h14v4zM24.6 7V2h2.8v5z" fill="#d6ccb4"/><circle cx="26" cy="15" r="2.2" fill="#fff4d8"/><path d="M0 24l13-4v4zM52 24l-13-4v4z" fill="#a45a3d"/></svg>',
   highway: '<svg viewBox="0 0 52 38" aria-hidden="true"><defs><linearGradient id="th" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#060a1c"/><stop offset="1" stop-color="#463352"/></linearGradient></defs><rect width="52" height="38" fill="url(#th)"/><path d="M0 18h52v20H0z" fill="#26332b"/><path d="M22 18h8l16 20H6z" fill="#2b2f3b"/><path d="M25.6 18h.8l1 20h-2.8z" fill="#b4b6c2"/><circle cx="19" cy="31" r="1.4" fill="#ff3344"/><circle cx="21.5" cy="31" r="1.4" fill="#ff3344"/><circle cx="33" cy="24" r="1.1" fill="#fff1cc"/><circle cx="34.6" cy="24" r="1.1" fill="#fff1cc"/></svg>'
 };
 const STAT_NAMES = ['Top speed', 'Acceleration', 'Handling', 'Durability', 'Ramming'];
@@ -2788,7 +3054,7 @@ function showMenu(){
     <section class="m-sec">
       <div class="m-label"><span>01</span>Free ride · Map</div>
       <div class="maps">
-        <button class="map" data-pick="mode" data-val="city" aria-pressed="${sel.mode === 'city'}">${MAP_THUMB.city}<span><b>City traffic</b><small>8 shards · 3:00 · signals</small></span></button>
+        <button class="map" data-pick="mode" data-val="city" aria-pressed="${sel.mode === 'city'}">${MAP_THUMB.city}<span><b>Lisbon · Baixa</b><small>8 shards · 3:00 · trams</small></span></button>
         <button class="map" data-pick="mode" data-val="highway" aria-pressed="${sel.mode === 'highway'}">${MAP_THUMB.highway}<span><b>Highway</b><small>4 km · traffic both ways</small></span></button>
         <button class="map" data-pick="mode" data-val="country" aria-pressed="${sel.mode === 'country'}">${MAP_THUMB.country}<span><b>Countryside</b><small>Hills · farms · village</small></span></button>
       </div>
@@ -2802,7 +3068,7 @@ function showMenu(){
     <div class="m-foot">
       <span class="desk-only"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive · <kbd>Space</kbd> handbrake · <kbd>P</kbd> pause · <kbd>M</kbd> sound</span>
       <span class="touch-only">Steer on the left, brake and gas on the right.</span>
-      <span>Best · City ${bestNote('city')} · Highway ${bestNote('highway')} · Country ${bestNote('country')}</span>
+      <span>Best · Lisbon ${bestNote('city')} · Highway ${bestNote('highway')} · Country ${bestNote('country')}</span>
       <span class="gfx">Graphics <button data-gfx="ultra" aria-pressed="${gfx === 'ultra'}">Ultra</button><button data-gfx="balanced" aria-pressed="${gfx === 'balanced'}">Balanced</button></span>
     </div>`, 'menu');
   renderVehDetail();
@@ -3122,21 +3388,21 @@ function applyGfx(){
 // ### A three-act campaign that follows room 1 (the escape room). The detective, framed for stealing the Starfall
 // ### necklace and jailed as inmate 4471, has escaped through the tunnel. Officer Hale, who opened the way, helps over
 // ### the radio. The police hunt the escaped inmate across the city, the highway and the countryside. An optional sealed
-// ### letter hidden downtown (not shown on the radar) decides the ending: with it the truth comes out (Ending A),
+// ### letter hidden in the Baixa (not shown on the radar) decides the ending: with it the truth comes out (Ending A),
 // ### without it the detective goes back to cell 4471 (Ending B). Busted, wrecked or out of time is Ending C.
 let story = null, courier = null;
 const STORY = {
   acts: [
-    { mode: 'city', title: 'The Scatter', goal: 'Recover the eight star shards hidden downtown.' },
+    { mode: 'city', title: 'The Scatter', goal: 'Recover the eight star shards hidden in Lisbon’s Baixa.' },
     { mode: 'highway', title: 'The Courier', goal: 'Catch the gold-marked courier lorry and take the clasp.' },
     { mode: 'country', title: 'Homecoming', goal: 'Drive back to the Ashford mansion.' }
   ],
   // [seconds into the act, text, tone]: Hale's lines are orange (tone 'hale'), police dispatch is red
   radio: [
-    [[5, 'HALE: You made it out. Eight shards of the Starfall necklace are hidden downtown. Find them before the police find you.', 'hale'],
+    [[5, 'HALE: You made it out. Eight shards of the Starfall necklace are hidden in the Baixa. Find them before the police find you.', 'hale'],
      [9, 'DISPATCH: All units, inmate 4471 has escaped from Cell Block D. %V. Approach with caution.', 'red'],
      [32, 'HALE: Ashford’s people used the parks as dead drops. Look there. Not everything shows up on your radar.', 'hale'],
-     [58, 'DISPATCH: Escaped inmate still downtown. Roadblocks on the ring road.', 'red'],
+     [58, 'DISPATCH: Escaped inmate still in the Baixa. Roadblocks on the waterfront.', 'red'],
      [95, 'DISPATCH: Lady Ashford has been told about the escape. Bring 4471 in.', 'red']],
     [[5, 'HALE: The clasp is on a gold-marked courier lorry heading north. Catch it before the toll.', 'hale'],
      [12, 'DISPATCH: Inmate 4471 on the motorway, northbound. %V. All units intercept.', 'red'],
@@ -3156,7 +3422,7 @@ function showStoryIntro(){
     <div class="eyebrow">Story mode · After the tunnel · 02:30</div>
     <h1>The Necklace <em>Job</em></h1>
     <p>The tunnel under Cell Block D ends in a lock-up garage. Officer Hale’s note was true: a vehicle is waiting, the keys in the ignition, a radio on the seat.</p>
-    <p>Three weeks ago you were framed for stealing the Starfall necklace. Tonight it has been broken into eight star shards and scattered across downtown. Hale believes you but cannot prove it. You can, if you recover the necklace before the police recover you.</p>
+    <p>Three weeks ago you were framed for stealing the Starfall necklace. Tonight it has been broken into eight star shards and scattered across Lisbon’s Baixa. Hale believes you but cannot prove it. You can, if you recover the necklace before the police recover you.</p>
     <div class="acts">${STORY.acts.map((a, i) => `<div><span>Act ${i + 1}</span><b>${a.title}</b><small>${a.goal}</small></div>`).join('')}</div>
     <p class="note">Hale helps over the radio. Look carefully: not everything you need shows up on the radar.</p>
     <div class="actions">
@@ -3307,7 +3573,7 @@ function showEnding(){
     <div class="eyebrow">Finale · Ending B of 3 · Framed</div>
     <h1>Back in <em>4471</em></h1>
     <p>You lay the shards and the clasp on the table. “Thank you, inmate 4471,” says Lady Ashford, and turns to the officers behind you. “There is your thief. Broke out of prison, too.”</p>
-    <p>Without proof, the insurance claim is just paper. By morning you are back in cell 4471, and Hale cannot help you twice. Somewhere downtown, a sealed letter is still waiting in a park.</p>
+    <p>Without proof, the insurance claim is just paper. By morning you are back in cell 4471, and Hale cannot help you twice. Somewhere in the Baixa, a sealed letter is still waiting in a park.</p>
     ${stats}
     <div class="actions"><button class="btn" data-action="story">Try for the true ending <small class="desk-only">Enter</small></button><button class="btn ghost" data-action="menu">Main menu</button></div>`);
 }

@@ -181,3 +181,17 @@ test('the story runs on from room 1 into room 2', () => {
   assert.match(game, /inmate 4471/, 'the police hunt the same inmate');
   assert.match(game, /'hale'/, 'Officer Hale helps over the radio');
 });
+
+test('the city is Lisbon: the gate stands under the arch, and the story says so', () => {
+  assert.match(game, /gp = \{ x: 0, z: 81 \}/, 'the gate is on Rua Augusta');
+  assert.match(game, /arco\(78\)/, 'the arch spans z 78 to 84, around the gate');
+  assert.match(game, /hidden in Lisbon’s Baixa/);
+  assert.ok(!/downtown/i.test(game), 'no leftover from the old unnamed city');
+  assert.match(game, /fleet: 'tram'/, 'trams are part of the traffic');
+});
+
+test('the trams have tracks: bed and rails are built on the same loop the trams drive', () => {
+  assert.match(game, /strip\(trackBed, 0,/, 'a stone track bed');
+  assert.match(game, /strip\(marks, side,/, 'rails on both sides');
+  assert.match(game, /if \(n\.tram\) return Core\.tramNext\(/, 'trams only follow the loop');
+});
