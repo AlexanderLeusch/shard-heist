@@ -64,8 +64,9 @@ test('the Content Security Policy only allows this site and the two CDNs to run 
 
 test('no credentials or secrets anywhere in the repository', () => {
   const patterns = [/AKIA[0-9A-Z]{16}/, /gh[pousr]_[A-Za-z0-9]{30,}/, /sk-[A-Za-z0-9]{20,}/, /-----BEGIN [A-Z ]*PRIVATE KEY-----/, /(api[_-]?key|secret|password|token)\s*[:=]\s*['"][^'"]{8,}['"]/i];
-  const walk = d => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.name.startsWith('.git') || e.name === 'node_modules' ? [] : e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
-  const files = walk(ROOT).filter(f => /\.(js|html|css|json|md|yml|yaml)$/.test(f));
+  // Every file git tracks, so local folders such as plot-twist/.venv (installed packages, ignored by git) do not count
+  const tracked = require('child_process').execFileSync('git', ['ls-files', '-z'], { cwd: ROOT }).toString().split('\0').filter(Boolean);
+  const files = tracked.filter(f => /\.(js|html|css|json|md|yml|yaml|py|toml|txt)$/.test(f)).map(f => path.join(ROOT, f));
   assert.ok(files.length >= 8);
   for (const f of files){
     const text = fs.readFileSync(f, 'utf8');

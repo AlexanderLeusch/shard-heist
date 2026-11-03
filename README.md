@@ -7,7 +7,9 @@ A two-room browser game. **Room 1, *Plot Twist: Cell Block D***, is a 3D prison 
 | 1 · Escape room | https://alexanderleusch.github.io/shard-heist/escape-room/ |
 | 2 · Police chase | https://alexanderleusch.github.io/shard-heist/ |
 
-Both are published automatically from `main` once all tests pass.
+Both are published automatically from `main` once all tests pass. The rules of both rooms are written out in plain English in [rules/](rules/README.md).
+
+The folder `plot-twist/` holds the original solo project *Plot Twist: The Missing Necklace* (Python and Streamlit), which room 1 rebuilds in 3D. It is kept for reference, and CI tests it, but it is not part of the deployed game. Run it with `cd plot-twist && uv run streamlit run app.py`.
 
 ## Room 1 · Plot Twist: Cell Block D
 
@@ -48,6 +50,7 @@ npm test           # rules, story, input, page and escape-room tests (about 1 s)
 npm run test:sri   # checks the library files against their integrity hashes (needs internet)
 npm run test:browser   # plays both rooms in headless Chrome or Edge (about 1.5 min)
 npm run test:all   # all of the above
+cd plot-twist && uv run pytest   # the 36 Python tests of the original Plot Twist project (needs uv)
 ```
 
 Opening `escape-room/index.html` or `index.html` directly from the folder also works.
@@ -55,6 +58,8 @@ Opening `escape-room/index.html` or `index.html` directly from the folder also w
 ## How it is built
 
 ```
+rules/            the rules of both rooms in plain English (working draft)
+plot-twist/       the original Python/Streamlit solo project: logic.py, story.py, db.py, app.py, pytest tests
 escape-room/      ROOM 1, self-contained (it shares no files with room 2):
   index.html        page structure: HUD, markers, cards, error screen
   styles.css        prison look
@@ -69,7 +74,8 @@ src/core.js       the rules: tuning tables, driving, damage, police pressure, sc
 src/game.js       everything visual and real-time: 3D worlds, vehicles, traffic and police AI, sound, HUD, story scenes
 tests/            Node tests for both rooms' rules and pages, plus a headless-browser test of both rooms
 scripts/          dev server (serve.js) and the SRI checker (check-sri.js)
-.github/workflows CI: tests on every push; deploy to GitHub Pages only when they pass
+.github/workflows CI: JavaScript tests, SRI check, browser tests, Python tests and dependency audit on every push to main
+                  and every pull request; deploy to GitHub Pages only when all of them pass
 docs/             Code Guide (PDF): architecture, all code sections, tuning, limits
 ```
 
@@ -95,7 +101,7 @@ docs/             Code Guide (PDF): architecture, all code sections, tuning, lim
 
 ## Testing
 
-`npm test` runs 64 tests in Node (15 of them for the escape room), and `npm run test:browser` runs 14 more in headless Chrome (4 of them in the escape room). CI runs all of them, plus the SRI check, on every push to `main` and on every pull request. They cover:
+`npm test` runs 64 tests in Node (15 of them for the escape room), and `npm run test:browser` runs 14 more in headless Chrome (4 of them in the escape room). CI runs all of them, plus the SRI check and the 36 pytest checks of `plot-twist/`, on every push to `main` and on every pull request. They cover:
 
 - **Escape room:** both endings and the jammed-door grace minute; refused actions (walking where there is no exit, taking an item twice, the tile without the spoon, the door without the mop, lock wheels that do not exist, anything before the briefing or after an ending) return the unchanged state; wrong codes cost 30 s but never take the clock below zero; warnings sound once; tampered saved games are rejected; in the browser: briefing, refused action, save and continue after a reload, a wrong code and then Ending A.
 - **Accepted actions:** each menu action in the states whose cards show it; valid map and vehicle picks; restoring a valid saved selection; finishing every story act; both story endings.
@@ -113,7 +119,7 @@ Writing the tests found two real bugs. Both are fixed:
 - **No accounts, no server, no personal data.** The only data the game stores is your last map and vehicle, best times and the graphics setting, all in your browser's `localStorage`. There are no credentials anywhere in the repository; a test scans every file for keys and tokens.
 - **Input validation.** Everything read back from `localStorage` is checked (`parsePick`, `parseBest`) and replaced by defaults when it is invalid. Menu picks and actions are checked against fixed lists using own properties only. Error messages are inserted as text, never as HTML.
 - **Access control.** Nothing on the site needs a login. Cards accept only the actions allowed in the current state, and the dev server only serves known file types from the project folder (no `.git`, no path traversal, GET and HEAD only).
-- **Dependencies.** No npm packages at all. The only runtime library is three.js 0.128.0 (9 files), pinned by exact URL, checked by SRI hashes (`npm run test:sri`) and loaded with `crossorigin="anonymous"`. `npm audit` reports 0 known vulnerabilities for `three@0.128.0` (checked 3 November 2026). GitHub Actions are pinned to commit hashes.
+- **Dependencies.** No npm packages at all. The Python project pins every package in `uv.lock`, and CI audits them with `pip-audit` (0 known vulnerabilities on 3 November 2026). The only runtime library is three.js 0.128.0 (9 files), pinned by exact URL, checked by SRI hashes (`npm run test:sri`) and loaded with `crossorigin="anonymous"`. `npm audit` reports 0 known vulnerabilities for `three@0.128.0` (checked 3 November 2026). GitHub Actions are pinned to commit hashes.
 - **Content Security Policy.** Scripts may only come from this site and the two pinned CDNs; there are no inline scripts, plugins, forms or foreign base URLs.
 
 ## Limits

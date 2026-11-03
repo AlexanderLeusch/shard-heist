@@ -1,4 +1,4 @@
-# ### CI: every push and pull request runs all tests. On main, the site is published to GitHub Pages only if they pass.
+# ### CI: every push and pull request runs all tests (both rooms in JavaScript, the Python Plot Twist project). On main, the site is published to GitHub Pages only if they pass.
 # ### Actions are pinned to full commit hashes (the version is in the comment), so a moved tag cannot change what runs.
 name: Test and deploy
 
@@ -32,8 +32,24 @@ jobs:
         env:
           CHROME_PATH: /usr/bin/google-chrome
 
+  plot-twist:
+    # The original Plot Twist project (Python/Streamlit) in plot-twist/: its pytest checks and a dependency audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plot-twist
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: Python tests (exact versions from uv.lock)
+        run: uv run --frozen pytest -q
+      - name: Dependency audit (known vulnerabilities)
+        run: |
+          uv export --frozen --no-hashes --format requirements-txt > "$RUNNER_TEMP/requirements.txt"
+          uvx --from pip-audit==2.10.1 pip-audit -r "$RUNNER_TEMP/requirements.txt" --disable-pip --no-deps
+
   deploy:
-    needs: test
+    needs: [test, plot-twist]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
