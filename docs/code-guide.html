@@ -63,12 +63,12 @@ pre .c{ color:#7fd4e2; }
 <!-- Cover -->
 <div class="cover">
   <div class="cover-top">
-    <div class="eyebrow">Technical documentation · Shard Heist 1.0 · Repository edition</div>
+    <div class="eyebrow">Technical documentation · Shard Heist 1.1 · Two rooms</div>
     <h1>Shard Heist<br><em>Code Guide</em></h1>
-    <p class="lede">How the browser police-chase game is built: languages, architecture, the 24 code sections, the per-frame loop, AI and physics, the graphics and audio pipelines, the story mode, testing, security and deployment, an honest complexity assessment and a tuning guide.</p>
+    <p class="lede">How the two-room browser game is built: the 3D prison escape room (room 1) and the police chase (room 2). For the chase: languages, architecture, the 24 code sections, the per-frame loop, AI and physics, the graphics and audio pipelines, the story mode, testing, security and deployment, an honest complexity assessment and a tuning guide.</p>
     <div class="editions">
-      <div><b>Free ride</b>Three maps, three getaway vehicles, police chase.</div>
-      <div><b>Story mode · The Necklace Job</b>Three acts on the three maps, two story items, three endings.</div>
+      <div><b>Room 1 · Plot Twist: Cell Block D</b>3D prison escape room: find the code for the hatch in ten minutes (section 14).</div>
+      <div><b>Room 2 · Shard Heist</b>Police chase: three maps, three vehicles, and the story mode The Necklace Job.</div>
     </div>
     <div class="toc">
       <div><span>01</span>The game at a glance</div>
@@ -84,6 +84,7 @@ pre .c{ color:#7fd4e2; }
       <div><span>06</span>Worlds, traffic and police AI</div>
       <div><span>13</span>Testing, security and deployment</div>
       <div><span>07</span>Physics, boundary and camera</div>
+      <div><span>14</span>Room 1: the escape room</div>
     </div>
   </div>
   <div class="cover-band">
@@ -106,12 +107,12 @@ pre .c{ color:#7fd4e2; }
     <div class="kpi"><b>3,656</b><span>lines of JavaScript</span></div>
     <div class="kpi"><b>157</b><span>named functions</span></div>
     <div class="kpi"><b>24</b><span>code sections</span></div>
-    <div class="kpi"><b>54</b><span>automated tests</span></div>
+    <div class="kpi"><b>78</b><span>automated tests</span></div>
     <div class="kpi"><b>0</b><span>npm dependencies</span></div>
     <div class="kpi"><b>0</b><span>image / sound files</span></div>
     <div class="kpi"><b>253 KB</b><span>game code size</span></div>
   </div>
-  <p class="mono" style="color:var(--muted)">Figures for version 1.0: index.html, styles.css and src/ (boot.js, core.js, game.js). Tests add 659 lines.</p>
+  <p class="mono" style="color:var(--muted)">Figures for room 2 (index.html, styles.css, src/). Room 1 is described in section 14. The test count covers both rooms. Tests add 659 lines.</p>
   <h3>The three maps</h3>
   <table>
     <tr><th>Map</th><th>Layout</th><th>Goal</th><th class="num">Car top speed</th><th class="num">Police</th><th class="num">Time</th></tr>
@@ -127,6 +128,7 @@ pre .c{ color:#7fd4e2; }
     <tr><td>v13</td><td>Audio is suspended when the tab is hidden and silenced in the pause menu.</td></tr>
     <tr><td>Edition</td><td>The Necklace Job: three-act story mode with an optional hidden letter, a courier lorry and three endings.</td></tr>
     <tr><td>1.0</td><td>Repository edition: both editions merged into one game; split into index.html, styles.css and src/boot.js, core.js, game.js; game rules moved into core.js with 54 automated tests; error screen; integrity hashes, security policy and validated input; CI with deployment to GitHub Pages (section 13). Two bugs found by the tests were fixed.</td></tr>
+    <tr><td>1.1</td><td>Room 1 added: <i>Plot Twist: Cell Block D</i>, a 3D prison escape room in <code>escape-room/</code>, separate from the chase until the group connects them (section 14). 24 new tests. Marco’s original Python version of Plot Twist sits in <code>plot-twist/</code>.</td></tr>
   </table>
 </section>
 
@@ -518,7 +520,9 @@ damage += max(0, (impact − 3) · 1.6 · VEH.dmg)              <span class="c">
   <h3>Repository</h3>
   <table>
     <tr><th>Path</th><th>Contents</th></tr>
-    <tr><td><code>index.html</code>, <code>styles.css</code></td><td>Page structure and styling; scripts load in a fixed order</td></tr>
+    <tr><td><code>escape-room/</code></td><td>Room 1, self-contained: page, styles, error screen, rules and 3D room (section 14)</td></tr>
+    <tr><td><code>plot-twist/</code></td><td>The original Plot Twist project in Python/Streamlit (added by Marco, not deployed)</td></tr>
+    <tr><td><code>index.html</code>, <code>styles.css</code></td><td>Room 2: page structure and styling; scripts load in a fixed order</td></tr>
     <tr><td><code>src/boot.js</code></td><td>Error screen for load failures, missing WebGL, lost graphics and unexpected errors</td></tr>
     <tr><td><code>src/core.js</code></td><td>Tuning tables and all game rules as pure functions</td></tr>
     <tr><td><code>src/game.js</code></td><td>3D worlds, vehicles, AI, sound, HUD, story scenes (24 sections)</td></tr>
@@ -526,14 +530,15 @@ damage += max(0, (impact − 3) · 1.6 · VEH.dmg)              <span class="c">
     <tr><td><code>scripts/</code></td><td>Local dev server, library integrity checker</td></tr>
     <tr><td><code>.github/workflows/ci.yml</code></td><td>Test on every push to main and every pull request; deploy to GitHub Pages only when all tests pass</td></tr>
   </table>
-  <h3>Tests (54)</h3>
+  <h3>Tests (78)</h3>
   <table>
     <tr><th>File</th><th class="num">Tests</th><th>Accepted</th><th>Rejected and edge cases</th></tr>
     <tr><td><code>rules.test.js</code></td><td class="num">17</td><td>Top speeds, 0–80 times, stat bars, collisions, damage, stars, best times</td><td>Gas and brake together, 0 s and 3 s frames, negative frame time, NaN impact, damage outside 0–100, coasting to exactly 0</td></tr>
     <tr><td><code>story.test.js</code></td><td class="num">8</td><td>Three acts in order, Ending A with the letter, Ending B without</td><td>Acts outside 1–3, toll without the clasp, letter found in a failed attempt, radio lines repeating</td></tr>
     <tr><td><code>input.test.js</code></td><td class="num">9</td><td>Every menu action in its states, valid picks, valid saved data</td><td>Actions while driving, story actions without a story, unknown actions, picks like <code>constructor</code> or <code>__proto__</code>, tampered storage, implausible best times</td></tr>
-    <tr><td><code>page.test.js</code></td><td class="num">10</td><td>Element ids, button actions, script order, dev server serves files</td><td>Unpinned or unhashed libraries, inline scripts, secrets in any file, <code>.git</code> requests, path traversal, wrong HTTP methods</td></tr>
-    <tr><td><code>browser.test.js</code></td><td class="num">10</td><td>Menu, vehicle choice, a run with throttle and timer, pause and resume, story act 1</td><td>Card buttons while driving, tampered saved data, blocked library, no WebGL</td></tr>
+    <tr><td><code>page.test.js</code></td><td class="num">15</td><td>Element ids, button actions, script order, dev server serves files; the same page checks for room 1</td><td>Unpinned or unhashed libraries, inline scripts, secrets in any file, <code>.git</code> requests, path traversal, wrong HTTP methods, one room loading the other’s files</td></tr>
+    <tr><td><code>escape-rules.test.js</code></td><td class="num">15</td><td>Both endings, the grace minute, clues, lock, saved games</td><td>Actions before the briefing or after an ending, no exit, items twice, tile without spoon, door without mop, wheels that do not exist, clock below zero, tampered saves</td></tr>
+    <tr><td><code>browser.test.js</code></td><td class="num">14</td><td>Room 2: menu, vehicle choice, a run, pause, story act 1. Room 1: briefing, save and continue after reload, Ending A</td><td>Card buttons while driving, tampered saved data, blocked library, no WebGL; the tile without the spoon, a wrong code</td></tr>
   </table>
   <div class="note gold"><b>Bugs the tests found (fixed):</b> saved data such as <code>{"mode":"constructor"}</code> passed the old check, because every JavaScript object inherits <code>constructor</code>; the next load would have crashed. And the throttle let the car run about 5 km/h above the top speed shown in the menu; it now stops at the limit.</div>
   <h3>Security</h3>
@@ -549,7 +554,72 @@ damage += max(0, (impact − 3) · 1.6 · VEH.dmg)              <span class="c">
   <h3>Deployment</h3>
 <pre>git push (main)
   └─ test job:   npm test  →  npm run test:sri  →  npm run test:browser (headless Chrome)
-       └─ deploy job (only if all pass):  copy index.html, styles.css, src/  →  GitHub Pages</pre>
+       └─ deploy job (only if all pass):  copy index.html, styles.css, src/, escape-room/  →  GitHub Pages</pre>
+</section>
+
+<!-- 14 -->
+<section>
+  <div class="eyebrow">14 · Room 1</div>
+  <h2>Plot Twist: Cell Block D</h2>
+  <p>The first room of the game is a 3D escape room that rebuilds the course project <i>Plot Twist</i> as a prison break. The detective from the Ashford necklace case has been convicted of the theft and is now <b>inmate 4471</b>. Officer Hale locks them in washroom 2 for ten minutes. A hatch in the floor of the toilet stall is held shut by a four-digit lock; the code is hidden in the room. It lives in <code>escape-room/</code>, shares no files with the chase, and is played at <code>/shard-heist/escape-room/</code>.</p>
+  <table>
+    <tr><th>Brief requirement</th><th>In the escape room</th></tr>
+    <tr><td>At least 5 scenes</td><td>The door, the sinks, the stall, the hatch, the tunnel</td></tr>
+    <tr><td>2 items</td><td>Spoon (pries the crooked tile off the wall), mop (optional: jams the door)</td></tr>
+    <tr><td>2 endings</td><td><b>A</b>: the hatch opens in time, down into the tunnel. <b>B</b>: time runs out, Hale takes you back to the cell</td></tr>
+    <tr><td>An ending that depends on an earlier decision</td><td>Jamming the door with the mop buys one extra minute before Ending B, which can decide whether you reach Ending A</td></tr>
+  </table>
+  <h3>The puzzle</h3>
+  <table>
+    <tr><th>Clue</th><th>Where and how</th><th>What it says</th></tr>
+    <tr><td>Mirror</td><td>Only visible after turning on the hot tap: the steam shows letters someone traced</td><td>“UNSINKABLE?”</td></tr>
+    <tr><td>Graffiti</td><td>Scratched into the stall wall</td><td>“She was unsinkable. She sailed only once. The year opens the floor.”</td></tr>
+    <tr><td>Newspaper scrap</td><td>Behind the crooked tile, which only comes off with the spoon</td><td>“The ‘unsinkable’ liner went down on her first voyage. 15 April 19▒2.”</td></tr>
+  </table>
+  <p>Together they point to the Titanic and the code <b>1912</b>; “sailed only once” gives the missing digit to players who do not know the history. The code is the same every time. Every wrong code makes noise and costs 30 seconds; Hale warns at 5:00, 2:00, 1:00 and 0:30. The plot twist comes in Ending A: a note on the ladder (“Took you long enough. A car is waiting. — H.”) shows the guard wanted the detective out, which leads into the chase.</p>
+  <h3>How it is built</h3>
+  <p>The structure is the one of the original Python project, rewritten in JavaScript: <code>rules.js</code> (198 lines) holds the story and the rules as pure functions, <code>room.js</code> (776 lines) only draws and turns clicks into actions.</p>
+<pre><span class="c">// rules.js: one plain object is the whole state</span>
+state = { scene, time, inventory, clues, tileOpen, steam, wedged, graceUsed, lock, wrongTries, ending, warned }
+perform(state, action, target)  →  { state, ok, message, cue }   <span class="c">// refused: the SAME state, nothing saved</span>
+tick(state, dt)                 →  { state, message, cue }       <span class="c">// the clock, warnings, grace minute, Ending B</span>
+visibleHotspots(state)          →  what can be used right now
+restore(savedText)              →  a checked state, or null for anything that is not a real save
+
+<span class="c">// room.js: a click becomes an action</span>
+marker or object clicked  →  use(action, target)  →  act()  →  rules.perform()
+  accepted: keep the new state, save it, move the camera, syncWorld(), update HUD and markers
+  refused:  show the message, play a short buzz, change nothing</pre>
+  <table>
+    <tr><th class="num">Line</th><th>Section of room.js</th><th>Purpose</th></tr>
+    <tr><td class="num">12</td><td>State and saving</td><td>The game state from rules.js, safe storage access, the saved game</td></tr>
+    <tr><td class="num">27</td><td>Renderer, scene, camera</td><td>Renderer with WebGL check, shadows, filmic colour, fog</td></tr>
+    <tr><td class="num">50</td><td>Painted textures</td><td>Tiles, paint, concrete, diamond plate, graffiti with the clue, steamed mirror, sign, guard silhouette</td></tr>
+    <tr><td class="num">163</td><td>Materials</td><td>All surfaces, from glazed tiles to polished steel</td></tr>
+    <tr><td class="num">190</td><td>The washroom</td><td>Walls, door and window, sinks and mirror, spoon, mop and bucket, stall, toilet, tile, hatch, shaft, lights</td></tr>
+    <tr><td class="num">347</td><td>Camera</td><td>One viewpoint per scene, gliding between them, drag or arrow keys to look around</td></tr>
+    <tr><td class="num">396</td><td>Hotspots</td><td>Markers placed over objects, “Walk to” buttons, clicking objects in 3D</td></tr>
+    <tr><td class="num">456</td><td>Actions</td><td>use() and act(): everything goes through rules.perform(); syncWorld() moves the objects</td></tr>
+    <tr><td class="num">494</td><td>HUD and cards</td><td>Clock, items, clues, messages; briefing, continue, pause, clue, lock and ending cards</td></tr>
+    <tr><td class="num">648</td><td>Sound</td><td>Fluorescent hum, drips, running water, effects per action (Web Audio)</td></tr>
+    <tr><td class="num">702</td><td>Endings</td><td>Hatch opens and the camera climbs down; or the door bursts open</td></tr>
+    <tr><td class="num">709</td><td>Loop</td><td>Clock (rules.tick), animations, markers, render</td></tr>
+    <tr><td class="num">769</td><td>Start</td><td>Continue a saved game or start the briefing</td></tr>
+  </table>
+  <h3>Design decisions</h3>
+  <ul>
+    <li><b>Markers are real buttons.</b> Each usable object gets a pulsing HTML button placed over it every frame, so the room works with a mouse, a keyboard and on touch screens, and the browser tests can click them. Clicking the 3D object itself does the same.</li>
+    <li><b>Viewpoints instead of free walking.</b> Five fixed spots with free looking around keep the room readable and impossible to get stuck in.</li>
+    <li><b>The clock keeps running</b> while reading clues and turning the lock; only the pause card stops it, and so does hiding the tab.</li>
+    <li><b>Saved after every accepted action</b>, and checked field by field when loaded, like the SQLite save slot of the original but in the browser.</li>
+  </ul>
+  <h3>Limits and next steps</h3>
+  <ul>
+    <li><b>Not yet connected</b> to room 2. Planned: the Ending A card gets a button that opens the chase.</li>
+    <li><b>Open decisions:</b> 10 or 15 minutes (<code>TIME_LIMIT</code>), and whether the code should change between games (now always 1912).</li>
+    <li>Ending B and the grace minute are tested in the rules tests only, not in the browser test.</li>
+    <li>The Python original in <code>plot-twist/</code> is a separate program with its own pytest tests and is not deployed.</li>
+  </ul>
 </section>
 
 </body>
