@@ -1,0 +1,13 @@
+[project]
+name = "plot-twist"
+version = "0.1.0"
+description = "Plot Twist: a saved text mystery (Nova SBE Intro to Programming, solo project)"
+requires-python = ">=3.11"
+dependencies = [
+    "streamlit",
+    "pytest",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
