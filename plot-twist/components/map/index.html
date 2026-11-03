@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; background: transparent; font-family: -apple-system, "Segoe UI", sans-serif; }
+  #wrap { width: 100%; max-width: 800px; margin: 0 auto; }
+  #map { position: relative; width: 100%; }
+  #pic { width: 100%; display: block; border-radius: 12px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45); }
+  .hotspot { position: absolute; display: flex; align-items: center; justify-content: center; box-sizing: border-box;
+    border: 2px solid transparent; border-radius: 10px; cursor: pointer; transition: all 0.15s; }
+  .hotspot:hover { background: rgba(255, 224, 140, 0.22); border-color: #ffe08c; }
+  .hotspot.locked { background: rgba(160, 30, 40, 0.18); }
+  .hotspot.locked:hover { background: rgba(190, 40, 50, 0.35); border-color: #ff7a7a; }
+  .label { opacity: 0; font: 600 13px sans-serif; color: #fff; background: rgba(0, 0, 0, 0.75);
+    padding: 3px 9px; border-radius: 6px; pointer-events: none; text-align: center; }
+  .hotspot:hover .label { opacity: 1; }
+  .lock { position: absolute; top: 38%; font-size: 26px; pointer-events: none; }
+  #bar { display: flex; align-items: center; gap: 10px; padding: 10px 2px 4px; color: #666; font-size: 13px; }
+  #mute { font-size: 18px; border: 1px solid #ccc; background: #fff; border-radius: 8px; cursor: pointer; padding: 2px 8px; }
+  #vol { width: 120px; }
+  #hint { margin-left: auto; font-style: italic; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="map"><img id="pic" alt=""></div>
+  <div id="bar">
+    <button id="mute" type="button" title="Mute or unmute">&#128266;</button>
+    <input id="vol" type="range" min="0" max="100" value="60" title="Volume">
+    <span id="hint">Click the picture once to enable sound</span>
+  </div>
+</div>
+<script>
+"use strict";
+
+// ---- Talking to Streamlit (the component protocol, written by hand) ----
+function send(message) {
+  window.parent.postMessage(Object.assign({ isStreamlitMessage: true }, message), "*");
+}
+function setHeight() {
+  send({ type: "streamlit:setFrameHeight", height: document.documentElement.scrollHeight });
+}
+
+// ---- Settings that live in the browser, not in the game save ----
+function readSetting(key, fallback) {
+  try { const value = localStorage.getItem(key); return value === null ? fallback : value; } catch (e) { return fallback; }
+}
+function writeSetting(key, value) {
+  try { localStorage.setItem(key, value); } catch (e) { /* storage may be blocked: the setting just won't be remembered */ }
+}
+let muted = readSetting("pt_muted", "0") === "1";
+let volume = parseFloat(readSetting("pt_volume", "0.6"));
+
+// ---- Audio engine ----
+let ctx = null, master = null, analyser = null, noiseBuffer = null;
+const desired = { music: null, ambience: null };
+const running = { music: null, ambience: null };
+
+function applyVolume() {
+  if (master) master.gain.value = muted ? 0 : volume;
+  document.getElementById("mute").innerHTML = muted ? "&#128263;" : "&#128266;";
+  document.getElementById("vol").value = Math.round(volume * 100);
+}
+
+function ensureAudio() {
+  if (!ctx) {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    master = ctx.createGain();
+    analyser = ctx.createAnalyser();
+    master.connect(analyser);
+    analyser.connect(ctx.destination);
+    noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    applyVolume();
+  }
+  if (ctx.state === "suspended") ctx.resume();
+  document.getElementById("hint").style.display = "none";
+  return ctx;
+}
+
+// One short note. "to" glides the pitch; "dest" is where the sound goes.
+function tone(freq, start, duration, o) {
+  o = Object.assign({ type: "sine", gain: 0.2, attack: 0.02, release: 0.2, to: null, dest: master }, o);
+  const osc = ctx.createOscillator(), env = ctx.createGain();
+  osc.type = o.type;
+  osc.frequency.setValueAtTime(freq, start);
+  if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, start + duration);
+  env.gain.setValueAtTime(0.0001, start);
+  env.gain.exponentialRampToValueAtTime(o.gain, start + o.attack);
+  env.gain.exponentialRampToValueAtTime(0.0001, start + duration + o.release);
+  osc.connect(env).connect(o.dest);
+  osc.start(start);
+  osc.stop(start + duration + o.release + 0.05);
+}
+
+// A burst of filtered noise: the base of creaks, scrapes, rustles and whispers.
+function noise(start, duration, o) {
+  o = Object.assign({ type: "bandpass", freq: 1000, freqTo: null, q: 1, gain: 0.2, attack: 0.01, release: 0.1, dest: master }, o);
+  const source = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), env = ctx.createGain();
+  source.buffer = noiseBuffer;
+  source.loop = true;
+  filter.type = o.type;
+  filter.Q.value = o.q;
+  filter.frequency.setValueAtTime(o.freq, start);
+  if (o.freqTo) filter.frequency.exponentialRampToValueAtTime(o.freqTo, start + duration);
+  env.gain.setValueAtTime(0.0001, start);
+  env.gain.exponentialRampToValueAtTime(o.gain, start + o.attack);
+  env.gain.exponentialRampToValueAtTime(0.0001, start + duration + o.release);
+  source.connect(filter).connect(env).connect(o.dest);
+  source.start(start, Math.random() * 1.5);
+  source.stop(start + duration + o.release + 0.05);
+}
+
+// ---- Sound effects: one per cue name in story.py ----
+const CUES = {
+  door: function (t) {
+    tone(140, t, 0.55, { type: "sawtooth", gain: 0.05, to: 230, attack: 0.08, release: 0.1 });
+    noise(t, 0.55, { freq: 500, freqTo: 900, q: 6, gain: 0.09, attack: 0.1 });
+    tone(70, t + 0.5, 0.12, { gain: 0.3, to: 40, attack: 0.005, release: 0.15 });
+    noise(t + 0.5, 0.1, { type: "lowpass", freq: 300, gain: 0.25, attack: 0.003 });
+  },
+  locked: function (t) {
+    [0, 0.09, 0.19, 0.27].forEach(function (offset, i) {
+      noise(t + offset, 0.05, { freq: 2500 + i * 300, q: 8, gain: 0.18, attack: 0.002, release: 0.04 });
+      tone(i % 2 ? 330 : 247, t + offset, 0.04, { type: "square", gain: 0.05, attack: 0.002, release: 0.05 });
+    });
+  },
+  drawer: function (t) {
+    noise(t, 0.4, { type: "lowpass", freq: 300, freqTo: 900, gain: 0.22, attack: 0.05 });
+    tone(95, t, 0.4, { type: "triangle", gain: 0.06, to: 120, attack: 0.05, release: 0.1 });
+    tone(80, t + 0.42, 0.1, { gain: 0.25, to: 50, attack: 0.004, release: 0.12 });
+  },
+  paper: function (t) {
+    for (let i = 0; i < 7; i++) {
+      noise(t + i * 0.07 + Math.random() * 0.04, 0.06,
+        { type: "highpass", freq: 3000 + Math.random() * 2000, gain: 0.12, attack: 0.004, release: 0.05 });
+    }
+  },
+  accuse: function (t) {
+    [220, 233, 311].forEach(function (f) { tone(f, t, 1.4, { type: "sawtooth", gain: 0.05, attack: 0.4, release: 0.8 }); });
+    tone(55, t, 0.5, { gain: 0.4, to: 35, attack: 0.005, release: 0.5 });
+    noise(t, 0.4, { type: "lowpass", freq: 200, gain: 0.3, attack: 0.005, release: 0.4 });
+  },
+  ending_a: function (t) {
+    [261.6, 329.6, 392, 523.3].forEach(function (f, i) {
+      tone(f, t + i * 0.28, 1.2, { type: "triangle", gain: 0.12, attack: 0.03, release: 1.2 });
+    });
+  },
+  ending_b: function (t) {
+    [329.6, 311.1, 293.7, 220].forEach(function (f, i) {
+      tone(f, t + i * 0.5, 1.4, { type: "triangle", gain: 0.1, attack: 0.05, release: 1.5 });
+    });
+    tone(55, t, 3.5, { gain: 0.2, attack: 1, release: 1.5 });
+  }
+};
+
+// ---- Music: one loop per mood. Each starter returns a function that stops its timers. ----
+function lowpassInto(bus, frequency) {
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = frequency;
+  filter.connect(bus);
+  return filter;
+}
+
+const MOODS = {
+  lobby: function (bus) {
+    const pad = lowpassInto(bus, 500), notes = [110, 87.31, 130.81, 82.41];
+    let i = 0;
+    function chord() {
+      const t = ctx.currentTime, f = notes[i++ % notes.length];
+      [f, f * 1.5].forEach(function (frequency) { tone(frequency, t, 3.6, { type: "sawtooth", gain: 0.03, attack: 1.2, release: 1.4, dest: pad }); });
+    }
+    function bell() { tone(880 * (Math.random() > 0.5 ? 1 : 1.2), ctx.currentTime, 0.2, { gain: 0.03, attack: 0.01, release: 1.6, dest: bus }); }
+    chord();
+    const a = setInterval(chord, 4000), b = setInterval(bell, 6500);
+    return function () { clearInterval(a); clearInterval(b); };
+  },
+  kitchen: function (bus) {
+    const hum = lowpassInto(bus, 700);
+    let tick = 0;
+    function clock() {
+      noise(ctx.currentTime, 0.02, { freq: tick++ % 2 ? 1800 : 1300, q: 6, gain: 0.07, attack: 0.002, release: 0.03, dest: bus });
+    }
+    function warm() {
+      const t = ctx.currentTime;
+      [146.8, 220].forEach(function (f) { tone(f, t, 3.2, { type: "triangle", gain: 0.035, attack: 1, release: 1.4, dest: hum }); });
+    }
+    warm();
+    const a = setInterval(clock, 1000), b = setInterval(warm, 4000);
+    return function () { clearInterval(a); clearInterval(b); };
+  },
+  study: function (bus) {
+    const hum = lowpassInto(bus, 400);
+    function drone() {
+      const t = ctx.currentTime;
+      [55, 82.4].forEach(function (f) { tone(f, t, 5, { gain: 0.07, attack: 2, release: 2, dest: hum }); });
+    }
+    function note() {
+      const f = [164.8, 196, 246.9, 123.5][Math.floor(Math.random() * 4)];
+      tone(f, ctx.currentTime, 0.1, { type: "triangle", gain: 0.05, attack: 0.01, release: 2.6, dest: bus });
+    }
+    drone();
+    const a = setInterval(drone, 5000), b = setInterval(note, 4200);
+    return function () { clearInterval(a); clearInterval(b); };
+  },
+  suspense: function (bus) {
+    const dark = lowpassInto(bus, 320);
+    function drone() {
+      const t = ctx.currentTime;
+      [55, 58.3, 82.4].forEach(function (f) { tone(f, t, 5, { type: "sawtooth", gain: 0.035, attack: 2, release: 2, dest: dark }); });
+    }
+    function heartbeat() {
+      const t = ctx.currentTime;
+      tone(62, t, 0.12, { gain: 0.35, to: 40, attack: 0.005, release: 0.15, dest: bus });
+      tone(58, t + 0.2, 0.1, { gain: 0.25, to: 38, attack: 0.005, release: 0.15, dest: bus });
+    }
+    drone();
+    const a = setInterval(drone, 5000), b = setInterval(heartbeat, 1300);
+    return function () { clearInterval(a); clearInterval(b); };
+  }
+};
+
+// ---- Ambience: a layer on top of the music ----
+const AMBIENCES = {
+  murmur: function (bus) {
+    const layers = [{ freq: 700, q: 2 }, { freq: 1400, q: 3 }, { freq: 2300, q: 4 }].map(function (layer) {
+      const source = ctx.createBufferSource(), filter = ctx.createBiquadFilter(), level = ctx.createGain();
+      source.buffer = noiseBuffer;
+      source.loop = true;
+      filter.type = "bandpass";
+      filter.frequency.value = layer.freq;
+      filter.Q.value = layer.q;
+      level.gain.value = 0.0001;
+      source.connect(filter).connect(level).connect(bus);
+      source.start(0, Math.random() * 1.5);
+      return { source: source, filter: filter, level: level, base: layer.freq };
+    });
+    function whisper() {
+      const t = ctx.currentTime;
+      layers.forEach(function (layer) {
+        layer.level.gain.linearRampToValueAtTime(0.02 + Math.random() * 0.1, t + 0.4);
+        layer.filter.frequency.linearRampToValueAtTime(layer.base * (0.8 + Math.random() * 0.5), t + 0.4);
+      });
+    }
+    whisper();
+    const timer = setInterval(whisper, 450);
+    return function () { clearInterval(timer); layers.forEach(function (layer) { layer.source.stop(ctx.currentTime + 2.5); }); };
+  }
+};
+
+// Start a loop on its own volume knob so it can fade in and out.
+function startLoop(factory, fadeSeconds) {
+  const bus = ctx.createGain(), now = ctx.currentTime;
+  bus.gain.setValueAtTime(0.0001, now);
+  bus.gain.linearRampToValueAtTime(1, now + fadeSeconds);
+  bus.connect(master);
+  return { bus: bus, stop: factory(bus) };
+}
+
+function stopLoop(loop) {
+  if (!loop) return;
+  const now = ctx.currentTime;
+  loop.stop();
+  loop.bus.gain.cancelScheduledValues(now);
+  loop.bus.gain.setValueAtTime(Math.max(loop.bus.gain.value, 0.0001), now);
+  loop.bus.gain.linearRampToValueAtTime(0.0001, now + 2);
+  setTimeout(function () { loop.bus.disconnect(); }, 3000);
+}
+
+// Make what is playing match what the current room asks for. Needs the first click to have happened.
+function syncSound() {
+  if (!ctx) return;
+  if (running.music !== desired.music) {
+    stopLoop(running.musicLoop);
+    running.music = desired.music;
+    running.musicLoop = desired.music ? startLoop(MOODS[desired.music], 2.5) : null;
+  }
+  if (running.ambience !== desired.ambience) {
+    stopLoop(running.ambienceLoop);
+    running.ambience = desired.ambience;
+    running.ambienceLoop = desired.ambience ? startLoop(AMBIENCES[desired.ambience], 1.5) : null;
+  }
+}
+
+// ---- The picture and its clickable areas ----
+let clickCount = 0, firstRender = true, lastEndingCue = null;
+
+function render(args) {
+  const map = document.getElementById("map"), pic = document.getElementById("pic");
+  map.style.aspectRatio = args.width + " / " + args.height;
+  if (pic.getAttribute("src") !== args.image) pic.setAttribute("src", args.image);
+  pic.alt = args.title;
+
+  map.querySelectorAll(".hotspot").forEach(function (old) { old.remove(); });
+  args.hotspots.forEach(function (hotspot) {
+    const box = hotspot.box, link = document.createElement("div");
+    link.className = hotspot.locked ? "hotspot locked" : "hotspot";
+    link.title = hotspot.label;
+    link.style.left = (box[0] / args.width * 100) + "%";
+    link.style.top = (box[1] / args.height * 100) + "%";
+    link.style.width = (box[2] / args.width * 100) + "%";
+    link.style.height = (box[3] / args.height * 100) + "%";
+    link.innerHTML = (hotspot.locked ? '<span class="lock">&#128274;</span>' : "") + '<span class="label"></span>';
+    link.querySelector(".label").textContent = hotspot.label;
+    link.addEventListener("click", function () {
+      ensureAudio();
+      syncSound();
+      if (CUES[hotspot.cue]) CUES[hotspot.cue](ctx.currentTime + 0.01);
+      send({
+        type: "streamlit:setComponentValue",
+        dataType: "json",
+        value: { id: Date.now() + "-" + (++clickCount), action: hotspot.action, target: hotspot.target }
+      });
+    });
+    map.appendChild(link);
+  });
+
+  desired.music = args.music;
+  desired.ambience = args.ending_cue ? null : args.ambience;
+  syncSound();
+
+  if (args.ending_cue !== lastEndingCue) {
+    if (!firstRender && args.ending_cue && ctx && CUES[args.ending_cue]) CUES[args.ending_cue](ctx.currentTime + 0.4);
+    lastEndingCue = args.ending_cue;
+  }
+  firstRender = false;
+  setHeight();
+}
+
+document.getElementById("mute").addEventListener("click", function () {
+  muted = !muted;
+  writeSetting("pt_muted", muted ? "1" : "0");
+  applyVolume();
+});
+document.getElementById("vol").addEventListener("input", function (event) {
+  volume = event.target.value / 100;
+  writeSetting("pt_volume", String(volume));
+  applyVolume();
+});
+applyVolume();
+
+window.addEventListener("message", function (event) {
+  if (event.data && event.data.type === "streamlit:render") render(event.data.args);
+});
+new ResizeObserver(setHeight).observe(document.body);
+send({ type: "streamlit:componentReady", apiVersion: 1 });
+
+// For checking in the browser console: how loud is the output, and what is playing?
+window.audioLevel = function () {
+  if (!analyser) return -1;
+  const samples = new Uint8Array(analyser.fftSize);
+  analyser.getByteTimeDomainData(samples);
+  let peak = 0;
+  samples.forEach(function (v) { peak = Math.max(peak, Math.abs(v - 128)); });
+  return peak / 128;
+};
+window.audioState = function () {
+  return { context: ctx && ctx.state, music: running.music, ambience: running.ambience, muted: muted, volume: volume };
+};
+</script>
+</body>
+</html>
