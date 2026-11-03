@@ -1,0 +1,15 @@
+{
+  "name": "shard-heist",
+  "version": "1.0.0",
+  "description": "A 3D police-chase driving game with three maps, three getaway vehicles and a three-act story mode.",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node scripts/serve.js",
+    "test": "node --test tests/rules.test.js tests/story.test.js tests/input.test.js tests/page.test.js",
+    "test:browser": "node --test tests/browser.test.js",
+    "test:sri": "node scripts/check-sri.js",
+    "test:all": "npm test && npm run test:sri && npm run test:browser"
+  }
+}

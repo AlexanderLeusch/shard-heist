@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- ### SECURITY: scripts may only come from this site and the two pinned CDNs; no plugins, no forms, no foreign base URL. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Shard Heist</title>
+<meta name="description" content="A 3D police-chase driving game with three maps, three getaway vehicles and a three-act story mode.">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=JetBrains+Mono:wght@500;700&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<!-- ### MARKUP: the WebGL canvas, the HUD (mission, timer, pursuit, radar, cockpit), touch pads and the menu overlay. -->
+<canvas id="game" aria-label="Game world"></canvas>
+
+<div id="hud" class="off">
+  <section class="panel mission">
+    <div class="eyebrow" id="missionEye">Downtown</div>
+    <div class="mission-name" id="missionName">Star Shards</div>
+    <div class="chips" id="chips"></div>
+    <div class="prog" id="prog" hidden>
+      <div class="prog-row"><span class="eyebrow">Finish</span><b id="progKm">4.0 km</b></div>
+      <div class="ptrack"><i id="pfill"></i></div>
+    </div>
+  </section>
+  <section class="panel timer">
+    <div>
+      <div class="eyebrow">Time left</div>
+      <div class="time" id="time">3:00</div>
+    </div>
+    <div class="tbtns">
+      <button class="icon-btn" id="btnPause" aria-label="Pause">
+        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+      </button>
+      <button class="icon-btn" id="btnSound" aria-label="Mute sound">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/><path id="soundWaves" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>
+      </button>
+    </div>
+  </section>
+  <section class="panel pursuit" id="pursuit">
+    <div class="pur-row"><span class="siren"></span><span class="pur-title">Pursuit</span><span class="pur-state" id="purState">No police yet</span></div>
+    <div class="cops" id="cops"><i></i><i></i><i></i></div>
+    <div class="bust-row"><span>Bust</span><b id="bustPct">0%</b></div>
+    <div class="btrack"><i id="bfill"></i></div>
+  </section>
+  <section class="radar-wrap">
+    <canvas id="radar" width="320" height="320" aria-label="Radar"></canvas>
+    <div class="signal"><span class="bars" id="bars"><i></i><i></i><i></i><i></i></span><span id="sigText">Weak signal</span></div>
+  </section>
+  <section class="dash" id="dash">
+    <div class="dmg" id="dmg" data-level="ok">
+      <div class="dmg-row">
+        <svg class="car-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="6.5" y="2.5" width="11" height="19" rx="4"/><path d="M8.5 8.5h7M8.5 16h7"/></svg>
+        <span class="dmg-label">Damage</span>
+        <span class="pill" id="dmgState">Good</span>
+        <b class="dmg-pct"><span id="dmgPct">0</span><small>%</small></b>
+      </div>
+      <div class="dtrack"><i id="dfill"></i></div>
+    </div>
+    <div class="dash-main">
+      <div class="gauge">
+        <svg viewBox="0 0 160 160" aria-hidden="true">
+          <defs>
+            <linearGradient id="gGrad" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#55ecff"/><stop offset=".6" stop-color="#8f7dff"/><stop offset="1" stop-color="#ff5d9e"/></linearGradient>
+            <filter id="gBlur" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="4"/></filter>
+            <filter id="gBlurS" x="-300%" y="-300%" width="700%" height="700%"><feGaussianBlur stdDeviation="1.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+          </defs>
+          <path class="g-track" id="gTrack"/>
+          <g id="gTicks"></g>
+          <path class="g-glow" id="gGlow" pathLength="100"/>
+          <path class="g-val" id="gVal" pathLength="100"/>
+          <circle class="g-tip" id="gTip" r="3.6" cx="80" cy="80" opacity="0"/>
+        </svg>
+        <div class="g-read"><b id="speed">0</b><span>km/h</span><span class="rpm" id="rpm">900 rpm</span></div>
+        <div class="gearbox"><span data-g="P">P</span><span data-g="R">R</span><span data-g="N" class="on">N</span><span data-g="D" id="gearD">D</span></div>
+      </div>
+      <div class="pedals">
+        <div class="pedal brake" id="pBrake"><span class="pv" id="pBrakeV">0</span><div class="cap"><i></i></div><span class="lbl">Brake</span></div>
+        <div class="pedal gas" id="pGas"><span class="pv" id="pGasV">0</span><div class="cap"><i></i></div><span class="lbl">Gas</span></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="toast"></div>
+<!-- ### BOUNDARY WARNING: red screen edge and a turn-back banner whose arrow points into the map -->
+<div id="edgeWarn" aria-hidden="true"></div>
+<div class="ew-banner" id="ewBanner" role="status"><svg id="ewArrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l8 9.5h-4.6v9.5H8.6V12H4z"/></svg><span><b>Map boundary</b><small>Turn back</small></span></div>
+
+<div id="touch">
+  <div class="grp">
+    <button class="pad steer" data-key="left" aria-label="Steer left"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button class="pad steer" data-key="right" aria-label="Steer right"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+  </div>
+  <div class="grp">
+    <button class="pad brake" id="tBrake" data-key="down" aria-label="Brake and reverse"><span>Brake</span></button>
+    <button class="pad gas" id="tGas" data-key="up" aria-label="Gas"><span>Gas</span></button>
+  </div>
+</div>
+
+<div id="overlay"><div class="show-name" id="showName" aria-hidden="true"></div><div class="card" id="card"></div></div>
+
+<!-- ### ERROR SCREEN: shown by src/boot.js instead of a black page when something cannot load or breaks. -->
+<div id="fatal" class="fatal" role="alertdialog" aria-modal="true" aria-labelledby="fatalTitle" aria-describedby="fatalText" hidden>
+  <div class="fatal-card">
+    <div class="eyebrow">Shard Heist · Error</div>
+    <h2 id="fatalTitle">Something went wrong</h2>
+    <p id="fatalText"></p>
+    <div class="actions">
+      <button class="btn" id="fatalReload">Reload the game</button>
+      <button class="btn ghost" id="fatalDismiss" hidden>Keep playing</button>
+    </div>
+  </div>
+</div>
+
+<!-- ### SCRIPTS: boot.js (error screen) first, then three.js r128 and its post-processing add-ons, pinned to one version and
+     ### checked with Subresource Integrity hashes, then the game rules (core.js) and the game itself (game.js). -->
+<script src="src/boot.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha384-CI3ELBVUz9XQO+97x6nwMDPosPR5XvsxW2ua7N1Xeygeh1IxtgqtCkGfQY9WWdHu" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js" integrity="sha384-nhO9toQuMo5osCuA0l+YFpSqscZWxDu251Bnho2gD3kSPv1neEwHg0LyEmrA+mPj" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js" integrity="sha384-mY+ii969jnDCI2HjRHftH2NZVkIO5ZGUkcnGCg3oVJ3kVstWQXwerYWBg+nbUG4R" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/GammaCorrectionShader.js" integrity="sha384-oolHSqfhyZ93/WnHwbxKVk50Dzix102iutPlvXoWoxH7ZBXC8+fLQ8UnR9+gP9DA" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/FXAAShader.js" integrity="sha384-No2tT0gxxdbq/aRJ3g6hqHsfLzAiS1uKg3Wz3r69GU/XGctg4GGZ3FKH3RN0wXGs" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js" integrity="sha384-GkidzTYmQg24v13sa3xhBBbvOLbVLO1QxfyKLdOWweQqNqS/iWwUst2T1fER2Xrg" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js" integrity="sha384-2EpLreWSFuZsk4hcSplXLhlHd/wzvDNF907bTGIXSXM0SlhJNzy4YK0DhBFvkFEs" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js" integrity="sha384-I3lsvPeDJYFrEAzn/TA0yhc/SCYKwpyfyq8lKzHYKohu43H9f7xc/Q9ZWgSVUDl3" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js" integrity="sha384-aVQ2QnWkoxhOefDB0YZB64OPVzujvccydpcC7UqMDJUK0ChwA382zOHmrWHGDRRa" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="src/core.js"></script>
+<script src="src/game.js"></script>
+</body>
+</html>
