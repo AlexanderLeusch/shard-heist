@@ -1,0 +1,31 @@
+# Game rules
+
+> **Status: working draft.** These documents describe what the game does **right now**, as implemented in the code. The group will rework the rules step by step. When a rule changes, update the document and the code together, and the tests with them.
+
+The game has two rooms that are played one after the other. Until the group connects them, each room is its own page.
+
+| Room | Document | Code with the rules | Tests |
+|---|---|---|---|
+| 1 · Plot Twist: Cell Block D (escape room) | [room-1-escape-room.md](room-1-escape-room.md) | `escape-room/src/rules.js` | `tests/escape-rules.test.js` |
+| 2 · Shard Heist (police chase) | [room-2-shard-heist.md](room-2-shard-heist.md) | `src/core.js` (rules), `src/game.js` (pickups, police AI) | `tests/rules.test.js`, `tests/story.test.js`, `tests/input.test.js` |
+
+## The whole game in one paragraph
+
+You were the detective on the Ashford necklace case. Now you are inmate 4471, convicted of stealing it. **Room 1:** you have ten minutes in a prison washroom to find the code for a hatch in the floor. If you get out (Ending A), a note shows that the guard wanted you out, and a car is waiting at the end of the tunnel. **Room 2:** the police chase begins. You drive a getaway vehicle through the city, on the highway and across the countryside, collecting star shards while up to three police cars try to box you in.
+
+## How the two rooms will connect (planned, not built)
+
+- Ending A of room 1 shows a button that opens room 2.
+- Ending B of room 1 stays in room 1 (try again).
+- Open question for the group: does room 2 then start in free ride, or straight in the story mode *The Necklace Job*?
+
+## Words used in these documents
+
+| Word | Meaning |
+|---|---|
+| **Accepted action** | The player did something allowed. The state changes and is saved. |
+| **Refused action** | The player tried something not allowed. Nothing changes, and the player is told why. |
+| **State** | Everything the game remembers at one moment: where you are, items, time left, and so on. |
+| **Scene** | A place you can stand in room 1 (the door, the sinks, ...). |
+| **Hotspot** | Something you can use in a scene, shown as a pulsing marker or a "Walk to" button. |
+| **Tick** | One step of the clock, many times per second. |
