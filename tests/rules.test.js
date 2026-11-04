@@ -225,3 +225,75 @@ test('a tram never leaves its rails: from any crossing it stays on the loop and 
   assert.equal(Core.streetAt(24, T.z1, Math.PI / 2), 'Praça do Comércio');
   assert.equal(Core.streetAt(T.x0, 24, 0), 'Rua Áurea');
 });
+
+const VEHICLES = ['car', 'bike', 'truck'];
+const rmsOf = d => Math.sqrt(d.reduce((t, v) => t + v * v, 0) / d.length);
+const similarity = (d, lag) => { let a = 0, b = 0; for (let i = 0; i < d.length; i++){ a += d[i] * d[(i + lag) % d.length]; b += d[i] * d[i]; } return a / b; };
+
+test('the gearbox shifts up only under power, drops down when slowing, and stays in first in reverse', () => {
+  for (const key of VEHICLES){
+    const E = Core.ENGINES[key], top = E.gears[0];
+    assert.equal(Core.gearFor(E, 1, top, 1), 2, key + ' shifts up at the top of first');
+    assert.equal(Core.gearFor(E, 1, top, 0), 1, key + ' does not shift up off the throttle');
+    assert.equal(Core.gearFor(E, 1, top * 0.5, 1), 1, key + ' stays in gear below the top');
+    assert.equal(Core.gearFor(E, 2, top * 0.2, 0), 1, key + ' shifts down when slow');
+    assert.equal(Core.gearFor(E, 2, Core.REV_SPEED, 1), 1, key + ' reverses in first');
+    assert.equal(Core.gearFor(E, E.gears.length, 500, 1), E.gears.length, key + ' has no gear above the last');
+    // after a shift the next gear must not shift straight back down
+    for (let g = 1; g < E.gears.length; g++) assert.equal(Core.gearFor(E, g + 1, E.gears[g - 1] * 0.97, 1), g + 1, key + ' gear ' + g);
+  }
+});
+
+test('the rpm follows the road speed and stays between idle and the limit', () => {
+  for (const key of VEHICLES){
+    const E = Core.ENGINES[key];
+    assert.equal(Core.engineTarget(E, 1, 0, 0), E.idle, key + ' idles when standing');
+    assert.equal(Core.engineTarget(E, 1, 0, 1), E.launch, key + ' holds launch rpm on the clutch');
+    assert.equal(Core.engineTarget(E, 1, E.gears[0], 0), E.max, key + ' reaches max rpm at the top of the gear');
+    assert.equal(Core.engineTarget(E, 1, 500, 1), E.max, key + ' never passes the limit');
+    assert.ok(Core.engineTarget(E, 1, Core.REV_SPEED, 1) < E.max, key + ' does not hit the limiter in reverse');
+    assert.ok(Core.engineTarget(E, 2, E.gears[0], 1) < E.max * 0.9, key + ' revs fall in the next gear');
+  }
+});
+
+test('engine loops are periodic at the firing frequency of each real engine', () => {
+  const SR = Core.ENGINE_SR;
+  for (const key of ['bike', 'truck']){
+    const E = Core.ENGINES[key], rpm = E.refs[2], d = Core.engineLoop(E, rpm, true, SR, 7);
+    const firing = rpm / 60 * E.cyl / 2, lag = Math.round(SR / firing);
+    assert.ok(similarity(d, lag) > 0.45, key + ' repeats every firing: ' + similarity(d, lag));
+    assert.ok(similarity(d, Math.round(lag * 0.5)) < similarity(d, lag), key + ' not at half the interval');
+  }
+  // the loop holds whole engine cycles, and the end joins the start without a click
+  for (const key of VEHICLES){
+    const E = Core.ENGINES[key], d = Core.engineLoop(E, E.refs[1], true, SR, 7), cycles = d.length / SR / (120 / E.refs[1]);
+    assert.ok(Math.abs(cycles - Math.round(cycles)) < 0.01, key + ' whole cycles: ' + cycles);
+    let steps = 0; for (let i = 1; i < d.length; i++) steps += (d[i] - d[i - 1]) ** 2;
+    assert.ok(Math.abs(d[0] - d[d.length - 1]) < 5 * Math.sqrt(steps / d.length), key + ' joins without a jump');
+  }
+});
+
+test('the V8 burbles: its two banks make each cycle repeat better than each firing, unlike the even four and six', () => {
+  const SR = Core.ENGINE_SR, unevenness = key => {
+    const E = Core.ENGINES[key], rpm = E.refs[1], d = Core.engineLoop(E, rpm, true, SR, 7), firing = rpm / 60 * E.cyl / 2;
+    return similarity(d, Math.round(SR * 120 / rpm)) - similarity(d, Math.round(SR / firing));
+  };
+  assert.ok(unevenness('car') > 0.2, 'car ' + unevenness('car'));
+  assert.ok(unevenness('car') > 2 * unevenness('truck'), 'truck ' + unevenness('truck'));
+  assert.ok(unevenness('car') > 2 * unevenness('bike'), 'bike ' + unevenness('bike'));
+});
+
+test('engine loops: louder with rpm and under load, within range, the same for the same seed', () => {
+  for (const key of VEHICLES){
+    const E = Core.ENGINES[key], loops = Core.engineLoops(E, Core.ENGINE_SR, 3);
+    assert.equal(loops.length, E.refs.length);
+    loops.forEach((l, i) => {
+      assert.ok(rmsOf(l.off) < rmsOf(l.on) * 0.75, key + ' overrun is quieter at ' + l.rpm);
+      if (i) assert.ok(rmsOf(l.on) > rmsOf(loops[i - 1].on), key + ' louder at ' + l.rpm);
+      for (const d of [l.on, l.off]) assert.ok(d.every(v => Math.abs(v) <= 1 && Number.isFinite(v)), key + ' in range');
+    });
+    assert.ok(E.refs[0] <= E.idle * 1.1 && E.refs[E.refs.length - 1] >= E.max * 0.9, key + ' loops cover the rpm range');
+  }
+  const a = Core.engineLoop(Core.ENGINES.car, 1500, true, Core.ENGINE_SR, 9), b = Core.engineLoop(Core.ENGINES.car, 1500, true, Core.ENGINE_SR, 9);
+  assert.deepEqual(a, b);
+});

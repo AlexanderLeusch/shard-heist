@@ -203,3 +203,11 @@ test('the buildings of the city are authentic: closed blocks of low houses and t
   assert.match(city, /rng\(\) >= 0\.12 \? 'pombal'/, 'tiled fronts stay the exception');
   for (const landmark of ['teatro(cx, cz)', 'estacao(cx, cz)', 'torreao(', 'liftTower(cx, cz)', 'arco(80)']) assert.ok(city.includes(landmark), landmark);
 });
+
+test('the engines are played from the tested model: loaded and overrun loops per rpm, with no sound files', () => {
+  assert.match(game, /Core\.engineLoops\(/);
+  assert.match(game, /Core\.gearFor\(/);
+  assert.match(game, /Core\.engineTarget\(/);
+  assert.doesNotMatch(game, /engineBuffer|GEAR_TOP/, 'the old loops are gone');
+  assert.doesNotMatch(game, /\.(mp3|ogg|wav|m4a)\b/, 'no audio files');
+});

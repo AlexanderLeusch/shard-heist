@@ -98,7 +98,7 @@ docs/             Code Guide (PDF): architecture, all code sections, tuning, lim
 | Everything procedural (buildings, textures, vehicles, sounds) | No image or audio files to license or download; the whole game is a few hundred KB | Stylised rather than photo-real |
 | Rules split out into `core.js` | They can be tested in Node in milliseconds, and the rules are in one place | `game.js` still shares state between its sections |
 | Arcade physics (speed along the heading, collision circles) | Predictable, fun handling at 60 fps on modest hardware | No real tyre grip or weight transfer |
-| Engine sound synthesised from combustion pulses | Reacts to every rpm and gear change, different per vehicle | Approximates real engines, it is not a recording |
+| Engine sound from a small physical model: a pressure pulse per firing, a reflecting exhaust pipe, fixed muffler resonances, separate loops for load and overrun | Follows every rpm and gear change, each vehicle has its real engine layout, and the model can be tested in Node | Approximates real engines, it is not a recording; we checked it by measurement, and the group should judge it by ear |
 | Story as data (`STORY` acts and radio timeline) plus rules in `core.js` | Texts and timing can change without touching the logic; the ending logic is tested | Branching is simple (one decision, three endings) |
 
 ## Testing
