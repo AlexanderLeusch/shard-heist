@@ -68,9 +68,12 @@ The Baixa is the flat centre of Lisbon, rebuilt as a street grid after the 1755 
 | Rule | Value |
 |---|---|
 | Crash | impacts under 3 m/s (about 11 km/h) are free; above that, damage = (impact − 3) × 1.6 × the vehicle's damage factor |
-| 50 % damage | warning: "Engine damaged: top speed reduced." |
+| 25 % damage | the paint shows dents and scratches, and thin grey smoke rises from the engine |
+| 50 % damage | warning: "Engine damaged: top speed reduced." Loose parts and a smashed light; the engine misfires; the smoke turns dark |
+| 75 % damage | hood up (car), screen gone (motorcycle), hanging bumper and cracked windscreen (truck); a thick black column of smoke; sparks at speed |
+| 88 % damage | the engine is on fire |
 | **100 % damage** | **vehicle wrecked: game over** |
-| Repair kit | removes 40 % damage |
+| Repair kit | removes 40 % damage, and the damage you see goes with it |
 
 Your brake lights come on while you brake, in either direction, and with the handbrake while moving.
 
@@ -93,7 +96,7 @@ Your brake lights come on while you brake, in either direction, and with the han
 | ★★★★ | 3 | 106 % | 2.5 s | 6 s | 3.5 |
 | ★★★★★ | 4 | 110 % | 2 s | 4.5 s | 4 |
 
-**Helicopter.** The fifth star brings a police helicopter for the rest of the run. Its searchlight follows you at 94 % of the police speed. While you are in the light (within 9 m of its centre), the police drive 6 % faster, and in the city they see you from 170 m instead of 110 m. It cannot bust you or damage you. At full speed on a clear road you can stay ahead of the light.
+**Helicopter.** After 60 seconds on the run (or sooner with the fifth star), a police helicopter joins the chase for the rest of the run and hunts you with its searchlight. Its searchlight follows you at 94 % of the police speed. While you are in the light (within 9 m of its centre), the police drive 6 % faster, and in the city they see you from 170 m instead of 110 m. It cannot bust you or damage you. At full speed on a clear road you can stay ahead of the light.
 
 ## Ending a run
 

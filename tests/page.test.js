@@ -229,9 +229,18 @@ test('the player has brake lights', () => {
 test('the wanted stars and the helicopter are wired up', () => {
   assert.equal((html.match(/id="stars"[^>]*>(<i><\/i>){5}/) || []).length > 0, true, 'five stars in the HUD');
   assert.equal((html.match(/id="cops">(<i><\/i>){4}/) || []).length > 0, true, 'four police slots');
-  assert.match(game, /Core\.helicopterDue\(stars\)/);
+  assert.match(game, /Core\.helicopterDue\(H\.runTime, stars\)/);
   assert.match(game, /Core\.copTopSpeed\(M\.police, stars, dist, heli\.spotted\)/);
   assert.doesNotMatch(game, /heatLevel|heat\(\)/, 'stars replaced the old heat level');
   assert.match(game, /Core\.rotorLoop\(/, 'the rotor sound comes from the tested loop');
   for (const piece of ['bubble canopy', 'engine hump', 'tail boom', 'skids', 'searchlight', 'four tapered', 'tail rotor']) assert.match(game, new RegExp(piece), 'helicopter: ' + piece);
+});
+
+test('damage is visible and the rider is posed', () => {
+  assert.match(game, /Core\.damageStage\(damage\)/);
+  assert.match(game, /Core\.smokeFor\(damage\)/);
+  assert.match(game, /shader\.uniforms\.uDent = dentU/, 'dents and scratches in the paint shader');
+  for (const key of ['car', 'bike', 'truck']) assert.match(game, new RegExp('MODELS\\.' + key + ' = \\{[^}]*damageParts'), key + ' has loose parts');
+  for (const piece of ['hood up', 'smashed tail light', 'torn mudguard', 'cracked windscreen']) assert.match(game, new RegExp(piece));
+  for (const piece of ['two-tone leathers', 'fingers round the grips', 'full-face helmet', 'tuck']) assert.match(game, new RegExp(piece));
 });

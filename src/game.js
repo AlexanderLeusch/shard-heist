@@ -2047,13 +2047,60 @@ const limb = (a, b, r0, r1, seg) => {
   return g;
 };
 const ball = (p, r, sx, sy, sz) => new THREE.SphereGeometry(r, 12, 9).scale(sx || 1, sy || 1, sz || 1).translate(p[0], p[1], p[2]);
+// A smooth skin over elliptical rings [x, y, z, half width, half depth] along a path, closed at both ends: body parts
+function loft(rings, seg){
+  seg = seg || 14;
+  const pos = [], idx = [], V3 = THREE.Vector3, X = new V3(1, 0, 0);
+  const at = i => new V3(rings[i][0], rings[i][1], rings[i][2]);
+  rings.forEach((r, i) => {
+    const t = at(Math.min(i + 1, rings.length - 1)).sub(at(Math.max(i - 1, 0))).normalize();
+    const side = X.clone().addScaledVector(t, -X.dot(t)).normalize(), up = new V3().crossVectors(t, side);
+    for (let k = 0; k < seg; k++){
+      const a = k / seg * Math.PI * 2, c = Math.cos(a) * r[3], s = Math.sin(a) * r[4];
+      pos.push(r[0] + side.x * c + up.x * s, r[1] + side.y * c + up.y * s, r[2] + side.z * c + up.z * s);
+    }
+  });
+  for (let i = 0; i < rings.length - 1; i++) for (let k = 0; k < seg; k++){
+    const a = i * seg + k, b = i * seg + (k + 1) % seg, c = a + seg, d = b + seg;
+    idx.push(a, b, c, b, d, c);
+  }
+  const first = pos.length / 3; pos.push(rings[0][0], rings[0][1], rings[0][2]);
+  const lr = rings[rings.length - 1], lastC = first + 1; pos.push(lr[0], lr[1], lr[2]);
+  for (let k = 0; k < seg; k++){ idx.push(first, (k + 1) % seg, k); idx.push(lastC, (rings.length - 1) * seg + k, (rings.length - 1) * seg + (k + 1) % seg); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+// A limb from a to b with a radius at each ring, so it can bulge and taper like a thigh or a forearm
+const limbLoft = (a, b, radii, seg) => loft(radii.map((r, i) => { const t = i / (radii.length - 1); return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, r, r]; }), seg);
 const MODELS = {};
+// The paint dents and scratches as damage rises: the surface is pushed in and out, its shading follows, bare metal shows
+// in thin scratches and soot in patches. uDent is 0 on an undamaged vehicle, so it then looks and costs nothing extra.
+const dentU = { value: 0 };
+function dentShader(shader){
+  shader.uniforms.uDent = dentU;
+  shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nuniform float uDent; varying vec3 vDentP;')
+    .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
+      objectNormal = normalize(objectNormal + uDent * 0.8 * vec3(cos(position.x * 5.3 + position.z * 3.1), cos(position.y * 7.7 + position.z * 4.3), cos(position.z * 2.3 + position.x * 6.1)));`)
+    .replace('#include <begin_vertex>', `#include <begin_vertex>
+      vDentP = position;
+      transformed += normal * uDent * 0.1 * sin(position.x * 5.3 + position.z * 3.1) * sin(position.y * 7.7 + position.z * 4.3) * sin(position.z * 2.3 + position.x * 6.1);`);
+  shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uDent; varying vec3 vDentP;')
+    .replace('#include <color_fragment>', `#include <color_fragment>
+      float scratch = sin(vDentP.y * 53.0 + 2.0 * sin(vDentP.z * 2.0)) * sin(vDentP.x * 29.0 + vDentP.z * 1.5) + 0.5 * sin(vDentP.z * 3.0 + vDentP.y * 5.0);
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62, 0.62, 0.64), smoothstep(1.0, 1.35, scratch) * min(1.0, uDent * 2.0));
+      float soot = sin(vDentP.x * 2.7 + vDentP.z * 3.3) * sin(vDentP.y * 4.1 + vDentP.z * 1.9);
+      diffuseColor.rgb *= 1.0 - uDent * 0.5 * smoothstep(0.1, 0.7, soot);`);
+}
 const headlights = [], beams = [];
 // the player's tail lights: dim red, and bright with a glow around each lamp while braking
 const brakeLights = { mat: new THREE.MeshBasicMaterial({ color: 0x7a0c14 }), glows: [], on: false };
 (function buildPlayerModels(){
   const mk = (geo, mat, parent) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; parent.add(m); return m; };
-  const paintMat = (hex, rough, metal) => { const m = new THREE.MeshPhysicalMaterial({ color: hex, roughness: rough, metalness: metal, clearcoat: 1, clearcoatRoughness: 0.05 }); m.userData.env = 1.15; return m; };
+  const paintMat = (hex, rough, metal) => { const m = new THREE.MeshPhysicalMaterial({ color: hex, roughness: rough, metalness: metal, clearcoat: 1, clearcoatRoughness: 0.05 }); m.userData.env = 1.15; m.onBeforeCompile = dentShader; return m; };
+  // Parts that appear (or, with gone, disappear) from a damage stage up; each returns its mesh
+  const hinged = (list, stage, geo, mat, parent, pos, rot) => { const m = mk(geo, mat, parent); if (pos) m.position.set(pos[0], pos[1], pos[2]); if (rot) m.rotation.set(rot[0], rot[1], rot[2]); m.visible = false; list.push({ stage, m, show: true }); return m; };
+  const gone = (list, stage, m) => list.push({ stage, m, show: false });
   const shp = pts => { const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) s.lineTo(pts[i][0], pts[i][1]); s.closePath(); return s; };
   const cyl = (r0, r1, len, seg) => new THREE.CylinderGeometry(r0, r1, len, seg || 14);
   const pipe = (pts, r) => pts.slice(1).flatMap((p, i) => [limb(pts[i], p, r, r, 8), ball(p, r)]);
@@ -2151,7 +2198,15 @@ const brakeLights = { mat: new THREE.MeshBasicMaterial({ color: 0x7a0c14 }), glo
     [[0.86, 1.45, true], [-0.86, 1.45, true], [0.88, -1.35, false], [-0.88, -1.35, false]].forEach(([x, z, f]) =>
       wheel(g, { x, z, r: 0.38, w: 0.3, rim: gun, spokes: 5, caliper: 0xd0202a, front: f, list: wheels, pivots }));
     brakeGlow(g, [[0.72, 0.82, -2.56], [-0.72, 0.82, -2.56], [0, 0.87, -2.5]], 1.25);
-    MODELS.car = { g, paint: pm, base: C(base), wheels, pivots, r: 0.38 };
+    // battered: smashed tail light, boot lid sprung open, bumper hanging at one end. Critical: hood up, a dead headlight, door ajar
+    const damageParts = [];
+    hinged(damageParts, 2, boxG(0.38, 0.19, 0.07, -0.72, 0.8, -2.545), SHARED.trim, g);
+    hinged(damageParts, 2, boxG(1.42, 0.05, 0.74, 0, 0, -0.37), pm, g, [0, 1.03, -1.6], [0.16, 0, 0]);
+    hinged(damageParts, 2, boxG(1.6, 0.16, 0.2, -0.8, 0, 0), pm, g, [0.8, 0.4, -2.56], [0, 0, 0.17]);
+    hinged(damageParts, 3, boxG(1.62, 0.05, 1.4, 0, 0, 0.7), pm, g, [0, 1.0, 0.66], [-0.5, 0, 0]);
+    hinged(damageParts, 3, boxG(0.5, 0.13, 0.06, -0.66, 0.69, 2.51), SHARED.trim, g);
+    hinged(damageParts, 3, boxG(0.05, 0.5, 1.15, 0, 0, -0.57), pm, g, [-1.0, 0.66, 0.42], [0, -0.3, 0]);
+    MODELS.car = { g, paint: pm, base: C(base), wheels, pivots, r: 0.38, damageParts, dent: 1, smoke: [1.5, 1.1], stage: 0 };
   }
 
   // Motorcycle: superbike with an inline four, twin-spar frame, upside-down fork and a tucked rider in leathers.
@@ -2171,7 +2226,7 @@ const brakeLights = { mat: new THREE.MeshBasicMaterial({ color: 0x7a0c14 }), glo
 
     // nose with its pointed plan, windscreen, headlights and the air intake under them
     mk(smoothGeo(shapeBody(extrudeProfile(shp([[1.0, 0.86], [0.92, 0.97], [0.76, 1.06], [0.58, 1.11], [0.44, 1.1], [0.38, 0.98], [0.42, 0.8], [0.62, 0.76], [0.84, 0.76], [0.96, 0.8]]), 0.42, 0.035), { half: 0.62, zc: 0.42, belt: 0.82, roof: 1.12, tumble: 0.28, plan: 0.78 })), pm, g);
-    mk(extrudeProfile(shp([[0.76, 1.08], [0.5, 1.29], [0.44, 1.27], [0.56, 1.12]]), 0.27, 0.01), smoke, g);
+    const screen = mk(extrudeProfile(shp([[0.76, 1.08], [0.5, 1.29], [0.44, 1.27], [0.56, 1.12]]), 0.27, 0.01), smoke, g);
     mk(boxG(0.13, 0.05, 0.04, 0, 0.8, 1.01), skin, g);
     mk(mergeGeos([-1, 1].map(sd => ball([sd * 0.052, 0.905, 0.955], 0.05, 1, 0.34, 0.6))), led, g);
     mk(mergeGeos([-1, 1].map(sd => boxG(0.012, 0.02, 0.14, sd * 0.12, 0.84, 0.86))), acc, g);
@@ -2224,29 +2279,53 @@ const brakeLights = { mat: new THREE.MeshBasicMaterial({ color: 0x7a0c14 }), glo
     mk(mergeGeos([-1, 1].map(sd => boxG(0.085, 0.04, 0.008, sd * 0.28, 1.12, 0.742, 0.15))), smoke, g);
     mk(boxG(0.13, 0.03, 0.09, 0, 1.17, 0.5, 0.6), SHARED.trim, g);
     mk(mergeGeos([-1, 1].flatMap(sd => [limb([sd * 0.15, 0.56, -0.22], [sd * 0.22, 0.5, -0.27], 0.014, 0.012, 6), boxG(0.04, 0.09, 0.03, sd * 0.15, 0.6, -0.2, 0.3)])), alu, g);
-    // the rider: arms to the bars, knees against the tank, feet on the pegs, head down behind the screen
-    const J = { hip: [0.11, 1.09, -0.38], knee: [0.27, 0.85, 0.06], ankle: [0.22, 0.56, -0.25], sh: [0.18, 1.39, 0.03], el: [0.3, 1.2, 0.26], wr: [0.25, 1.09, 0.46] };
+    // the rider, a smooth body in two-tone leathers: hips back, chest low over the tank, elbows out, knees against the tank,
+    // balls of the feet on the pegs. The group pivots at the hips, so the rider can tuck and lean into turns.
+    const rider = new THREE.Group(); rider.position.set(0, 1.1, -0.38); g.add(rider);
+    const part = (geo, mat) => mk(geo.translate(0, -1.1, 0.38), mat, rider);
+    const J = { hip: [0.1, 1.1, -0.38], knee: [0.27, 0.86, 0.08], ankle: [0.2, 0.58, -0.26], sh: [0.2, 1.41, 0.06], el: [0.33, 1.23, 0.27], wr: [0.26, 1.115, 0.46] };
     const lr = (p, sd) => [p[0] * sd, p[1], p[2]];
-    mk(mergeGeos([
-      limb([0, 1.08, -0.38], [0, 1.38, 0.0], 0.155, 0.185, 14).scale(1.14, 1, 1), ball([0, 1.1, -0.38], 0.175, 1.1, 0.88, 1.05), ball([0, 1.38, 0.02], 0.185, 1.16, 0.8, 0.84),
+    part(loft([[0, 1.0, -0.5, 0.1, 0.06], [0, 1.08, -0.45, 0.18, 0.13], [0, 1.2, -0.28, 0.165, 0.12], [0, 1.31, -0.1, 0.185, 0.135], [0, 1.41, 0.04, 0.225, 0.125], [0, 1.475, 0.13, 0.11, 0.08]], 18), leather);
+    part(mergeGeos([
+      ball([0.085, 1.09, -0.47], 0.125, 1, 0.95, 1.05), ball([-0.085, 1.09, -0.47], 0.125, 1, 0.95, 1.05),
       ...[-1, 1].flatMap(sd => [
-        limb(lr(J.hip, sd), lr(J.knee, sd), 0.105, 0.072, 12), ball(lr(J.knee, sd), 0.076), limb(lr(J.knee, sd), lr(J.ankle, sd), 0.07, 0.046, 12),
-        limb(lr(J.sh, sd), lr(J.el, sd), 0.072, 0.052, 12), ball(lr(J.sh, sd), 0.08), ball(lr(J.el, sd), 0.054), limb(lr(J.el, sd), lr(J.wr, sd), 0.052, 0.036, 12)
+        limbLoft(lr(J.hip, sd), lr(J.knee, sd), [0.1, 0.104, 0.09, 0.07]), ball(lr(J.knee, sd), 0.072),
+        limbLoft(lr(J.knee, sd), lr(J.ankle, sd), [0.065, 0.073, 0.06, 0.045]),
+        limbLoft(lr(J.sh, sd), lr(J.el, sd), [0.074, 0.07, 0.058, 0.05]), ball(lr(J.sh, sd), 0.08), ball(lr(J.el, sd), 0.052),
+        limbLoft(lr(J.el, sd), lr(J.wr, sd), [0.05, 0.056, 0.045, 0.034])
       ])
-    ]), leather, g);
-    // armour and stripes on the suit, hump behind the helmet
-    mk(mergeGeos([ball([0, 1.47, -0.09], 0.075, 0.9, 1.25, 1), ...[-1, 1].flatMap(sd => [ball(lr(J.sh, sd), 0.052, 1.25, 0.9, 1).translate(0, 0.045, 0), ball(lr(J.el, sd), 0.036, 1, 1, 1.2).translate(sd * 0.02, 0, 0)])]), matte, g);
-    mk(mergeGeos([-1, 1].flatMap(sd => [ball(lr(J.knee, sd), 0.05, 1.05, 0.7, 1.1).translate(sd * 0.04, -0.01, 0.03), limb([sd * 0.2, 1.3, -0.1], [sd * 0.2, 1.12, -0.33], 0.016, 0.016, 6)])), acc, g);
-    // boots and gloves
-    mk(mergeGeos([-1, 1].flatMap(sd => [
-      limb(lr(J.ankle, sd), lr([0.22, 0.5, -0.28], sd), 0.046, 0.05, 10), boxG(0.09, 0.05, 0.25, sd * 0.225, 0.47, -0.19, 0.08), ball([sd * 0.225, 0.48, -0.07], 0.046, 1, 0.65, 1.1),
-      ball(lr(J.wr, sd), 0.042, 1.1, 0.8, 1.35), ball([sd * 0.25, 1.09, 0.51], 0.038, 1.2, 0.72, 0.8)
-    ])), matte, g);
-    // full-face helmet with chin bar, visor and a small aero fin
-    mk(mergeGeos([ball([0, 1.54, 0.22], 0.137, 0.96, 0.96, 1.08), ball([0, 1.47, 0.3], 0.1, 0.92, 0.72, 1.1), limb([0, 1.42, 0.08], [0, 1.47, 0.17], 0.065, 0.075, 10)]), carbon, g);
+    ]), leather);
+    // darker stretch panels, the aero hump behind the helmet, sliders on knees, elbows and shoulders
+    part(mergeGeos([
+      loft([[0, 1.33, -0.17, 0.07, 0.03], [0, 1.46, -0.11, 0.125, 0.07], [0, 1.56, -0.03, 0.09, 0.06], [0, 1.6, 0.05, 0.04, 0.03]], 12),
+      loft([[0, 1.14, -0.42, 0.14, 0.14], [0, 1.2, -0.285, 0.172, 0.127], [0, 1.27, -0.17, 0.176, 0.13]], 16),
+      ...[-1, 1].map(sd => ball([sd * 0.2, 0.74, -0.08], 0.05, 0.9, 1.5, 0.9))
+    ]), matte);
+    part(mergeGeos([-1, 1].flatMap(sd => [ball(lr(J.sh, sd), 0.056, 1.15, 0.75, 1.1).translate(sd * 0.03, 0.04, 0), ball(lr(J.el, sd), 0.036, 1, 1, 1.25).translate(sd * 0.024, -0.008, 0)])), steel);
+    part(mergeGeos([-1, 1].flatMap(sd => [
+      ball(lr(J.knee, sd), 0.052, 0.9, 0.62, 1.15).translate(sd * 0.052, -0.022, 0.02),
+      limbLoft(lr(J.wr, sd), [sd * 0.285, 1.165, 0.375], [0.036, 0.039], 10)
+    ])), acc);
+    part(mergeGeos([-1, 1].map(sd => loft([[sd * 0.17, 1.42, 0.0, 0.016, 0.05], [sd * 0.185, 1.3, -0.1, 0.016, 0.05], [sd * 0.17, 1.17, -0.28, 0.016, 0.05]], 8))), acc);
+    // boots with soles and toe sliders, gloves with fingers round the grips
+    part(mergeGeos([-1, 1].flatMap(sd => [
+      limbLoft(lr(J.ankle, sd), [sd * 0.21, 0.5, -0.28], [0.05, 0.054]),
+      loft([[sd * 0.215, 0.51, -0.34, 0.045, 0.045], [sd * 0.22, 0.48, -0.24, 0.05, 0.045], [sd * 0.225, 0.462, -0.11, 0.046, 0.032], [sd * 0.225, 0.452, -0.03, 0.03, 0.02]], 10),
+      ball([sd * 0.265, 1.095, 0.49], 0.05, 0.95, 0.7, 1.1)
+    ])), matte);
+    part(mergeGeos([-1, 1].flatMap(sd => [boxG(0.08, 0.016, 0.34, sd * 0.222, 0.43, -0.17), ...[0.205, 0.235, 0.265, 0.295].flatMap(x => [
+      limb([sd * x, 1.125, 0.5], [sd * x, 1.115, 0.545], 0.0135, 0.012, 6), limb([sd * x, 1.115, 0.545], [sd * x, 1.06, 0.53], 0.012, 0.011, 6), ball([sd * x, 1.06, 0.53], 0.011)
+    ]), limb([sd * 0.22, 1.08, 0.46], [sd * 0.215, 1.055, 0.52], 0.014, 0.012, 6)])), skin);
+    part(mergeGeos([-1, 1].map(sd => boxG(0.1, 0.018, 0.04, sd * 0.25, 1.143, 0.505))), carbon);
+    part(mergeGeos([-1, 1].map(sd => boxG(0.05, 0.05, 0.05, sd * 0.2, 0.45, -0.05))), acc);
+    // full-face helmet: rounded shell, chin bar with vents, a neck roll, an iridium visor over its dark seal, a small rear spoiler
+    part(limbLoft([0, 1.44, 0.08], [0, 1.5, 0.17], [0.07, 0.075], 12), matte);
+    part(mergeGeos([ball([0, 1.555, 0.22], 0.137, 0.95, 0.98, 1.1), ball([0, 1.47, 0.315], 0.096, 0.9, 0.64, 1.0), loft([[0, 1.61, 0.03, 0.06, 0.03], [0, 1.65, 0.06, 0.05, 0.02], [0, 1.68, 0.1, 0.02, 0.012]], 8)]), carbon);
+    part(ball([0, 1.55, 0.29], 0.105, 1.15, 0.5, 0.9), skin);
     const visor = new THREE.MeshStandardMaterial({ color: 0x3f7c9c, roughness: 0.08, metalness: 0.95 }); visor.userData.env = 1.5;
-    mk(ball([0, 1.555, 0.298], 0.094, 1.17, 0.46, 0.8), visor, g);
-    mk(mergeGeos([ball([0, 1.62, 0.16], 0.1, 0.22, 0.62, 1.05), ...[-1, 1].map(sd => boxG(0.012, 0.028, 0.15, sd * 0.126, 1.5, 0.14))]), acc, g);
+    part(ball([0, 1.555, 0.3], 0.099, 1.13, 0.43, 0.87), visor);
+    part(mergeGeos([ball([0, 1.64, 0.18], 0.1, 0.14, 0.55, 1.05), ...[-1, 1].map(sd => boxG(0.012, 0.024, 0.14, sd * 0.127, 1.5, 0.15))]), acc);
+    part(mergeGeos([-1, 1].map(sd => boxG(0.05, 0.012, 0.03, sd * 0.035, 1.44, 0.4, 0.5))), SHARED.trim);
     const wheels = [], pivots = [];
     const rimF = rimMat, rimR = rimMat;
     wheel(root, { x: 0, z: 0.76, r: 0.31, w: 0.12, rim: rimF, spokes: 6, tyre: 0.16, rotors: [0.058, -0.058], rotorR: 0.158, front: true, list: wheels, pivots });
@@ -2259,7 +2338,13 @@ const brakeLights = { mat: new THREE.MeshBasicMaterial({ color: 0x7a0c14 }), glo
     mk(mergeGeos([-1, 1].flatMap(sd => [boxG(0.05, 0.13, 0.05, sd * 0.09, 0.09, -0.135, -0.5), boxG(0.03, 0.05, 0.05, sd * 0.06, 0.12, -0.13)])), gold, fork);
     const fender = new THREE.Mesh(extrudeProfile(shp([[0.25, 0.14], [0.14, 0.3], [-0.06, 0.345], [-0.25, 0.2], [-0.2, 0.2], [-0.06, 0.31], [0.12, 0.27], [0.21, 0.13]]), 0.13, 0.008), carbon); fork.add(fender);
     brakeGlow(root, [[0, 1.1, -1.13]], 0.9);
-    MODELS.bike = { g: root, paint: pm, base: C(base), wheels, pivots, r: 0.31 };
+    // battered: a side panel hanging loose and a smashed tail light. Critical: the screen is gone and the tail unit cracked open
+    const damageParts = [];
+    hinged(damageParts, 2, extrudeProfile(shp([[0.3, 0], [0.02, -0.02], [-0.02, -0.3], [0.24, -0.26]]), 0.02, 0.005), pm, g, [0.262, 0.82, 0.14], [0.62, 0, 0.32]);
+    hinged(damageParts, 2, boxG(0.13, 0.05, 0.05, 0, 1.235, -1.09, 0.5), SHARED.trim, g);
+    hinged(damageParts, 3, extrudeProfile(shp([[0, 0], [-0.38, 0.03], [-0.44, -0.06], [-0.04, -0.09]]), 0.02, 0.004), pm, g, [-0.15, 1.04, -0.68], [-0.3, 0.12, -0.5]);
+    gone(damageParts, 3, screen);
+    MODELS.bike = { g: root, paint: pm, base: C(base), wheels, pivots, r: 0.31, damageParts, dent: 0.35, smoke: [0.15, 0.72], stage: 0, rider };
   }
 
   // Truck: European cab-over tractor unit in sage green. A tall sleeper cab sits over the front axle; behind it the
@@ -2353,7 +2438,14 @@ const brakeLights = { mat: new THREE.MeshBasicMaterial({ color: 0x7a0c14 }), glo
     [[1.1, 2.0, true, 0.32], [-1.1, 2.0, true, 0.32], [0.76, -1.7, false, 0.26], [1.06, -1.7, false, 0.26], [-0.76, -1.7, false, 0.26], [-1.06, -1.7, false, 0.26]].forEach(([x, z, f, w]) =>
       wheel(g, { x, z, r: 0.52, w, tyre: 0.22, rim: alu, solid: true, front: f, list: wheels, pivots }));
     brakeGlow(g, [[0.98, 0.86, -3.32], [-0.98, 0.86, -3.32]], 1.6);
-    MODELS.truck = { g, paint: pm, base: C(base), wheels, pivots, r: 0.52 };
+    // battered: a torn mudguard, a smashed tail light and a mirror hanging down. Critical: bumper hanging, cracked windscreen
+    const damageParts = [];
+    hinged(damageParts, 2, boxG(0.74, 0.03, 0.84, 0, 0, -0.42), plastic, g, [-0.93, 1.21, -1.3], [-0.5, 0, 0.1]);
+    hinged(damageParts, 2, boxG(0.26, 0.15, 0.05, -0.98, 0.86, -3.27), SHARED.trim, g);
+    hinged(damageParts, 2, mergeGeos([boxG(0.25, 0.56, 0.1, 0, -0.28, 0), boxG(0.21, 0.5, 0.012, 0, -0.28, -0.058)]), plastic, g, [-1.5, 3.16, 2.86], [0.1, 0, -0.45]);
+    hinged(damageParts, 3, boxG(1.3, 0.3, 0.1, -0.65, 0, 0), plastic, g, [0.12, 0.72, 3.3], [0, 0, 0.2]);
+    hinged(damageParts, 3, mergeGeos([[-0.5, 2.72, 0.5, 2.84], [-0.5, 2.72, -0.2, 2.42], [-0.5, 2.72, -1.0, 2.98], [-0.5, 2.72, -0.72, 2.46], [-0.5, 2.72, 0.05, 3.06]].map(([x0, y0, x1, y1]) => limb([x0, y0, 3.09 - (y0 - 2.42) * 0.17], [x1, y1, 3.09 - (y1 - 2.42) * 0.17], 0.006, 0.006, 4))), new THREE.MeshBasicMaterial({ color: 0xc8d0da }), g);
+    MODELS.truck = { g, paint: pm, base: C(base), wheels, pivots, r: 0.52, damageParts, dent: 1.4, smoke: [0.7, 3.95], stage: 0 };
   }
 
   Object.values(MODELS).forEach(m => { m.g.visible = false; carTilt.add(m.g); });
@@ -2426,8 +2518,7 @@ function updateWanted(){
   const next = Core.wantedStars(stars, M.time - timeLeft, M.time, progress, copsWrecked);
   if (next === stars) return;
   stars = next;
-  if (Core.helicopterDue(stars)) toast('Five stars: police helicopter overhead! Stay out of its light.', 'red', 3600);
-  else if (stars >= 3) toast('Wanted level up: ' + stars + ' stars. More police, and faster.', 'red', 2400);
+  if (stars >= 3) toast('Wanted level up: ' + stars + ' stars. More police, and faster.', 'red', 2400);
 }
 const snapI = v => clamp(Math.round(v / PITCH) * PITCH, -3 * PITCH, 3 * PITCH);
 function segmentBlocked(x0, z0, x1, z1){
@@ -2596,11 +2687,11 @@ function updatePoliceVisuals(){
 function resetPolice(){
   police.forEach(p => { p.active = false; p.respawn = 0; p.g.visible = false; p.light.intensity = 0; });
   spawnTimer = 4; bust = 0; copsWrecked = 0; copsWarned = false; nearestCop = Infinity; stars = 1;
-  heli.on = false; heli.spotted = false; heli.g.visible = false; heli.beam.visible = false; heli.pool.visible = false;
+  heli.runTime = 0; heli.on = false; heli.spotted = false; heli.g.visible = false; heli.beam.visible = false; heli.pool.visible = false;
 }
 
 // ---------- Police helicopter ----------
-// ### Comes with the fifth star and stays until the run ends. It flies ahead of the player, so its searchlight is in view from
+// ### Joins the chase after 60 seconds (or with the fifth star) and stays until the run ends. It flies ahead of the player, so its searchlight is in view from
 // ### the chase camera. The light follows the player a little slower than the police can drive: at full speed on a clear road
 // ### you stay ahead of it, but every sharp turn or crash lets it catch you. While you are in the light the police know
 // ### where you are: they drive 6 % faster and see you from further away. Its beam is a fake (a cone and a glow on the ground),
@@ -2665,18 +2756,20 @@ const heli = (() => {
   const strobeB = add(ball([0, 0.68, -0.3], 0.1), new THREE.MeshBasicMaterial({ color: 0x4d86ff }), g);
   add(mergeGeos([ball([1.0, 2.04, -5.32], 0.045)]), new THREE.MeshBasicMaterial({ color: 0x35ff7a }), g);
   add(mergeGeos([ball([-1.0, 2.04, -5.32], 0.045)]), new THREE.MeshBasicMaterial({ color: 0xff3040 }), g);
-  g.scale.setScalar(1.12);
+  g.scale.setScalar(1.25);
   g.visible = false; scene.add(g);
   const beam = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 24, 1, true).rotateX(-Math.PI / 2).translate(0, 0, 0.5), BEAM_MAT.clone());
   beam.material.opacity = 0.26; beam.visible = false; scene.add(beam);
   const pool = new THREE.Mesh(new THREE.CircleGeometry(1, 28).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: glowTexture, color: 0xdfe9ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
   pool.scale.setScalar(Core.SPOT_RADIUS * 1.5); pool.visible = false; scene.add(pool);
-  return { g, rotor, tail, beam, pool, strobeR, strobeB, on: false, spotted: false, closing: 0, x: 0, z: 0, sx: 0, sz: 0, h: 0, tilt: 0, roll: 0 };
+  return { g, rotor, tail, beam, pool, strobeR, strobeB, on: false, spotted: false, runTime: 0, closing: 0, x: 0, z: 0, sx: 0, sz: 0, h: 0, tilt: 0, roll: 0 };
 })();
 function updateHeli(dt){
   const live = state === 'play', H = heli;
   if (!H.on){
-    if (!live || !Core.helicopterDue(stars)) return;
+    if (live) H.runTime += dt;
+    if (!live || !Core.helicopterDue(H.runTime, stars)) return;
+    toast('Police helicopter overhead! Stay out of its searchlight.', 'red', 3600);
     // it arrives from behind the player and overtakes
     H.on = true; H.x = car.x - Math.sin(car.heading) * 170; H.z = car.z - Math.cos(car.heading) * 170; H.sx = H.x; H.sz = H.z; H.h = car.heading;
     H.g.visible = true; H.beam.visible = true; H.pool.visible = true;
@@ -2701,9 +2794,9 @@ function updateHeli(dt){
   const gy = groundH(H.sx, H.sz) + 0.3;
   H.pool.position.set(H.sx, gy, H.sz);
   H.pool.material.color.setHex(H.spotted ? 0xfff0d8 : 0xdfe9ff);
-  const lx = H.x + Math.sin(H.h) * 1.92, lz = H.z + Math.cos(H.h) * 1.92;
-  H.beam.position.set(lx, y + 0.5, lz); H.beam.lookAt(H.sx, gy, H.sz);
-  const L = Math.hypot(H.sx - lx, gy - y - 0.5, H.sz - lz);
+  const lx = H.x + Math.sin(H.h) * 2.15, lz = H.z + Math.cos(H.h) * 2.15;
+  H.beam.position.set(lx, y + 0.55, lz); H.beam.lookAt(H.sx, gy, H.sz);
+  const L = Math.hypot(H.sx - lx, gy - y - 0.55, H.sz - lz);
   H.beam.scale.set(Core.SPOT_RADIUS, Core.SPOT_RADIUS, L);
 }
 // moving vehicles as circles (city traffic) for collisions
@@ -2822,7 +2915,8 @@ function placeRun(){
 }
 
 // ---------- Particles & smoke ----------
-// ### burst spawns short-lived sparks (collect, crash, wreck). Above 35 % damage the engine bay smokes, darker when critical.
+// ### burst spawns short-lived sparks (collect, crash, wreck). Core.smokeFor says how the damaged engine smokes: from thin grey
+// ### to a thick black column rising above the vehicle, and flames near the end. Sprites come from fixed pools, so nothing is allocated.
 const particles = [];
 const partGeo = new THREE.TetrahedronGeometry(0.26, 0);
 function burst(x, y, z, color, n, spread){
@@ -2844,32 +2938,57 @@ function updateParticles(dt){
     if (p.life <= 0){ scene.remove(p.mesh); particles.splice(i, 1); if (--p.grp.left === 0) p.mat.dispose(); }
   }
 }
-const smoke = [];
-for (let i = 0; i < 40; i++){
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color: 0x6f6f78, transparent: true, depthWrite: false, opacity: 0 }));
+const smoke = [], flames = [];
+for (let i = 0; i < 70; i++){
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color: 0x4a4a50, transparent: true, depthWrite: false, opacity: 0 }));
   s.visible = false; scene.add(s);
-  smoke.push({ s, life: 0, vx: 0, vy: 0, vz: 0 });
+  smoke.push({ s, life: 0, vx: 0, vy: 0, vz: 0, peak: 0.5 });
 }
-let smokeAcc = 0, smokeIdx = 0;
+for (let i = 0; i < 14; i++){
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color: 0xff7a1e, transparent: true, depthWrite: false, opacity: 0, blending: THREE.AdditiveBlending }));
+  s.visible = false; scene.add(s);
+  flames.push({ s, life: 0, vx: 0, vy: 0, vz: 0 });
+}
+let smokeAcc = 0, smokeIdx = 0, flameAcc = 0, flameIdx = 0;
 function updateSmoke(dt){
-  if (state === 'play' && damage > 35){
-    smokeAcc += dt * (2 + (damage - 35) / 65 * 16);
-    const fx = Math.sin(car.heading), fz = Math.cos(car.heading), front = V.key === 'truck' ? 2.6 : V.key === 'bike' ? 0.4 : 1.6;
+  const P = Core.smokeFor(damage), md = MODELS[V.key];
+  const fx = Math.sin(car.heading), fz = Math.cos(car.heading), ox = car.x + fx * md.smoke[0], oz = car.z + fz * md.smoke[0], oy = car.y + md.smoke[1];
+  if (state === 'play' && P.rate > 0){
+    smokeAcc += dt * P.rate;
     while (smokeAcc >= 1){
       smokeAcc -= 1;
       const p = smoke[smokeIdx++ % smoke.length];
-      p.life = 1; p.s.visible = true;
-      p.s.position.set(car.x + fx * front + (Math.random() - 0.5) * 0.6, car.y + (V.key === 'truck' ? 3 : 1.2), car.z + fz * front + (Math.random() - 0.5) * 0.6);
-      p.vx = (Math.random() - 0.5) * 1.2 - fx * car.speed * 0.25; p.vy = 1.6 + Math.random(); p.vz = (Math.random() - 0.5) * 1.2 - fz * car.speed * 0.25;
-      p.s.material.color.set(damage > 75 ? 0x2e2c30 : 0x77777f);
+      p.life = 1; p.s.visible = true; p.peak = P.opacity;
+      p.s.position.set(ox + (Math.random() - 0.5) * 0.6, oy, oz + (Math.random() - 0.5) * 0.6);
+      p.vx = (Math.random() - 0.5) * 1.1 - fx * car.speed * 0.2; p.vy = P.rise + Math.random() * 1.2; p.vz = (Math.random() - 0.5) * 1.1 - fz * car.speed * 0.2;
+      p.s.material.color.set(P.color);
+    }
+    if (P.fire){
+      flameAcc += dt * 26;
+      while (flameAcc >= 1){
+        flameAcc -= 1;
+        const p = flames[flameIdx++ % flames.length];
+        p.life = 1; p.s.visible = true;
+        p.s.position.set(ox + (Math.random() - 0.5) * 0.5, oy - 0.1, oz + (Math.random() - 0.5) * 0.5);
+        p.vx = (Math.random() - 0.5) * 0.6 - fx * car.speed * 0.3; p.vy = 1.8 + Math.random() * 1.6; p.vz = (Math.random() - 0.5) * 0.6 - fz * car.speed * 0.3;
+      }
     }
   }
   for (const p of smoke){
     if (p.life <= 0) continue;
-    p.life -= dt * 0.7;
+    p.life -= dt * 0.42;
     p.s.position.x += p.vx * dt; p.s.position.y += p.vy * dt; p.s.position.z += p.vz * dt;
-    p.s.scale.setScalar(1.2 + (1 - p.life) * 4);
-    p.s.material.opacity = Math.max(0, p.life) * 0.55;
+    p.vx *= 1 - dt * 0.6; p.vz *= 1 - dt * 0.6;
+    p.s.scale.setScalar(1.0 + (1 - p.life) * 5);
+    p.s.material.opacity = Math.min(1, (1 - p.life) * 8) * Math.max(0, p.life) * p.peak;
+    if (p.life <= 0) p.s.visible = false;
+  }
+  for (const p of flames){
+    if (p.life <= 0) continue;
+    p.life -= dt * 2.6;
+    p.s.position.x += p.vx * dt; p.s.position.y += p.vy * dt; p.s.position.z += p.vz * dt;
+    p.s.scale.setScalar(0.5 + p.life * 1.3);
+    p.s.material.opacity = Math.max(0, p.life) * 0.95;
     if (p.life <= 0) p.s.visible = false;
   }
 }
@@ -3245,7 +3364,7 @@ function updateHud(dt){
   if (stars !== last.stars){
     last.stars = stars;
     [...ui.stars.children].forEach((s, i) => s.classList.toggle('on', i < stars));
-    ui.stars.classList.toggle('max', Core.helicopterDue(stars));
+    ui.stars.classList.toggle('max', stars >= Core.MAX_STARS);
     ui.stars.setAttribute('aria-label', 'Wanted level ' + stars + ' of ' + Core.MAX_STARS);
   }
   const active = police.filter(p => p.active).length, want = state === 'play' ? Core.pursuit(stars).cops : active;
@@ -3762,11 +3881,22 @@ function applyCarMesh(dt){
     brakeLights.mat.color.setHex(braking ? 0xff2a38 : 0x7a0c14);
     brakeLights.glows.forEach(s => { s.visible = braking; });
   }
+  const stage = Core.damageStage(damage);
+  if (stage !== md.stage){
+    md.stage = stage;
+    md.damageParts.forEach(d => { d.m.visible = d.show ? stage >= d.stage : stage < d.stage; });
+  }
+  dentU.value = sstep(12, 100, damage) * md.dent;
+  // a hanging part scrapes the road and throws sparks
+  if (state === 'play' && stage === 3 && sp > 12 && Math.random() < dt * 5) burst(car.x - Math.sin(car.heading) * 2, car.y + 0.15, car.z - Math.cos(car.heading) * 2, SPARKS, 2, 0.3);
   carTilt.rotation.x = -(car.pitch + car.bodyPitch);
   if (V.key === 'bike'){
     car.lean += (-car.steer * Math.min(1, sp / 18) * 0.5 - car.lean) * Math.min(1, 8 * dt);
     carTilt.rotation.z = car.lean;
-  } else carTilt.rotation.z = car.roll + car.steer * Math.min(1, sp / 34) * (V.key === 'truck' ? 0.04 : 0.07);
+    // the rider tucks in at speed and leans further into the turn than the bike
+    md.rider.rotation.x = 0.07 * Math.min(1, sp / 28);
+    md.rider.rotation.z = car.lean * 0.22; md.rider.position.x = car.lean * 0.1;
+  } else carTilt.rotation.z = car.roll + car.steer * Math.min(1, sp / 34) * (V.key === 'truck' ? 0.04 : 0.07) + (md.stage === 3 ? 0.022 : 0);
   md.wheels.forEach(w => w.rotation.x = car.wheelRot / md.r);
   md.pivots.forEach(p => p.rotation.y = car.steer * 0.45);
   md.paint.color.copy(md.base).lerp(PAINT_DEAD, damage / 100 * 0.65);

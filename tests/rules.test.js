@@ -156,10 +156,12 @@ test('every star makes the chase at least as hard', () => {
   assert.ok(Core.copTopSpeed(33, 1, 200, false) > Core.copTopSpeed(33, 1, 100, false), 'far behind they catch up');
 });
 
-test('the helicopter comes only with the fifth star, in the last fifth of a run', () => {
-  assert.deepEqual([1, 2, 3, 4, 5].map(Core.helicopterDue), [false, false, false, false, true]);
-  assert.equal(Core.wantedStars(1, 180 * 0.79, 180, 0, 0), 4);
-  assert.equal(Core.wantedStars(1, 180 * 0.81, 180, 0, 0), 5);
+test('the helicopter joins after 60 seconds, or sooner with the fifth star', () => {
+  assert.equal(Core.HELI_AFTER, 60);
+  assert.equal(Core.helicopterDue(0, 1), false);
+  assert.equal(Core.helicopterDue(59.9, 4), false);
+  assert.equal(Core.helicopterDue(60, 1), true);
+  assert.equal(Core.helicopterDue(20, 5), true);
 });
 
 test('the searchlight moves at its speed limit, never overshoots, and catches only a point inside its radius', () => {
@@ -366,4 +368,20 @@ test('brake lights: on while braking in either direction, off when reversing or 
   assert.equal(Core.isBraking(-5, true, false, false), false, 'reversing');
   assert.equal(Core.isBraking(0, false, false, true), false, 'handbrake at a standstill');
   assert.equal(Core.isBraking(20, false, false, false), false, 'coasting');
+});
+
+test('damage shows in four stages, and the smoke thickens and darkens up to flames', () => {
+  assert.deepEqual([0, 24.9, 25, 49.9, 50, 74.9, 75, 100].map(Core.damageStage), [0, 0, 1, 1, 2, 2, 3, 3]);
+  assert.equal(Core.smokeFor(0).rate, 0, 'a clean vehicle does not smoke');
+  assert.equal(Core.smokeFor(24).rate, 0);
+  let prev = Core.smokeFor(25);
+  for (let d = 26; d <= 100; d++){
+    const s = Core.smokeFor(d);
+    assert.ok(s.rate >= prev.rate && s.opacity >= prev.opacity && s.rise >= prev.rise, 'at ' + d);
+    assert.ok(s.color <= prev.color, 'darker at ' + d);
+    prev = s;
+  }
+  assert.ok(Core.smokeFor(100).color < 0x202020, 'near black at the end');
+  assert.equal(Core.smokeFor(87).fire, false);
+  assert.equal(Core.smokeFor(88).fire, true);
 });

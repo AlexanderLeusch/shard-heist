@@ -178,11 +178,21 @@
   const addDamage = (damage, add) => clamp(damage + Math.max(0, add), 0, 100);
   const repairDamage = damage => Math.max(0, damage - REPAIR_AMOUNT);
   const isWrecked = damage => damage >= 100;
+  // ### What damage looks like. Stage 0 is clean, 1 dented, 2 battered (loose parts, a smashed light), 3 critical (hood up and
+  // ### worse). Smoke starts at 25 %, thickens and turns from grey to black, and at 88 % the engine burns.
+  const damageStage = damage => damage >= 75 ? 3 : damage >= 50 ? 2 : damage >= 25 ? 1 : 0;
+  function smokeFor(damage){
+    const stage = damageStage(damage), within = (lo, hi) => clamp((damage - lo) / (hi - lo), 0, 1);
+    if (stage === 0) return { rate: 0, color: 0x55555c, opacity: 0, rise: 0, fire: false };
+    if (stage === 1) return { rate: 3 + 3 * within(25, 50), color: 0x4a4a50, opacity: 0.5, rise: 2.2, fire: false };
+    if (stage === 2) return { rate: 8 + 6 * within(50, 75), color: 0x26262a, opacity: 0.68, rise: 3, fire: false };
+    return { rate: 18 + 10 * within(75, 100), color: 0x0c0c0e, opacity: 0.75, rise: 3.8, fire: damage >= 88 };
+  }
 
   // ---------- Police pressure ----------
   // ### Wanted stars (1-5) rise with the time on the run and with the progress towards the end, whichever is further along.
-  // ### Each wrecked police car adds a little, and stars never fall. PURSUIT says what each star means. The fifth star comes in
-  // ### the last fifth of a run and brings the helicopter. The bust meter fills while a cop is within 9 m and you are almost
+  // ### Each wrecked police car adds a little, and stars never fall. PURSUIT says what each star means. The helicopter joins
+  // ### after a minute on the run, or sooner with the fifth star. The bust meter fills while a cop is within 9 m and you are almost
   // ### stopped, and drains otherwise.
   const PURSUIT = Object.freeze([
     Object.freeze({ cops: 1, speed: 1, spawn: 3, respawn: 9, hp: 3 }),
@@ -191,14 +201,14 @@
     Object.freeze({ cops: 3, speed: 1.06, spawn: 2.5, respawn: 6, hp: 3.5 }),
     Object.freeze({ cops: 4, speed: 1.1, spawn: 2, respawn: 4.5, hp: 4 })
   ]);
-  const MAX_STARS = PURSUIT.length, SPOT_RADIUS = 9;
+  const MAX_STARS = PURSUIT.length, SPOT_RADIUS = 9, HELI_AFTER = 60;
   function wantedStars(prev, elapsed, limit, progress, wrecked){
     const time = limit > 0 ? clamp(elapsed / limit, 0, 1) : 0;
     const score = Math.max(time, clamp(progress || 0, 0, 1)) + Math.max(0, wrecked || 0) * 0.04;
     return clamp(Math.max(prev || 1, 1 + Math.floor(score * MAX_STARS)), 1, MAX_STARS);
   }
   const pursuit = stars => PURSUIT[clamp(Math.round(stars) || 1, 1, MAX_STARS) - 1];
-  const helicopterDue = stars => stars >= MAX_STARS;
+  const helicopterDue = (runTime, stars) => runTime >= HELI_AFTER || stars >= MAX_STARS;
   // A police car's top speed: its map's speed, faster with more stars, when far behind, and when the helicopter has you in its light
   const copTopSpeed = (base, stars, dist, spotted) => base * pursuit(stars).speed * (dist > 140 ? 1.2 : 1) * (spotted ? 1.06 : 1);
   // Moves a point towards a target at no more than maxSpeed, and never past it: the helicopter and its searchlight
@@ -425,8 +435,8 @@
     isMode, isVeh, clamp, wrapAngle, mulberry32, shuffle, fmtTime, fmtTimeExact, frameDt,
     parsePick, parseBest, applyPick, actionAllowed,
     vehStats, zeroTo80, topSpeed, stepSpeed, collidePoint,
-    crashDamage, addDamage, repairDamage, isWrecked,
-    PURSUIT, MAX_STARS, SPOT_RADIUS, wantedStars, pursuit, helicopterDue, copTopSpeed, trackStep, inSpotlight, bustStep, edgeDistance,
+    crashDamage, addDamage, repairDamage, isWrecked, damageStage, smokeFor,
+    PURSUIT, MAX_STARS, SPOT_RADIUS, HELI_AFTER, wantedStars, pursuit, helicopterDue, copTopSpeed, trackStep, inSpotlight, bustStep, edgeDistance,
     driveTime, runStars, isNewBest,
     newStory, beginAct, retryAct, finishOpen, storyEnding, dueRadio,
     ENGINES, ENGINE_SR, gearFor, engineTarget, isBraking, engineLoop, engineLoops, ROTOR, rotorLoop
