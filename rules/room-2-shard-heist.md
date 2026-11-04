@@ -28,7 +28,7 @@ Percentages are relative to the map's top speed and to the car. The menu shows t
 | Map | Goal | Time | Car top speed | Police top speed | Shards | Repair kits |
 |---|---|---|---|---|---|---|
 | **Lisbon · Baixa** | Collect **all 8 shards**, then drive through the golden gate that appears under the Arco da Rua Augusta | 3:00 | 122 km/h | 119 km/h | 8 | 3 |
-| **Highway** | Reach the finish **4 km** ahead. Shards are optional: **+4 s** each | 1:40 | 200 km/h | 187 km/h | 12 | 2 |
+| **Highway** | Reach the finish **4 km** ahead. Shards are optional: **+4 s** each | 1:50 | 200 km/h | 187 km/h | 12 | 2 |
 | **Countryside** | Reach the village at the end of the road. Shards: **+4 s** each | 2:30 | 158 km/h | 148 km/h | 10 | 3 |
 
 - A shard is picked up within 3.8 m; a repair kit within 3.6 m, and only when you have damage.

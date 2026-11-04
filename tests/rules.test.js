@@ -184,7 +184,7 @@ test('boundary distance shrinks towards every edge; the highway only has two end
 
 test('scoring: drive time, stars and best time', () => {
   assert.equal(Core.driveTime('city', MODES.city, 100, 8), 80);
-  assert.equal(Core.driveTime('highway', MODES.highway, 20, 5), 100, 'bonus seconds are added back');
+  assert.equal(Core.driveTime('highway', MODES.highway, 20, 5), 110, 'bonus seconds are added back');
   assert.equal(Core.runStars('city', MODES.city, 100, 80, 0), 3);
   assert.equal(Core.runStars('city', MODES.city, 50, 130, 0), 2);
   assert.equal(Core.runStars('city', MODES.city, 10, 170, 0), 1);
