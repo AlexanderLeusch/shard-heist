@@ -60,7 +60,7 @@ Opening `escape-room/index.html` or `index.html` directly from the folder also w
 ## How it is built
 
 ```
-rules/            the rules of both rooms in plain English (working draft)
+rules/            the rules of both rooms in plain English; npm run docs builds docs/rules.html from them
 plot-twist/       the original Python/Streamlit solo project: logic.py, story.py, db.py, app.py, pytest tests
 escape-room/      ROOM 1, self-contained (it shares no files with room 2):
   index.html        page structure: HUD, markers, cards, error screen
@@ -78,7 +78,7 @@ tests/            Node tests for both rooms' rules and pages, plus a headless-br
 scripts/          dev server (serve.js) and the SRI checker (check-sri.js)
 .github/workflows CI: JavaScript tests, SRI check, browser tests, Python tests and dependency audit on every push to main
                   and every pull request; deploy to GitHub Pages only when all of them pass
-docs/             Code Guide (PDF): architecture, all code sections, tuning, limits
+docs/             Code Guide (PDF): architecture, all code sections, tuning, limits. Rules (PDF): the rules of both rooms
 ```
 
 **Room 1 in one sentence.** `rules.js` holds the state as one plain object; `perform(state, action, target)` returns a new state for an accepted action and the same, unchanged state plus a message for a refused one; `tick()` runs the clock; `room.js` only draws the state and turns clicks into actions. This is the structure of the original Plot Twist project, in JavaScript and 3D.
