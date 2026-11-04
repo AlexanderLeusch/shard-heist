@@ -1,3 +1,4 @@
+// ### Unit tests for input validation: saved data, menu choices and keys that are not allowed.
 // Player input: menu actions, menu picks, keys and stored data (src/core.js)
 const test = require('node:test');
 const assert = require('node:assert/strict');

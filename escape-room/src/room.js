@@ -52,6 +52,7 @@ canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); ShardFata
 // ### diamond-plate steel, scratched graffiti and the steamed-up mirror. No image files are downloaded.
 const TEX = COARSE ? 512 : 1024;
 const rnd = mulberry32(4471);
+// ### Paints a texture on a canvas, so the room needs no image files.
 function canvasTex(w, h, draw, repeat){
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   draw(c.getContext('2d'), w, h);
@@ -60,6 +61,7 @@ function canvasTex(w, h, draw, repeat){
   if (repeat){ t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repeat[0], repeat[1]); }
   return t;
 }
+// ### Adds dirt, scratches and stains to a wall texture.
 function grime(g, w, h, n, color, maxR, lowBias){
   for (let i = 0; i < n; i++){
     const x = rnd() * w, y = lowBias ? h - Math.pow(rnd(), 2) * h : rnd() * h, r = (0.2 + rnd()) * maxR;
@@ -152,6 +154,7 @@ const guardTex = canvasTex(256, 256, (g, w, h) => {
   g.fillRect(w * .3, h * .2, w * .44, h * .06);
   g.fillRect(w * .36, h * .1, w * .32, h * .12);
 });
+// ### Paints a digit for the wheels of the combination lock.
 const digitTex = () => { const c = document.createElement('canvas'); c.width = c.height = 64; const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t; };
 function drawDigit(t, d){
   const g = t.image.getContext('2d');
@@ -161,6 +164,7 @@ function drawDigit(t, d){
 }
 
 // ---------- Materials ----------
+// ### The surfaces of the cell: painted canvas textures for walls, floor and metal, so the room loads no image files.
 const M = {
   tiles: w => new THREE.MeshStandardMaterial({ map: tileTex(w / 1.2), roughness: .32, metalness: 0 }),
   paint: new THREE.MeshStandardMaterial({ map: paintTex, roughness: .9 }),
@@ -196,6 +200,7 @@ const box = (w, h, d, mat, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxG
 const cyl = (rt, rb, h, mat, x, y, z, seg = 20) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat); m.position.set(x, y, z); return add(m); };
 const plane = (w, h, mat, x, y, z, ry = 0, rx = 0) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat); m.position.set(x, y, z); m.rotation.set(rx, ry, 0); m.receiveShadow = true; room.add(m); return m; };
 const HOT = {};   // hotspot key -> meshes that can be clicked
+// ### Registers a clickable object (a hotspot) for the marker and the rules.
 const hot = (key, ...meshes) => { (HOT[key] = HOT[key] || []).push(...meshes); meshes.forEach(m => { if (m.material !== M.steam) m.material = m.material.clone(); m.userData.hot = key; }); };
 
 function wall(len, x, z, ry){
@@ -357,9 +362,11 @@ const VIEWS = {
   cell: { pos: [0, 1.62, 1.1], look: [0, 1.45, 3] }
 };
 const cam = { pos: new THREE.Vector3(...VIEWS.intro.pos), yaw: 0, pitch: 0, from: null, t: 1, dur: 1, yawOff: 0, pitchOff: 0, idle: 0 };
+// ### The camera angles that look at a point.
 const anglesTo = (pos, look) => { const d = new THREE.Vector3(...look).sub(new THREE.Vector3(...pos)); return { yaw: Math.atan2(d.x, -d.z), pitch: Math.atan2(d.y, Math.hypot(d.x, d.z)) }; };
 let camTarget = { pos: new THREE.Vector3(...VIEWS.intro.pos), ...anglesTo(VIEWS.intro.pos, VIEWS.intro.look) };
 Object.assign(cam, { yaw: camTarget.yaw, pitch: camTarget.pitch });
+// ### Moves the camera smoothly to another place in the cell.
 function goView(name, dur){
   const v = VIEWS[name];
   cam.from = { pos: cam.pos.clone(), yaw: cam.yaw, pitch: cam.pitch };
@@ -369,6 +376,7 @@ function goView(name, dur){
   while (camTarget.yaw - cam.from.yaw < -Math.PI) camTarget.yaw += Math.PI * 2;
   cam.t = 0; cam.dur = REDUCED ? .01 : (dur || 1.1); cam.yawOff = 0; cam.pitchOff = 0;
 }
+// ### Moves the camera each frame, towards the current place and where the player is looking.
 function updateCamera(dt){
   if (cam.t < 1){
     cam.t = Math.min(1, cam.t + dt / cam.dur);
@@ -405,6 +413,7 @@ const ANCHORS = {
 const keyOf = h => h.target ? `${h.action}:${h.target}` : h.action;
 let markerEls = [];
 const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2(), tmp = new THREE.Vector3();
+// ### Shows the markers for what can be used from here; Rules decides which those are.
 function renderHotspots(){
   const list = R.visibleHotspots(S);
   const mk = $('markers'); mk.textContent = ''; markerEls = [];
@@ -419,6 +428,7 @@ function renderHotspots(){
   }
   $('goBar').hidden = !go.children.length;
 }
+// ### Places the 2D markers over their 3D objects.
 function updateMarkers(){
   const w = innerWidth, h = innerHeight, busy = !overlay.hidden || cam.t < 1;
   for (const m of markerEls){
@@ -428,6 +438,7 @@ function updateMarkers(){
     if (on) m.el.style.transform = `translate(${((tmp.x + 1) / 2 * w - 14).toFixed(1)}px, ${((1 - tmp.y) / 2 * h - 14).toFixed(1)}px)`;
   }
 }
+// ### Finds the hotspot under the pointer with a ray through the scene.
 function pick(e){
   ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
   raycaster.setFromCamera(ndc, camera);
@@ -437,6 +448,7 @@ function pick(e){
   return hit && hit.distance < 6 ? hit.object.userData.hot : null;
 }
 let hovered = null;
+// ### Highlights the hotspot under the pointer.
 function hover(e){
   if (!overlay.hidden) return;
   const k = pick(e);
@@ -445,6 +457,7 @@ function hover(e){
   hovered = k; canvas.classList.toggle('over', !!k);
   if (k) (HOT[k] || []).forEach(m => { if (m.material.emissive){ m.userData.em = m.material.emissive.getHex(); m.material.emissive.setHex(0x3a2008); } });
 }
+// ### Handles a click on the scene.
 function clickAt(e){
   if (!overlay.hidden || S.scene === 'intro') return;
   const k = pick(e);
@@ -462,6 +475,7 @@ function use(action, target){
   if (action === 'lock'){ if (S.scene === 'hatch') showLock(); return; }
   act(action, target);
 }
+// ### Sends an action to Rules, and shows the answer. Refused actions return the state unchanged, with a reason.
 function act(action, target){
   const before = S, r = R.perform(S, action, target);
   cue(r.cue);
@@ -492,11 +506,13 @@ function syncWorld(){
 }
 
 // ---------- HUD and cards ----------
+// ### The clock, inventory and journal, and the cards for clues, the lock and the endings. They only show what Rules says.
 const overlay = $('overlay'), card = $('card'), hud = $('hud');
 const ICON = {
   spoon: '<svg viewBox="0 0 40 24" aria-hidden="true"><ellipse cx="10" cy="12" rx="8" ry="5" fill="#cfd6d9"/><rect x="16" y="10.5" width="22" height="3" rx="1.5" fill="#cfd6d9"/></svg>',
   mop: '<svg viewBox="0 0 40 24" aria-hidden="true"><rect x="2" y="10.5" width="28" height="3" rx="1.5" fill="#c49a64"/><path d="M28 6h10v12H28z" fill="#d8d2bf"/></svg>'
 };
+// ### Updates the clock, inventory and journal from the current state.
 function renderHud(){
   $('place').textContent = (R.SCENES[S.scene] || { title: S.scene === 'cell' ? 'The Cell' : 'Cell Block D' }).title;
   const slots = $('slots'); slots.textContent = '';
@@ -526,6 +542,7 @@ function showCard(html, cls){
   card.className = 'card' + (cls ? ' ' + cls : ''); card.innerHTML = html; overlay.hidden = false;
   const b = card.querySelector('.btn'); if (b && !COARSE) b.focus({ preventScroll: true });
 }
+// ### Closes a clue or lock card.
 function hideCard(){ overlay.hidden = true; }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
@@ -537,6 +554,7 @@ const BRIEF = [
   ['How to play', 'Your <em>moves</em>', null]
 ];
 let briefStep = 0;
+// ### Shows the opening briefing.
 function showBrief(i){
   briefStep = i;
   const [eye, title, text] = BRIEF[i], last = i === BRIEF.length - 1;
@@ -591,6 +609,7 @@ function renderLock(){
   ui.innerHTML = S.lock.map((d, i) => `<div class="wheel"><button data-turn="${i},1" aria-label="Wheel ${i + 1} up">▲</button><output aria-label="Wheel ${i + 1}">${d}</output><button data-turn="${i},-1" aria-label="Wheel ${i + 1} down">▼</button></div>`).join('');
   card.querySelector('#tries').textContent = S.wrongTries ? `Wrong codes so far: ${S.wrongTries} · each costs ${R.WRONG_CODE_PENALTY} s` : 'Each wrong code costs ' + R.WRONG_CODE_PENALTY + ' s';
 }
+// ### Shows one of the two endings.
 function showEnding(){
   const A = S.ending === 'A', E = R.ENDINGS[S.ending];
   showCard(`<div class="eyebrow">${A ? 'Ending A of 2' : 'Ending B of 2'}</div>
@@ -621,6 +640,7 @@ $('btnPause').addEventListener('click', e => { e.currentTarget.blur(); if (S.end
 $('btnNotes').addEventListener('click', e => { e.currentTarget.blur(); if (!paused) showNotes(); });
 let muted = false;
 $('btnSound').addEventListener('click', e => { e.currentTarget.blur(); toggleSound(); });
+// ### Turns the sound on or off.
 function toggleSound(){ muted = !muted; $('soundWaves').style.display = muted ? 'none' : ''; $('btnSound').setAttribute('aria-label', muted ? 'Turn sound on' : 'Mute sound'); if (master) master.gain.value = muted ? 0 : .8; }
 addEventListener('keydown', e => {
   if (e.code === 'Enter' && !overlay.hidden){ const b = card.querySelector('.btn'); if (b && document.activeElement && document.activeElement.closest && document.activeElement.closest('.card') && document.activeElement.tagName === 'BUTTON') return; if (b){ e.preventDefault(); b.click(); } return; }
@@ -649,6 +669,7 @@ addEventListener('shardheist:fatal', () => { paused = true; if (ac) ac.suspend()
 // ### Synthesised with Web Audio: the hum of the fluorescent tube, dripping water, running water while the tap is on,
 // ### and short effects for every kind of action. Starts on the first click, as browsers require.
 let ac = null, master = null, waterGain = null, noiseBuf = null, dripIn = 3;
+// ### Creates the audio on the first click, as browsers require.
 function initAudio(){
   if (ac){ if (ac.state === 'suspended' && !document.hidden) ac.resume(); return; }
   try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e){ ac = null; return; }
@@ -664,6 +685,7 @@ function initAudio(){
   waterGain = ac.createGain(); waterGain.gain.value = 0;
   water.connect(wf); wf.connect(waterGain); waterGain.connect(master); water.start();
 }
+// ### Plays one short tone.
 function tone(freq, dur, type, vol, slideTo, delay){
   if (!ac) return;
   const t = ac.currentTime + (delay || 0), o = ac.createOscillator(), g = ac.createGain();
@@ -671,6 +693,7 @@ function tone(freq, dur, type, vol, slideTo, delay){
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
   o.connect(g); g.connect(master); o.start(t); o.stop(t + dur + .02);
 }
+// ### Plays one short burst of filtered noise.
 function noise(dur, vol, type, freq, delay){
   if (!ac) return;
   const t = ac.currentTime + (delay || 0), s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
@@ -678,6 +701,7 @@ function noise(dur, vol, type, freq, delay){
   g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
   s.connect(f); f.connect(g); g.connect(master); s.start(t, Math.random()); s.stop(t + dur + .02);
 }
+// ### Plays a sound cue for an event, such as a warning or a lock opening.
 function cue(name){
   if (!ac || !name) return;
   switch (name){
@@ -710,6 +734,7 @@ function endingB(){ doorFlash = 1; goView('cell', .6); setTimeout(() => { if (S.
 // ### Runs once per screen refresh: the clock (rules.tick), then animations (camera, steam, flicker, guard, tile, hatch),
 // ### then the markers and the picture. The clock only runs while playing, not paused and not in the briefing.
 let clock = 0, last = performance.now(), guardShow = 0, flicker = 0, tileVel = 0;
+// ### The room loop each frame: clock, camera, markers and drawing.
 function frame(now){
   requestAnimationFrame(frame);
   const dt = clamp((now - last) / 1000, 0, .05); last = now; clock += dt;
@@ -767,6 +792,7 @@ function resize(){
 addEventListener('resize', resize);
 
 // ---------- Start ----------
+// ### Restores a saved game if there is a valid one, then starts the loop.
 if (saved && R.canContinue(saved)){
   S = saved; goView(S.scene, .01); syncWorld(); renderHud(); renderHotspots(); paused = true; showContinue();
 } else { syncWorld(); renderHud(); renderHotspots(); showBrief(0); }

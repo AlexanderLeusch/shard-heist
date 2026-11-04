@@ -1,3 +1,4 @@
+// ### Unit tests for the rules in src/core.js: accepted actions, refused actions and edge cases. No browser is needed.
 // Game rules: driving, damage, police, boundary and scoring (src/core.js)
 const test = require('node:test');
 const assert = require('node:assert/strict');

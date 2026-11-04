@@ -1,6 +1,6 @@
 # Room 1 · Plot Twist: Cell Block D
 
-> Working draft. It describes the current code in `escape-room/src/rules.js`. Values that are marked **(open)** are not decided yet.
+> This document describes the rules in `escape-room/src/rules.js`. Values marked **(open)** are not decided yet.
 
 ## Goal
 

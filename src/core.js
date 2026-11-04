@@ -136,6 +136,7 @@
   // ### drag and the handbrake for one frame; gas and brake held together both apply, which is how a real pedal pair works.
   // ### The throttle can never push past the top speed, so the km/h on the menu card is the real maximum.
   const topSpeed = (m, v, damage, offRoad) => m.max * v.speed * (1 - 0.4 * clamp(damage, 0, 100) / 100) * (offRoad ? 0.55 : 1);
+  // ### One physics step of speed: gravity on the slope, throttle, brakes, rolling drag and the top speed. dt is capped, so a slow frame cannot launch a vehicle.
   function stepSpeed(speed, keys, dt, maxNow, v, grade){
     dt = clamp(dt, 0, MAX_DT);
     // Gravity along the road comes first, so that the brakes and rolling friction can still hold a stopped vehicle on a hill
@@ -183,6 +184,7 @@
   // ### What damage looks like. Stage 0 is clean, 1 dented, 2 battered (loose parts, a smashed light), 3 critical (hood up and
   // ### worse). Smoke starts at 25 %, thickens and turns from grey to black, and at 88 % the engine burns.
   const damageStage = damage => damage >= 75 ? 3 : damage >= 50 ? 2 : damage >= 25 ? 1 : 0;
+  // ### How the engine smokes at a damage level: rate, colour, opacity, how fast it rises, and whether it burns.
   function smokeFor(damage){
     const stage = damageStage(damage), within = (lo, hi) => clamp((damage - lo) / (hi - lo), 0, 1);
     if (stage === 0) return { rate: 0, color: 0x55555c, opacity: 0, rise: 0, fire: false };
@@ -199,6 +201,7 @@
   const GRAVITY_PULL = 42;
   const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
   const HILL_BOX = Object.freeze({ city: [-180, 180, -180, 70], highway: [-Infinity, Infinity, 60, 3950], country: [-Infinity, Infinity, -Infinity, Infinity] });
+  // ### The height of the land at a point on a map. It is a sum of sine waves, faded out where the map must stay level.
   function hillHeight(modeKey, x, z){
     if (modeKey === 'city'){
       const w = (1 - smooth(105, 180, Math.abs(x))) * smooth(-180, -105, z) * (1 - smooth(-30, 70, z));
@@ -268,6 +271,7 @@
   function driveTime(modeKey, m, timeLeft, collected){
     return modeKey === 'city' ? m.time - timeLeft : m.time + collected * (m.bonus || 0) - timeLeft;
   }
+  // ### The one to three stars for a finished run, from the time left and the damage.
   function runStars(modeKey, m, timeLeft, used, damage){
     let stars;
     if (modeKey === 'city'){ const frac = timeLeft / m.time; stars = frac > 0.4 ? 3 : frac > 0.2 ? 2 : 1; }
@@ -289,6 +293,7 @@
     if (i === 1) story.clasp = false;
     return true;
   }
+  // ### Starts the current story act again, keeping what the player has already earned.
   function retryAct(story){ story.letter = story.letterAtStart; return story.act; }
   // The toll at the end of act 2 only opens with the clasp; every other finish line is always open
   const finishOpen = story => !story || story.act !== 1 || story.clasp;
@@ -433,6 +438,7 @@
   // ### The helicopter's sound, one seamless loop: every blade passing makes a low thump with a short slap (four blades at six
   // ### turns a second, 24 passes a second), over the buzz of the tail rotor, the turbine's whine and the rumble of the air.
   const ROTOR = Object.freeze({ blades: 4, rps: 6, revs: 12, tail: 132, turbine: [3400, 5100] });
+  // ### Renders one seamless loop of helicopter sound.
   function rotorLoop(sr, seed){
     const R = ROTOR, rnd = mulberry32(seed), n = Math.round(sr * R.revs / R.rps), d = new Float32Array(n), TAU = 2 * Math.PI, passes = R.blades * R.revs;
     const trim = []; for (let i = 0; i < R.blades; i++) trim.push(1 + (rnd() - 0.5) * 0.3);
@@ -484,6 +490,7 @@
   const ODE = [[[64, 1], [64, 1], [65, 1], [67, 1]], [[67, 1], [65, 1], [64, 1], [62, 1]], [[60, 1], [60, 1], [62, 1], [64, 1]], [[64, 1.5], [62, 0.5], [62, 2]], [[64, 1], [64, 1], [65, 1], [67, 1]], [[67, 1], [65, 1], [64, 1], [62, 1]], [[60, 1], [60, 1], [62, 1], [64, 1]], [[62, 1.5], [60, 0.5], [60, 2]]];
   const ODE_CHORDS = [48, 43, 48, 43, 48, 43, 48, 48];
   const textSeed = s => { let h = 7; for (let i = 0; i < s.length; i++) h = h * 31 + s.charCodeAt(i) | 0; return h; };
+  // ### Writes one bar of a station as notes: { t: beat, i: instrument, n: MIDI note, d: length in beats, v: level }.
   function radioBar(key, bar){
     const S = Object.hasOwn(RADIO, key) ? RADIO[key] : null, ev = [];
     if (!S) return ev;

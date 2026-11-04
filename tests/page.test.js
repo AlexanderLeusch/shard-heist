@@ -1,3 +1,4 @@
+// ### Checks on the page and the source: security headers, pinned libraries, and that each feature is wired up in the code.
 // The page and the repository: wiring between files, pinned and integrity-checked libraries, no secrets, safe dev server
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -264,4 +265,11 @@ test('the radio is synthesised, wired to a key and a button, and its stored choi
   assert.match(html, /id="btnRadio"/);
   assert.match(html, /id="radioTag"/);
   assert.doesNotMatch(game, /new Audio\(|\.(mp3|ogg|wav|m4a)\b/, 'no audio files anywhere');
+});
+
+test('the printable rules are built from rules/*.md and are up to date', () => {
+  const { buildRulesHtml, markdown } = require('../scripts/build-rules.js');
+  assert.equal(fs.readFileSync(path.join(ROOT, 'docs/rules.html'), 'utf8'), buildRulesHtml(), 'run npm run docs');
+  assert.match(markdown('| a | b |\n|---|---|\n| 1 | **2** |'), /<td><b>2<\/b><\/td>/);
+  assert.equal(markdown('<script>'), '<p>&lt;script&gt;</p>', 'text stays text');
 });

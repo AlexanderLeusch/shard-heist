@@ -55,6 +55,7 @@
   const ended = s => s.ending !== null;
 
   // ---------- Which hotspots can be used right now ----------
+  // ### The interface only offers what these functions allow, and the rules check every action again anyway.
   function visibleHotspots(s){
     const sc = SCENES[s.scene];
     if (!sc || ended(s)) return [];

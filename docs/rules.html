@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Shard Heist – Game Rules</title>
+<style>
+@page{size:A4;margin:18mm 16mm}
+:root{--ink:#1c2233;--muted:#5b6275;--line:#d8dbe4;--accent:#0a7f99;--soft:#f2f4f8}
+*{box-sizing:border-box}
+body{margin:0 auto;max-width:800px;padding:24px;font:10.5pt/1.5 "Segoe UI",system-ui,sans-serif;color:var(--ink);background:#fff}
+h1{font-size:21pt;line-height:1.15;margin:0 0 8pt}
+h2{font-size:13.5pt;margin:18pt 0 6pt;padding-bottom:3pt;border-bottom:1px solid var(--line);color:var(--accent);break-after:avoid}
+h3{font-size:11pt;margin:12pt 0 4pt;break-after:avoid}
+section{margin-top:26pt}
+section+section{break-before:page}
+.cover{padding:18pt 20pt;background:#10162b;color:#fff;border-radius:6pt;margin-bottom:6pt}
+.cover h1{color:#fff;font-size:27pt}
+.cover p{margin:0;color:#c3cbe0}
+p{margin:0 0 7pt}
+ul,ol{margin:0 0 8pt;padding-left:17pt}
+li{margin-bottom:3pt}
+blockquote{margin:0 0 9pt;padding:6pt 10pt;background:var(--soft);border-left:3px solid var(--accent);color:var(--muted)}
+table{width:100%;border-collapse:collapse;margin:5pt 0 11pt;font-size:9.4pt}
+tr{break-inside:avoid}
+th{text-align:left;background:var(--soft);font-weight:600}
+th,td{padding:4pt 6pt;border:1px solid var(--line);vertical-align:top}
+code{font:8.8pt Consolas,monospace;background:var(--soft);padding:0 2pt;border-radius:2pt}
+a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="cover"><h1>Shard Heist</h1><p>The game rules, for both rooms. Built from <code style="background:none;color:inherit">rules/*.md</code>.</p></div>
+<section id="README">
+<h1>Game rules</h1>
+<blockquote>These documents describe what the game does, as implemented in the code. When a rule changes, update the document, the code and the tests together, then run <code>npm run docs</code> to rebuild the printable version.</blockquote>
+<p>The game has two rooms that are played one after the other. Until the group connects them, each room is its own page.</p>
+<table><tr><th>Room</th><th>Document</th><th>Code with the rules</th><th>Tests</th></tr>
+<tr><td>1 · Plot Twist: Cell Block D (escape room)</td><td><a href="#room-1-escape-room">room-1-escape-room.md</a></td><td><code>escape-room/src/rules.js</code></td><td><code>tests/escape-rules.test.js</code></td></tr>
+<tr><td>2 · Shard Heist (police chase)</td><td><a href="#room-2-shard-heist">room-2-shard-heist.md</a></td><td><code>src/core.js</code> (rules), <code>src/game.js</code> (pickups, police AI)</td><td><code>tests/rules.test.js</code>, <code>tests/story.test.js</code>, <code>tests/input.test.js</code></td></tr>
+</table>
+<h2>The whole game in one paragraph</h2>
+<p>You were the detective on the Ashford necklace case. Now you are inmate 4471, convicted of stealing it. <b>Room 1:</b> you have ten minutes in a prison washroom to find the code for a hatch in the floor. If you get out (Ending A), a note shows that the guard wanted you out, and a car is waiting at the end of the tunnel. <b>Room 2:</b> the police chase begins. You drive a getaway vehicle through Lisbon's Baixa, on the highway and across the countryside, collecting star shards while up to four police cars and a helicopter hunt you.</p>
+<h2>One night, one look</h2>
+<ul><li><b>Time:</b> both rooms are set on the same night: room 1 around 02:15, room 2 from about 02:30.</li><li><b>Design:</b> both rooms share one design system: the same background, glass panels, fonts, buttons and cards. Each room keeps its own accent colour: <b>orange</b> in the prison, <b>cyan</b> on the run. Hale's radio messages in room 2 are orange because he comes from room 1.</li><li>A test (<code>tests/page.test.js</code>) checks that the shared design tokens and the story links between the rooms stay in place.</li></ul>
+<h2>How the two rooms will connect (planned, not built)</h2>
+<ul><li>Ending A of room 1 shows a button that opens room 2.</li><li>Ending B of room 1 stays in room 1 (try again).</li><li>Open question for the group: does room 2 then start in free ride, or straight in the story mode <i>The Necklace Job</i>?</li></ul>
+<h2>Words used in these documents</h2>
+<table><tr><th>Word</th><th>Meaning</th></tr>
+<tr><td><b>Accepted action</b></td><td>The player did something allowed. The state changes and is saved.</td></tr>
+<tr><td><b>Refused action</b></td><td>The player tried something not allowed. Nothing changes, and the player is told why.</td></tr>
+<tr><td><b>State</b></td><td>Everything the game remembers at one moment: where you are, items, time left, and so on.</td></tr>
+<tr><td><b>Scene</b></td><td>A place you can stand in room 1 (the door, the sinks, ...).</td></tr>
+<tr><td><b>Hotspot</b></td><td>Something you can use in a scene, shown as a pulsing marker or a "Walk to" button.</td></tr>
+<tr><td><b>Tick</b></td><td>One step of the clock, many times per second.</td></tr>
+</table>
+</section>
+<section id="room-1-escape-room">
+<h1>Room 1 · Plot Twist: Cell Block D</h1>
+<blockquote>This document describes the rules in <code>escape-room/src/rules.js</code>. Values marked <b>(open)</b> are not decided yet.</blockquote>
+<h2>Goal</h2>
+<p>Open the hatch in the floor of the toilet stall and climb out <b>before the clock reaches zero</b>.</p>
+<h2>Story</h2>
+<ol><li><b>Briefing.</b> You were the detective on the Ashford necklace case. Tonight you are inmate 4471, convicted of stealing the necklace: someone framed you.</li><li>Officer Hale walks you to washroom 2, locks the door and says: "Ten minutes. Not a second more." He waits outside.</li><li>Inmates whisper about a hatch in the floor of this washroom, locked with a four-digit code that is hidden somewhere in the room.</li></ol>
+<p>The clock only starts when the player presses <b>Start the clock</b> after the briefing.</p>
+<h2>Time</h2>
+<table><tr><th>Rule</th><th>Value</th></tr>
+<tr><td>Time limit</td><td><b>10:00</b> (open: 10 or 15 minutes; <code>TIME_LIMIT</code>)</td></tr>
+<tr><td>Warnings from Hale</td><td>at 5:00, 2:00, 1:00 and 0:30, each only once</td></tr>
+<tr><td>Wrong code</td><td>costs <b>30 seconds</b> (<code>WRONG_CODE_PENALTY</code>), never below 0:00</td></tr>
+<tr><td>Jammed door</td><td>when the clock hits 0:00 the first time, you get <b>one extra minute</b> (<code>WEDGE_GRACE</code>), once only</td></tr>
+<tr><td>The clock stops</td><td>in the briefing, in the pause menu, when the browser tab is hidden, and after an ending</td></tr>
+<tr><td>The clock keeps running</td><td>while reading a clue and while turning the lock</td></tr>
+</table>
+<h2>Scenes and how to move</h2>
+<table><tr><th>Scene</th><th>What is there</th><th>You can walk to</th></tr>
+<tr><td><b>The Door</b> (start)</td><td>Steel door with a barred window, Hale outside; mop in a bucket</td><td>Sinks, Stall</td></tr>
+<tr><td><b>The Sinks</b></td><td>Two steel sinks, a polished metal mirror, a soap dish, a hot tap</td><td>Door, Stall</td></tr>
+<tr><td><b>The Stall</b></td><td>Steel toilet, scratches on the wall, a crooked tile, the hatch in the floor</td><td>Door, Sinks, Hatch</td></tr>
+<tr><td><b>The Hatch</b></td><td>The trapdoor with a four-wheel combination lock (you kneel down)</td><td>Stall</td></tr>
+<tr><td><b>The Tunnel</b></td><td>Only reached through Ending A</td><td>–</td></tr>
+</table>
+<p>Walking anywhere else is refused: "You cannot get there from here."</p>
+<h2>Items (you can carry two)</h2>
+<table><tr><th>Item</th><th>Where</th><th>What it does</th></tr>
+<tr><td><b>Spoon</b></td><td>Soap dish at the sinks</td><td>Needed to pry the crooked tile off the wall</td></tr>
+<tr><td><b>Mop</b></td><td>Bucket by the door</td><td>Optional. Used at the door ("Jam the door with the mop") it is placed under the door handle and leaves your inventory. This buys the extra minute.</td></tr>
+</table>
+<h2>Clues and the code</h2>
+<table><tr><th>Clue</th><th>How to find it</th><th>Text</th></tr>
+<tr><td><b>Mirror</b></td><td>Turn on the hot tap first. Then the steam shows letters someone traced. Without steam you only see your face.</td><td>"UNSINKABLE?"</td></tr>
+<tr><td><b>Graffiti</b></td><td>Read the scratches on the stall wall</td><td>"She was unsinkable. She sailed only once. The year opens the floor."</td></tr>
+<tr><td><b>Newspaper scrap</b></td><td>Pry the tile off with the spoon, then read the paper behind it</td><td>"...the 'unsinkable' liner went down on her first voyage. 15 April 19▒2..."</td></tr>
+</table>
+<ul><li>The code is <b>1912</b>, the year the Titanic sank. It is the <b>same in every game</b> (open: should it change between games?).</li><li>Players who do not know the history can still solve it: "sailed only once" gives the missing digit 1.</li><li>Every clue you read is kept in your clue notes (3 at most). Reading a clue again does not count twice.</li></ul>
+<h2>The lock</h2>
+<ul><li>Four wheels, each showing 0–9. Up after 9 is 0, down after 0 is 9.</li><li>You can only turn the wheels and try the code while kneeling at the hatch.</li><li><b>Try the code:</b></li></ul>
+<p>  - Right code: the hatch opens, Ending A.   - Wrong code: "Clunk. The lock holds." Hale hears the noise, and you lose 30 seconds. The number of wrong codes is counted.</p>
+<h2>Endings</h2>
+<table><tr><th>Ending</th><th>When</th><th>What happens</th></tr>
+<tr><td><b>A · Out below</b></td><td>The right code before time runs out</td><td>You climb down the ladder. A note is taped to it: "Took you long enough. A car is waiting at the end of the tunnel. — H." The guard wanted you out. That is the plot twist that leads to room 2.</td></tr>
+<tr><td><b>B · Back to the cell</b></td><td>The clock reaches 0:00 (after the extra minute, if the door was jammed)</td><td>The door bangs open and Hale and two officers take you back to cell 4471.</td></tr>
+</table>
+<p><b>The earlier decision:</b> jamming the door early gives one more minute at the very end. That can turn Ending B into Ending A.</p>
+<p>After an ending, every action is refused except <b>Play again / Try again</b>, which starts a new game from the briefing.</p>
+<h2>Refused actions (nothing changes, the player is told why)</h2>
+<table><tr><th>The player tries to...</th><th>Message (short)</th></tr>
+<tr><td>do anything before the briefing is finished</td><td>"Read the briefing first."</td></tr>
+<tr><td>walk where there is no way</td><td>"You cannot get there from here."</td></tr>
+<tr><td>take an item that is not here, or twice</td><td>"There is no ... here." / "You already have the ..."</td></tr>
+<tr><td>pry the tile without the spoon</td><td>"...your fingers cannot get behind it. Something thin and hard would do."</td></tr>
+<tr><td>jam the door without the mop, or a second time</td><td>"You need something long and solid..." / "The door is already jammed."</td></tr>
+<tr><td>read the scrap while the tile is still on</td><td>"The tile is still in place."</td></tr>
+<tr><td>use the tap away from the sinks, the lock away from the hatch</td><td>"There is no tap here." / "Kneel down at the hatch to reach the lock."</td></tr>
+<tr><td>turn a wheel that does not exist</td><td>"The lock only has four wheels."</td></tr>
+<tr><td>do anything after an ending</td><td>"The story is over. Start a new game to play again."</td></tr>
+</table>
+<h2>Saving</h2>
+<ul><li>The game is saved in the browser after <b>every accepted action</b> and every few seconds while the clock runs.</li><li>After a reload, the player can <b>Continue</b> (with the time that was left) or start a <b>New game</b>, which asks for confirmation first.</li><li>A saved game is checked field by field when loaded. Anything that is not a real save is ignored, and a new game starts.</li></ul>
+<h2>Controls</h2>
+<table><tr><th>Input</th><th>Action</th></tr>
+<tr><td>Drag the mouse or a finger, or the arrow keys</td><td>Look around</td></tr>
+<tr><td>Click a pulsing marker or the object itself</td><td>Use it</td></tr>
+<tr><td>"Walk to" buttons (bottom right)</td><td>Move to another scene</td></tr>
+<tr><td>"Clues" button (bottom left)</td><td>Read your clue notes</td></tr>
+<tr><td><code>P</code> / <code>Esc</code></td><td>Pause (Esc also closes a card)</td></tr>
+<tr><td><code>M</code></td><td>Sound on or off</td></tr>
+<tr><td><code>Enter</code></td><td>Confirm the main button on a card</td></tr>
+</table>
+</section>
+<section id="room-2-shard-heist">
+<h1>Room 2 · Shard Heist</h1>
+<blockquote>This document describes the rules in <code>src/core.js</code>, and the pickups and police in <code>src/game.js</code>.</blockquote>
+<h2>Where room 2 starts</h2>
+<p>Room 2 begins where room 1 ends. You (inmate 4471, the framed detective) have climbed out of the tunnel under Cell Block D. It is about 02:30 at night. In a lock-up garage, Officer Hale's getaway vehicle is waiting. Every police car in town is now hunting the escaped inmate.</p>
+<p><b>Officer Hale is a secret ally.</b> He believes you were framed, but he cannot prove it. In the story mode he helps over the radio; his messages are shown in <b>orange</b>, the colour of room 1. Police dispatch messages are <b>red</b>.</p>
+<h2>Two ways to play</h2>
+<ul><li><b>Free ride:</b> pick a map and a getaway vehicle, then escape.</li><li>*<i>Story mode, </i>The Necklace Job<i>:</i>* three acts on the three maps, in order, with a story and three endings.</li></ul>
+<h2>Vehicles</h2>
+<table><tr><th>Vehicle</th><th>Top speed</th><th>Acceleration</th><th>Handling</th><th>Damage taken</th><th>Ramming</th></tr>
+<tr><td><b>Car</b> (muscle coupe)</td><td>100 %</td><td>100 %</td><td>100 %</td><td>100 %</td><td>1.0</td></tr>
+<tr><td><b>Motorcycle</b> (superbike)</td><td>112 %</td><td>130 %</td><td>140 %</td><td>100 %</td><td>0.4</td></tr>
+<tr><td><b>Truck</b> (tractor unit)</td><td>78 %</td><td>70 %</td><td>72 %</td><td><b>55 %</b></td><td>2.4</td></tr>
+</table>
+<p>Percentages are relative to the map's top speed and to the car. The menu shows the same values as bars (1–5) and as km/h and 0–80 km/h times, computed from these numbers.</p>
+<h2>Maps</h2>
+<table><tr><th>Map</th><th>Goal</th><th>Time</th><th>Car top speed</th><th>Police top speed</th><th>Shards</th><th>Repair kits</th></tr>
+<tr><td><b>Lisbon · Baixa</b></td><td>Collect <b>all 8 shards</b>, then drive through the golden gate that appears under the Arco da Rua Augusta</td><td>3:00</td><td>122 km/h</td><td>119 km/h</td><td>8</td><td>3</td></tr>
+<tr><td><b>Highway</b></td><td>Reach the finish <b>4 km</b> ahead. Shards are optional: <b>+4 s</b> each</td><td>1:40</td><td>200 km/h</td><td>187 km/h</td><td>12</td><td>2</td></tr>
+<tr><td><b>Countryside</b></td><td>Reach the village at the end of the road. Shards: <b>+4 s</b> each</td><td>2:30</td><td>158 km/h</td><td>148 km/h</td><td>10</td><td>3</td></tr>
+</table>
+<ul><li>A shard is picked up within 3.8 m; a repair kit within 3.6 m, and only when you have damage.</li><li>Lisbon has traffic lights, other cars and three yellow trams. The trams only run on their tracks, a stone track bed with two rails set into the road: a clockwise loop through Rua da Conceição, Rua da Prata, the north side of the Praça do Comércio and Rua Áurea. As on real Lisbon streets, cars and the player can drive over the tracks. The trams stop at red lights and behind other vehicles. On the highway traffic drives both ways. On country roads there is oncoming traffic, and driving off the road cuts your top speed to 55 %.</li><li>Each map has an edge you cannot cross. Near it the screen turns red and a "turn back" arrow appears.</li></ul>
+<h2>The city map: Lisbon's Baixa</h2>
+<p>The Baixa is the centre of Lisbon, rebuilt as a street grid after the 1755 earthquake. The map is a simplified version of it: the blocks are square, and the grid has 7 streets each way. The real Baixa has a few more, so some are left out. The real Baixa is also flat; the hills on this map are a game decision.</p>
+<table><tr><th>Direction</th><th>Streets, in their real order</th></tr>
+<tr><td>West to east</td><td>Rua do Crucifixo, Rua Áurea, Rua dos Sapateiros, <b>Rua Augusta</b>, Rua dos Correeiros, Rua da Prata, Rua dos Fanqueiros</td></tr>
+<tr><td>North to south</td><td>Rua de Santa Justa, Rua da Vitória, Rua de São Nicolau, Rua da Conceição, Rua do Comércio, Praça do Comércio (north side), Avenida Infante Dom Henrique</td></tr>
+</table>
+<ul><li>In free ride, the panel at the top left shows the street or square you are on. In story mode it shows the act instead.</li><li>You start on Rua Augusta, facing south towards the Arco da Rua Augusta.</li><li><b>Squares:</b> the Rossio and the Praça da Figueira in the north, the Praça do Comércio by the river in the south. The statue on the Praça do Comércio stands in the middle of the road, so traffic passes on both sides.</li><li><b>Landmarks you can see but not reach:</b> the river Tejo, the 25 de Abril bridge, Cristo Rei and the castle hill. The Santa Justa lift stands on the map, and you can crash into it.</li><li><b>Parks:</b> there are three, which the real Baixa does not have. The story needs them for the sealed letter.</li><li><b>Houses:</b> closed blocks of Pombaline houses, wall to wall, as the Baixa was rebuilt after 1755: a ground floor plus 3 to 5 floors (OpenStreetMap gives most buildings 5 levels), arched stone ground floors with old shop fronts, the tallest windows and the balconies on the first floor, limewash colours, and tile roofs with dormers. Tiled fronts are the exception, as they are in the real Baixa.</li><li><b>Real buildings in their place:</b> the National Theatre and Rossio station north of the Rossio, the yellow arcades and corner towers of the Praça do Comércio, and the Sé, seen at the end of Rua da Conceição. Their position is simplified, and they are modelled freely, not measured.</li><li>It is always about 02:30 at night. The clock on the arch shows it.</li></ul>
+<h2>Driving</h2>
+<table><tr><th>Rule</th><th>Value</th></tr>
+<tr><td>Top speed</td><td>map top speed × vehicle speed, <b>minus up to 40 %</b> at 100 % damage</td></tr>
+<tr><td>Throttle</td><td>never pushes you above the top speed</td></tr>
+<tr><td>Brake</td><td>slows you down, then reverses, up to 40 km/h backwards</td></tr>
+<tr><td>No pedal</td><td>the car rolls to a stop</td></tr>
+<tr><td>Handbrake (<code>Space</code>)</td><td>slows you quickly and turns sharper</td></tr>
+<tr><td>Brake lights</td><td>on while you brake, in either direction, and with the handbrake while moving</td></tr>
+</table>
+<p><b>Hills.</b> All three maps have hills, up to about 20 % steep. The Arco, the river front and the two ends of the highway are level. Uphill your top speed falls by up to 32 % and gravity pulls you back. Downhill your top speed rises by up to 22 % and you coast on. The truck feels slopes most, the motorcycle least. Brakes and rolling friction hold a stopped vehicle in place.</p>
+<h2>Damage</h2>
+<table><tr><th>Rule</th><th>Value</th></tr>
+<tr><td>Crash</td><td>impacts under 3 m/s (about 11 km/h) are free; above that, damage = (impact − 3) × 1.6 × the vehicle's damage factor</td></tr>
+<tr><td>25 % damage</td><td>the paint shows dents and scratches, and thin grey smoke rises from the engine</td></tr>
+<tr><td>50 % damage</td><td>warning: "Engine damaged: top speed reduced." Loose parts and a smashed light; the engine misfires; the smoke turns dark</td></tr>
+<tr><td>75 % damage</td><td>hood up (car), screen gone (motorcycle), hanging bumper and cracked windscreen (truck); a thick black column of smoke; sparks at speed</td></tr>
+<tr><td>88 % damage</td><td>the engine is on fire</td></tr>
+<tr><td><b>100 % damage</b></td><td><b>vehicle wrecked: game over</b></td></tr>
+<tr><td>Repair kit</td><td>removes 40 % damage, and the damage you see goes with it</td></tr>
+</table>
+<h2>Police</h2>
+<table><tr><th>Rule</th><th>Value</th></tr>
+<tr><td>First police car</td><td>after 4 seconds</td></tr>
+<tr><td><b>Wanted stars</b></td><td>1 to 5, shown under the clock. A new star every fifth of the time limit or of the way to the end (shards in the city, distance on the open roads), whichever is further along. Each wrecked police car counts as 4 % more. Stars never fall.</td></tr>
+<tr><td>New police car</td><td>until the number for your stars is reached, see the table below</td></tr>
+<tr><td>Ramming</td><td>every hard hit lowers a police car's health by impact × your ramming power; a police car is wrecked after its health points are gone and comes back after the time in the table below</td></tr>
+<tr><td><b>Bust meter</b></td><td>fills while a police car is <b>within 9 m</b> and you are <b>slower than 4.5 m/s</b> (about 16 km/h): full in 2.2 s. Otherwise it drains (empty from full in 3 s).</td></tr>
+<tr><td><b>Busted</b></td><td>bust meter at 100 %: game over</td></tr>
+</table>
+<table><tr><th>Stars</th><th>Police cars</th><th>Police speed</th><th>New car every</th><th>Wrecked car returns after</th><th>Health</th></tr>
+<tr><td>★</td><td>1</td><td>100 %</td><td>3 s</td><td>9 s</td><td>3</td></tr>
+<tr><td>★★</td><td>2</td><td>100 %</td><td>3 s</td><td>9 s</td><td>3</td></tr>
+<tr><td>★★★</td><td>3</td><td>103 %</td><td>3 s</td><td>8 s</td><td>3</td></tr>
+<tr><td>★★★★</td><td>3</td><td>106 %</td><td>2.5 s</td><td>6 s</td><td>3.5</td></tr>
+<tr><td>★★★★★</td><td>4</td><td>110 %</td><td>2 s</td><td>4.5 s</td><td>4</td></tr>
+</table>
+<p><b>Helicopter.</b> After 60 seconds on the run (or sooner with the fifth star), a police helicopter joins the chase for the rest of the run and hunts you with its searchlight. Its searchlight follows you at 94 % of the police speed. While you are in the light (within 9 m of its centre), the police drive 6 % faster, and in the city they see you from 170 m instead of 110 m. It cannot bust you or damage you. At full speed on a clear road you can stay ahead of the light.</p>
+<h2>Radio</h2>
+<p>Seven stations, or off: Reggae, Techno, Hardstyle, Schlager, Sing-Along Pop, Classical and Heavy Metal. Choose in the menu, or with <code>R</code> or the radio button while driving. The music plays while you drive, and is silent in the menu and in pause.</p>
+<p>All of it is composed and synthesised by the game, with no music files. The tunes are generated by the game. The classical station plays Bach and Beethoven, whose works are in the public domain.</p>
+<h2>Ending a run</h2>
+<table><tr><th>Result</th><th>When</th></tr>
+<tr><td><b>Clean getaway</b></td><td>Lisbon: reach the gate under the arch. Highway: pass the 4 km mark. Countryside: reach the village</td></tr>
+<tr><td><b>Busted</b></td><td>the bust meter is full</td></tr>
+<tr><td><b>Wrecked</b></td><td>damage reaches 100 %</td></tr>
+<tr><td><b>Time's up</b></td><td>the clock reaches 0:00</td></tr>
+</table>
+<h2>Stars and best times</h2>
+<ul><li><b>Drive time.</b> In the city this is the time used. On the highway and in the countryside it is the time used plus the bonus seconds the shards gave you, so collecting shards never makes a run look slower.</li><li><b>Stars:</b></li></ul>
+<table><tr><th>Map</th><th>★★★</th><th>★★</th><th>★</th></tr>
+<tr><td>City</td><td>more than 40 % of the time left</td><td>more than 20 % left</td><td>otherwise</td></tr>
+<tr><td>Highway</td><td>under 88 s</td><td>under 105 s</td><td>otherwise</td></tr>
+<tr><td>Countryside</td><td>under 115 s</td><td>under 135 s</td><td>otherwise</td></tr>
+</table>
+<ul><li>More than 50 % damage costs one star, but never the last one.</li><li>The best drive time per map is saved in the browser. Implausible saved values are ignored.</li></ul>
+<h2>Story mode: The Necklace Job</h2>
+<table><tr><th>Act</th><th>Map</th><th>Goal</th><th>Special rule</th></tr>
+<tr><td><b>1 · The Scatter</b></td><td>Lisbon</td><td>Recover the 8 shards, then the gate</td><td>An optional <b>sealed letter</b> is hidden in a park. It is <b>not shown on the radar</b>.</td></tr>
+<tr><td><b>2 · The Courier</b></td><td>Highway</td><td>Catch the gold-marked courier lorry (get within 9 m) to take the <b>clasp</b>, then the finish</td><td>The <b>toll at the finish only opens with the clasp</b></td></tr>
+<tr><td><b>3 · Homecoming</b></td><td>Countryside</td><td>Drive back to the Ashford mansion</td><td>The confrontation decides the ending</td></tr>
+</table>
+<table><tr><th>Ending</th><th>When</th></tr>
+<tr><td><b>A · The truth</b></td><td>You found the letter: it proves Lady Ashford staged the theft. Hale gives you your badge back.</td></tr>
+<tr><td><b>B · Back in 4471</b></td><td>No letter: Lady Ashford hands you to the police, and you go back to cell 4471.</td></tr>
+<tr><td><b>C · Caught</b></td><td>Busted, wrecked or out of time in any act: back to Cell Block D. You can retry that act.</td></tr>
+</table>
+<p><b>Retrying an act:</b> a letter found during the failed attempt does <b>not</b> count. A letter found in an earlier, finished act does.</p>
+<p>Radio messages (Hale in orange, police dispatch in red) appear at fixed times in each act, each only once.</p>
+<h2>Menu actions (accepted and refused)</h2>
+<table><tr><th>Button</th><th>Allowed when</th></tr>
+<tr><td>Start the getaway</td><td>in the main menu</td></tr>
+<tr><td>Story mode</td><td>in the main menu, or after the final ending</td></tr>
+<tr><td>Drive again / Restart</td><td>after a run, or in the pause menu</td></tr>
+<tr><td>Resume</td><td>in the pause menu</td></tr>
+<tr><td>Main menu</td><td>anywhere except while driving</td></tr>
+<tr><td>Next act</td><td>after a finished act, but not after the last one</td></tr>
+<tr><td>Retry act</td><td>after Ending C, or in the pause menu during a story</td></tr>
+</table>
+<p>Any other button or action is refused, and no card button works while you are driving.</p>
+<h2>Saved settings</h2>
+<p>The last map and vehicle, the best times, the radio station and the graphics setting are saved in the browser. Every saved value is checked when loaded; invalid values fall back to Lisbon, Car, radio off and the defaults.</p>
+<h2>Controls</h2>
+<table><tr><th>Input</th><th>Action</th></tr>
+<tr><td><code>W A S D</code> or arrow keys</td><td>Drive</td></tr>
+<tr><td><code>Space</code></td><td>Handbrake</td></tr>
+<tr><td><code>P</code> / <code>Esc</code></td><td>Pause</td></tr>
+<tr><td><code>M</code></td><td>Sound on or off</td></tr>
+<tr><td><code>R</code></td><td>Next radio station (<code>Shift</code> + <code>R</code> for the one before)</td></tr>
+<tr><td><code>Enter</code></td><td>Confirm the main button on a card</td></tr>
+<tr><td>Touch pads</td><td>Steer on the left; brake and gas on the right</td></tr>
+</table>
+</section>
+</body>
+</html>

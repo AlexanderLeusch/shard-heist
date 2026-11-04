@@ -21,6 +21,7 @@ function resolvePath(urlPath, root = ROOT){
   return file;
 }
 
+// ### A small static file server for local play and for the browser tests. It refuses paths outside the project.
 function createServer(root = ROOT){
   return http.createServer((req, res) => {
     if (req.method !== 'GET' && req.method !== 'HEAD'){ res.writeHead(405, { Allow: 'GET, HEAD' }); return res.end(); }

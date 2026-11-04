@@ -1,3 +1,4 @@
+// ### Unit tests for room 1, the escape room: both endings, refused actions, lock codes, the clock and tampered saved games.
 // Room 1, the escape room: story rules, accepted and rejected actions, the clock and saved games (escape-room/src/rules.js)
 const test = require('node:test');
 const assert = require('node:assert/strict');

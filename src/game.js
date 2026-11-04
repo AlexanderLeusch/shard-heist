@@ -14,7 +14,9 @@ const Core = ShardCore;
 // ### tests can reach them. Change a number there and the whole game, including the stat bars in the menu, follows it.
 const { MODES, VEH, REV_SPEED, REPAIR_AMOUNT } = Core;
 let mode = 'city', M = MODES.city, V = VEH.car;
+// ### Reads a saved value; returns null when the browser blocks storage, so private windows still work.
 const readStore = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+// ### Saves a value and ignores a blocked or full storage: losing a setting must never stop the game.
 const writeStore = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 const sel = Core.parsePick(readStore('shard-heist-pick'));
 
@@ -69,6 +71,7 @@ scene.add(sky);
   envScene.add(new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), skyMat));
   scene.environment = pmrem.fromScene(envScene, 0.03).texture;
 })();
+// ### Sets how strongly each material reflects the sky, using the strength stored on that material.
 function tuneEnv(root){
   root.traverse(o => {
     if (!o.material) return;
@@ -139,6 +142,7 @@ class Batch {
     return new THREE.Mesh(g, mat);
   }
 }
+// ### Merges many geometries into one, so a whole street can be drawn in a single draw call.
 function mergeGeos(list){
   const pos = [], nor = [], uvs = [];
   list.forEach(g => {
@@ -198,6 +202,7 @@ function smoothGeo(geo){
   out.computeVertexNormals();
   return out;
 }
+// ### Builds the simple tyres and rims that traffic and police cars share.
 function wheelSet(positions, r, w){
   const tires = [], rims = [];
   positions.forEach(([x, z]) => {
@@ -206,6 +211,7 @@ function wheelSet(positions, r, w){
   });
   return { tire: mergeGeos(tires), rim: mergeGeos(rims) };
 }
+// ### Builds the shared parts of a traffic car or SUV. Each part is drawn with instancing, so many cars stay cheap.
 function makeCarParts(suv){
   const k = suv ? 1.16 : 1;
   const s = new THREE.Shape();
@@ -249,6 +255,7 @@ function makeCarParts(suv){
   const lens = mergeGeos([boxG(0.48, 0.16, 0.06, 0.6, 0.74 * k, 2.38), boxG(0.48, 0.16, 0.06, -0.6, 0.74 * k, 2.38), boxG(0.56, 0.15, 0.06, 0.58, 0.84 * k, -2.43), boxG(0.56, 0.15, 0.06, -0.58, 0.84 * k, -2.43)]);
   return { body: mergeGeos([body, roof]), glass, trim, chrome, tire: wheels.tire, head, tail, lens, bodyOnly: body, roof };
 }
+// ### Builds the shared parts of the traffic lorry.
 function makeTruckParts(){
   const s = new THREE.Shape();
   s.moveTo(1.6, 0.75); s.lineTo(4.2, 0.75); s.lineTo(4.32, 1.35); s.lineTo(4.2, 2.35); s.lineTo(3.55, 3.15); s.lineTo(1.65, 3.2); s.closePath();
@@ -317,6 +324,7 @@ class Fleet {
   }
   commit(){ for (const m of this.meshes) m.instanceMatrix.needsUpdate = true; }
 }
+// ### A cloud of glowing points, used for the head and tail lights of traffic that is too far away to light the scene.
 class GlowPts {
   constructor(group, n, color, size){
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(n * 3).fill(-999), 3));
@@ -497,6 +505,7 @@ function baixaFronts(){
   const mask = new THREE.CanvasTexture(maskC); mask.wrapS = mask.wrapT = THREE.RepeatWrapping;
   return { plaster, blue, green, mask };
 }
+// ### Paints a modern facade texture on a canvas: windows, some lit, in a pattern set by the seed.
 function makeFacade(style, seed){
   const S = TEX, n = 8, B = S / n, r = mulberry32(seed);
   const [m, g, e, ge] = canvasPair(S, S);
@@ -700,6 +709,7 @@ function cobbleJoints(set){
     for (let i = 0; i < n; i++) g.fillRect((i + (j % 2) * 0.5 + (r() - 0.5) * 0.2) * s, j * s, Math.max(1, s * 0.09), s);
   }
 }
+// ### Gives the black and white waves of Portuguese pavement (calçada) their colour at a point.
 const calcadaColour = (h, p) => { const k = 205 + h * 40 - p * 20; return [k, k - 2, k - 8]; };
 const CALCADA = surfaceSet(COARSE ? 256 : 512, 19, calcadaColour, h => 0.55 + h * 0.3, 2);
 cobbleJoints(CALCADA);
@@ -844,6 +854,7 @@ function laySlopes(group, key){
 }
 
 const dummy = new THREE.Object3D(), tint = new THREE.Color();
+// ### Draws many copies of one object in one draw call; place() positions each copy.
 function instanced(group, geom, mat, list, place, colorFn){
   if (!list.length) return null;
   const m = new THREE.InstancedMesh(geom, mat, list.length);
@@ -864,6 +875,7 @@ function lightState(axis, grp){
 }
 const nodeGroup = (x, z) => (((Math.round(x / PITCH) + Math.round(z / PITCH)) % 2) + 2) % 2;
 const LAMP_ON = { r: 0xff2a2a, y: 0xffb020, g: 0x2cff8a }, LAMP_OFF = { r: 0x2a0808, y: 0x2a1c05, g: 0x06200f };
+// ### Runs the traffic lights: north-south and east-west streets take turns, with a short all-red gap.
 function updateSignals(){
   for (const grp of [0, 1]) for (const axis of ['x', 'z']){
     const st = lightState(axis, grp);
@@ -875,6 +887,7 @@ function updateSignals(){
   }
 }
 
+// ### Builds Lisbon's Baixa: the street grid, Pombaline blocks, landmarks, tram tracks and the river. Everything static is merged by material.
 function buildCity(){
   const grp = CITY.group, colliders = CITY.colliders, radarRects = CITY.radar;
   const rng = mulberry32(2026);
@@ -1434,6 +1447,7 @@ function buildCity(){
 
   const tTrunk = new THREE.CylinderGeometry(0.18, 0.26, 2.6, 6); tTrunk.translate(0, 1.3, 0);
   const tCrown = new THREE.IcosahedronGeometry(1.7, 0); tCrown.translate(0, 3.6, 0);
+  // ### Places one tree, unless it would stand on a road or in a building.
   const placeTree = (o, d) => { d.position.set(o.x, 0.3, o.z); d.rotation.set(0, o.rot, 0); d.scale.setScalar(o.s); };
   instanced(grp, tTrunk, flatMat({ color: 0x5e4433 }), trees, placeTree);
   instanced(grp, tCrown, flatMat(), trees, placeTree, (o, t) => t.set(0x3d7a4c).offsetHSL((o.v - 0.5) * 0.06, 0, (o.v - 0.5) * 0.1));
@@ -1458,6 +1472,7 @@ const TRAM_SEGS = (() => {
 })();
 const rightOf = (dx, dz) => [-dz, dx];
 const inGrid = (x, z) => Math.abs(x) <= 3 * PITCH + 1 && Math.abs(z) <= 3 * PITCH + 1;
+// ### Creates the city traffic and the trams, and places them at crossings.
 function initCityTraffic(){
   const grp = CITY.group, rnd = mulberry32(99);
   npcFleets = { sedan: new Fleet(grp, PARTS.sedan, N_NPC - NPC_SUV, rnd), suv: new Fleet(grp, PARTS.suv, NPC_SUV, rnd), tram: new Fleet(grp, PARTS.tram, N_TRAM, rnd, 0xf2bd1c) };
@@ -1468,6 +1483,7 @@ function initCityTraffic(){
   }
   for (let i = 0; i < N_TRAM; i++) npcs.push({ fleet: 'tram', tram: true, fi: i, x: 0, z: 0, dx: 1, dz: 0, node: null, next: 's', speed: 0, cruise: 8, turn: null, stun: 0, on: false, h: 0 });
 }
+// ### Decides where a city car goes at the next crossing. Trams ask Core.tramNext, so they stay on their rails.
 function chooseNext(n){
   if (n.tram) return Core.tramNext(n.node.x, n.node.z, n.dx, n.dz);
   const [rx, rz] = rightOf(n.dx, n.dz), opts = [];
@@ -1478,6 +1494,7 @@ function chooseNext(n){
   for (const [k, w] of opts){ r -= w; if (r <= 0) return k; }
   return opts[0][0];
 }
+// ### Puts a city car back into the street network, out of sight of the player.
 function spawnNpc(n, minDist){
   for (let k = 0; k < 30; k++){
     let dx, dz, along, sx, sz;
@@ -1518,6 +1535,7 @@ function startTurn(n, kind, over){
   n.x = Cx + R * Math.cos(a); n.z = Cz + R * Math.sin(a);
   n.turn = { Cx, Cz, R, a0, delta, t, len, d2x, d2z, P1x, P1z };
 }
+// ### Measures the free road ahead of a city car, so it keeps its distance and stops behind others.
 function npcGap(n, fx, fz){
   const rx = -fz, rz = fx;
   let gap = Infinity;
@@ -1531,6 +1549,7 @@ function npcGap(n, fx, fz){
   for (const p of police) if (p.active) test(p.x, p.z, 2.4);
   return gap;
 }
+// ### Moves the city traffic each frame: follows lanes, turns on arcs, obeys signals, and keeps its distance.
 function updateNpcs(dt){
   for (const n of npcs){
     if (!n.on){ if (Math.random() < dt) spawnNpc(n, 60); continue; }
@@ -1579,6 +1598,7 @@ function updateNpcs(dt){
   npcFleets.sedan.commit(); npcFleets.suv.commit(); npcFleets.tram.commit(); npcHead.commit(); npcTail.commit();
   if (CITY.water) CITY.water.material.normalMap.offset.x += dt * 0.012;
 }
+// ### Returns the city traffic to its starting places for a new run.
 function resetNpcs(){ npcs.forEach(n => { n.on = false; }); npcs.forEach(n => spawnNpc(n, 25)); }
 
 // ---------- Highway ----------
@@ -1597,6 +1617,7 @@ function makeSign(dist){
   return t;
 }
 
+// ### Builds the highway: three lanes each way, barriers, lamps, signs, toll gates and the landscape.
 function buildHighway(){
   const grp = HWY.group, colliders = HWY.colliders, radarRects = HWY.radar;
   const rng = mulberry32(77);
@@ -1715,6 +1736,7 @@ const traffic = [];
 let hwFleets = null, headPts = null, tailPts = null;
 const HW_FLEET = { sedan: 30, suv: 14, truck: 10 };
 const VDIM = { sedan: { len: 4.6, hw: 0.95, front: 2.3, back: 2.3, y: 0.75, off: 0.62 }, suv: { len: 4.6, hw: 1.0, front: 2.3, back: 2.3, y: 0.86, off: 0.62 }, truck: { len: 9.7, hw: 1.3, front: 4.35, back: 5.35, y: 1.05, off: 0.9 } };
+// ### Creates the highway traffic in both directions.
 function initTraffic(){
   const grp = HWY.group, rnd = mulberry32(5);
   hwFleets = { sedan: new Fleet(grp, PARTS.sedan, HW_FLEET.sedan, rnd), suv: new Fleet(grp, PARTS.suv, HW_FLEET.suv, rnd), truck: new Fleet(grp, PARTS.truck, HW_FLEET.truck, rnd) };
@@ -1745,6 +1767,7 @@ function resetTraffic(){
   traffic.forEach(t => { t.on = false; });
   traffic.forEach(t => spawnVehicle(t, car.z - 120, car.z + 700));
 }
+// ### Moves the highway traffic: vehicles keep their lane and distance, and are recycled around the player.
 function updateTraffic(dt){
   for (const t of traffic){
     if (!t.on){ if (Math.random() < dt * 2) spawnVehicle(t, car.z + 380, car.z + 760); continue; }
@@ -1829,6 +1852,7 @@ function roadQuery(x, z, cache){
   const p = P[bi], dx = x - p.x, dz = z - p.z;
   return { s: bi * ROAD.step + dx * p.tx + dz * p.tz, lat: dx * p.rx + dz * p.rz };
 }
+// ### The height of the countryside terrain at a point, read from a height grid.
 function terrainH(x, z){
   if (!TERR.h) return 0;
   const gx = clamp((x - TERR.x0) / TERR.cell, 0, TERR.nx - 1.001), gz = clamp((z - TERR.z0) / TERR.cell, 0, TERR.nz - 1.001);
@@ -1846,6 +1870,7 @@ function gridAdd(c){
   CTRY.colliders.push(c);
 }
 let nearStamp = 0;
+// ### Returns only the walls near a point, from a spatial grid, so collision checks stay fast.
 function collidersNear(x, z){
   if (W !== CTRY) return W.colliders;
   nearStamp++;
@@ -1876,6 +1901,7 @@ function ribbon(a, b, y, keep){
 
 const ctraffic = [];
 let ctryFleets = null, ctryHead = null, ctryTail = null;
+// ### Builds the countryside: a spline road, terrain, forests, farms, a village and the finish.
 function buildCountry(){
   const grp = CTRY.group, rng = mulberry32(314);
   // Road centreline through seeded bends
@@ -2051,6 +2077,7 @@ function buildCountry(){
   tuneEnv(grp);
   CTRY.built = true;
 }
+// ### Places one country vehicle on the road, ahead of or behind the player.
 function spawnCountryVehicle(t, sMin, sMax){
   for (let k = 0; k < 20; k++){
     const s = sMin + Math.random() * (sMax - sMin);
@@ -2068,6 +2095,7 @@ function resetCountryTraffic(){
   ctraffic.forEach(t => { t.on = false; });
   ctraffic.forEach(t => spawnCountryVehicle(t, roadPos.s - 150, roadPos.s + 800));
 }
+// ### Moves the country traffic along the road in both directions.
 function updateCountryTraffic(dt){
   for (const t of ctraffic){
     if (!t.on){ if (Math.random() < dt * 1.5) spawnCountryVehicle(t, roadPos.s + 350, roadPos.s + 800); continue; }
@@ -2102,6 +2130,7 @@ function updateCountryTraffic(dt){
   ctryHead.commit(); ctryTail.commit();
 }
 
+// ### How far along the route the player is on the linear maps: [done, total] in metres.
 function routeProgress(){ return mode === 'highway' ? [car.z, HW.LEN] : [roadPos.s, ROAD.len - 60]; }
 
 // ---------- Player vehicles ----------
@@ -2530,6 +2559,7 @@ const brakeLights = { mat: new THREE.MeshBasicMaterial({ color: 0x7a0c14 }), glo
     const beam = new THREE.Mesh(BEAM_GEO, BEAM_MAT); beam.rotation.x = 0.06; carTilt.add(beam); beams.push(beam);
   });
 })();
+// ### Shows the chosen vehicle and moves the headlights to fit it.
 function setVehicle(key){
   V = VEH[key];
   Object.entries(MODELS).forEach(([k, m]) => { m.g.visible = k === key; });
@@ -2584,6 +2614,7 @@ const policeTex = (() => {
   }
 })();
 let spawnTimer = 0, bust = 0, copsWrecked = 0, copsWarned = false, nearestCop = Infinity, stars = 1;
+// ### Works out the wanted stars from the time on the run, the progress and the wrecked police cars.
 function updateWanted(){
   let progress;
   if (M.linear){ const [done, total] = routeProgress(); progress = done / total; }
@@ -2594,6 +2625,7 @@ function updateWanted(){
   if (stars >= 3) toast('Wanted level up: ' + stars + ' stars. More police, and faster.', 'red', 2400);
 }
 const snapI = v => clamp(Math.round(v / PITCH) * PITCH, -3 * PITCH, 3 * PITCH);
+// ### True if a building stands between two points: the police line of sight.
 function segmentBlocked(x0, z0, x1, z1){
   const dx = x1 - x0, dz = z1 - z0;
   for (const c of CITY.colliders){
@@ -2611,6 +2643,7 @@ function segmentBlocked(x0, z0, x1, z1){
   }
   return false;
 }
+// ### Brings a police car into the chase, behind or near the player but out of sight.
 function spawnPolice(p){
   let x, z;
   if (mode === 'city'){
@@ -2631,6 +2664,7 @@ function spawnPolice(p){
   p.g.visible = true;
   return true;
 }
+// ### Takes a police car out of the chase with a burst of sparks. It returns after the time set by the stars.
 function wreckPolice(p){
   p.active = false; p.respawn = Core.pursuit(stars).respawn; copsWrecked++;
   burst(p.x, 1.2, p.z, SPARKS, 40, 1);
@@ -2638,6 +2672,7 @@ function wreckPolice(p){
   p.g.visible = false; p.light.intensity = 0;
   toast('Police car taken out!', 'gold', 2000);
 }
+// ### The police AI each frame: choose a target, steer, control speed, collide, hit the player, fill the bust meter.
 function updatePolice(dt){
   const live = state === 'play';
   if (live){
@@ -2745,6 +2780,7 @@ function updatePolice(dt){
     if (b.busted) gameOver('busted');
   }
 }
+// ### Flashes the light bars and moves the single point light of each police car.
 function updatePoliceVisuals(){
   const phase = Math.floor(clock * 8);
   police.forEach((p, i) => {
@@ -2837,6 +2873,7 @@ const heli = (() => {
   pool.scale.setScalar(Core.SPOT_RADIUS * 1.5); pool.visible = false; scene.add(pool);
   return { g, rotor, tail, beam, pool, strobeR, strobeB, on: false, spotted: false, runTime: 0, closing: 0, x: 0, z: 0, sx: 0, sz: 0, h: 0, tilt: 0, roll: 0 };
 })();
+// ### Flies the helicopter ahead of the player and moves its searchlight after them. In the light the police know where you are.
 function updateHeli(dt){
   const live = state === 'play', H = heli;
   if (!H.on){
@@ -2879,6 +2916,7 @@ function vehicleObstacles(){
   obsStamp = frameNo;
   return (obsCache = buildObstacles());
 }
+// ### Lists the moving vehicles near the player as circles, for collisions.
 function buildObstacles(){
   const out = [];
   if (mode === 'country'){
@@ -2921,6 +2959,7 @@ function glowSprite(color, size, opacity){
   return s;
 }
 
+// ### Sets up one run: places the shards, repair kits and finish gate for the current map.
 function placeRun(){
   if (runGroup){
     scene.remove(runGroup);
@@ -2992,6 +3031,7 @@ function placeRun(){
 // ### to a thick black column rising above the vehicle, and flames near the end. Sprites come from fixed pools, so nothing is allocated.
 const particles = [];
 const partGeo = new THREE.TetrahedronGeometry(0.26, 0);
+// ### Throws a short burst of sparks at a point.
 function burst(x, y, z, color, n, spread){
   const mat = new THREE.MeshBasicMaterial({ color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }), grp = { left: n };
   spread = spread || 1;
@@ -3001,6 +3041,7 @@ function burst(x, y, z, color, n, spread){
     particles.push({ mesh: m, vx: Math.cos(a) * out, vy: up, vz: Math.sin(a) * out, life: 1, mat, grp });
   }
 }
+// ### Moves and fades the sparks, and removes them when they die out.
 function updateParticles(dt){
   for (let i = particles.length - 1; i >= 0; i--){
     const p = particles[i];
@@ -3023,6 +3064,7 @@ for (let i = 0; i < 14; i++){
   flames.push({ s, life: 0, vx: 0, vy: 0, vz: 0 });
 }
 let smokeAcc = 0, smokeIdx = 0, flameAcc = 0, flameIdx = 0;
+// ### Emits the smoke and flames that Core.smokeFor asks for at the current damage, and lets them rise and fade.
 function updateSmoke(dt){
   const P = Core.smokeFor(damage), md = MODELS[V.key];
   const fx = Math.sin(car.heading), fz = Math.cos(car.heading), ox = car.x + fx * md.smoke[0], oz = car.z + fz * md.smoke[0], oy = car.y + md.smoke[1];
@@ -3075,6 +3117,7 @@ function updateSmoke(dt){
 let audio = null, muted = false;
 const ENGINES = Core.ENGINES;
 const eng = { rpm: 750, gear: 1, shift: 0, load: 0, boost: 0, miss: 0, prevPedal: 0, prevBrake: false, popTime: 0 };
+// ### Creates the audio graph on the first click or key. Browsers do not allow sound before the player has done something.
 function initAudio(){
   if (audio){ if (audio.ctx.state === 'suspended') audio.ctx.resume(); return; }
   try {
@@ -3137,16 +3180,19 @@ function setEngineVoice(){
 // ### audio clock, one bar at a time, so they stay in time even when the frame rate drops. The stations have no audio files.
 const radio = { key: 'off', out: null, drive: null, echo: null, bar: 0, next: 0 };
 const mtof = n => 440 * Math.pow(2, (n - 69) / 12);
+// ### Creates one station's outputs: dry, a distortion bus for guitars and leads, and an echo.
 function radioBuses(){
   const ctx = audio.ctx, out = ctx.createGain(); out.connect(audio.radioBus);
   const curve = new Float32Array(1024); for (let i = 0; i < 1024; i++){ const x = i / 512 - 1; curve[i] = Math.tanh(x * 7) * 0.8; }
   const drive = ctx.createWaveShaper(); drive.curve = curve; drive.oversample = '2x';
+  // ### Plays a short sequence of notes: pickups, crashes and results.
   const tone = ctx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 3600;
   drive.connect(tone).connect(out);
   const echo = ctx.createDelay(1.5); echo.delayTime.value = 0.75 * 60 / Core.RADIO[radio.key].bpm;
   const back = ctx.createGain(); back.gain.value = 0.42; echo.connect(back).connect(echo); echo.connect(out);
   radio.out = out; radio.drive = drive; radio.echo = echo;
 }
+// ### Plays one oscillator note with a short envelope and an optional filter, then frees itself.
 function radioOsc(type, f, at, dur, level, dest, opt){
   const o = opt || {}, ctx = audio.ctx, osc = ctx.createOscillator(), g = ctx.createGain(), stop = at + dur + (o.release || 0.03);
   osc.type = type; osc.frequency.setValueAtTime(f, at); if (o.detune) osc.detune.value = o.detune;
@@ -3158,12 +3204,14 @@ function radioOsc(type, f, at, dur, level, dest, opt){
   if (o.lp){ const fl = ctx.createBiquadFilter(); fl.type = 'lowpass'; fl.Q.value = o.q || 0.7; fl.frequency.setValueAtTime(o.lp, at); if (o.lpTo) fl.frequency.exponentialRampToValueAtTime(o.lpTo, at + dur); last = last.connect(fl); }
   last.connect(dest); osc.start(at); osc.stop(stop + 0.02);
 }
+// ### Plays one filtered burst of noise: the base of every drum and cymbal.
 function radioNoise(type, f, Q, at, dur, level, dest){
   const ctx = audio.ctx, s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
   s.buffer = audio.noiseBuf; fl.type = type; fl.frequency.value = f; fl.Q.value = Q;
   g.gain.setValueAtTime(level, at); g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
   s.connect(fl).connect(g).connect(dest); s.start(at, Math.random() * 1.5, dur + 0.02);
 }
+// ### Plays one note of Core.radioBar on the instrument it names.
 function radioNote(e, at, beat){
   const out = radio.out, drive = radio.drive, f = mtof(e.n), dur = e.d * beat, v = e.v;
   switch (e.i){
@@ -3196,6 +3244,7 @@ function radioNote(e, at, beat){
     case 'solo': radioOsc('sawtooth', f, at, dur, v * 0.2, drive, { hold: true }); break;
   }
 }
+// ### Schedules the next bar ahead on the audio clock, and silences the radio outside of driving.
 function updateRadio(){
   if (!audio) return;
   const t = audio.ctx.currentTime, playing = radio.key !== 'off' && state === 'play' && !muted;
@@ -3252,6 +3301,7 @@ const sfx = {
 };
 const engineNorm = () => { const E = ENGINES[V.key]; return clamp((eng.rpm - E.idle) / (E.max - E.idle), 0, 1); };
 function engineRpm(){ return eng.rpm; }
+// ### Runs the gearbox and rpm each frame, crossfades the engine loops, and sets road, wind, tyre, turbo and rotor levels.
 function updateEngine(dt){
   const sp = Math.abs(car.speed), live = state === 'play', E = ENGINES[V.key];
   const pedal = live && (keys.up || (keys.down && car.speed <= 0.5)) ? 1 : 0;
@@ -3342,6 +3392,7 @@ function boundaryRect(){
   const x1 = TERR.x0 + (TERR.nx - 1) * TERR.cell, z1 = TERR.z0 + (TERR.nz - 1) * TERR.cell;
   return [TERR.x0 + 30, x1 - 30, TERR.z0 + 30, z1 - 30];
 }
+// ### Builds the glowing force-field walls at the edge of the current map.
 function buildBoundary(){
   if (BOUND.mesh){ scene.remove(BOUND.mesh); BOUND.mesh.geometry.dispose(); }
   const [x0, x1, z0, z1] = boundaryRect(), y0 = mode === 'country' ? -30 : -24, H = mode === 'country' ? 120 : 56;
@@ -3357,6 +3408,7 @@ function boundaryDistance(){
   const [x0, x1, z0, z1] = boundaryRect(), pad = mode === 'city' ? 1.6 : mode === 'highway' ? 2.3 : 0;
   return Core.edgeDistance([x0, x1, z0, z1], car.x, car.z, pad, mode === 'highway');
 }
+// ### Animates the force field, and pushes the player back with a spark when they touch it.
 function updateBoundary(dt){
   if (!BOUND.mesh) return;
   const live = state === 'play', d = live ? boundaryDistance() : 999;
@@ -3441,6 +3493,7 @@ const STAR = '<svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.6 1.3 
 
 const G = { cx: 80, cy: 80, r: 66, a0: 135, sweep: 270, max: 160 };
 function polar(r, deg){ const a = deg * Math.PI / 180; return [G.cx + r * Math.cos(a), G.cy + r * Math.sin(a)]; }
+// ### Draws the speedometer scale for the current map.
 function initGauge(){
   G.max = M.gaugeMax;
   const [x0, y0] = polar(G.r, G.a0), [x1, y1] = polar(G.r, G.a0 + G.sweep);
@@ -3459,6 +3512,7 @@ function initGauge(){
 }
 
 let toastTimer = 0;
+// ### Shows a short message at the top of the screen.
 function toast(text, tone, ms){
   ui.toast.textContent = text;
   ui.toast.className = tone || '';
@@ -3473,6 +3527,7 @@ function renderChips(){
 }
 const pedal = { thr: 0, brk: 0 };
 const last = { street: '', time: '', speed: -1, rpm: -1, sig: '', gear: '', hb: null, thr: -1, brk: -1, dmg: -1, km: '', pur: '', bust: -1 };
+// ### Updates the HUD. A value is only written when it has changed, because touching the page every frame is slow.
 function updateHud(dt){
   // in story mode this line names the act instead
   if (mode === 'city' && !story){
@@ -3570,6 +3625,7 @@ function updateHud(dt){
 
 // Radar (heading up, world drawn to scale)
 const rc = $('radar'), rx = rc.getContext('2d');
+// ### Draws the radar: streets, shards, kits, police, the helicopter light, the gate and story markers.
 function drawRadar(){
   const S = rc.width, R = S / 2, range = M.radar, kk = R / range;
   const fx = Math.sin(car.heading), fz = Math.cos(car.heading);
@@ -3677,6 +3733,7 @@ let edgeHint = false, warnedDamage = false;
 const best = {};
 for (const k of Object.keys(MODES)){ const b = Core.parseBest(readStore(MODES[k].store)); if (b) best[k] = b; }
 
+// ### Switches map. A map is built the first time it is chosen, then bent over its hills once.
 function setMode(m){
   mode = m; M = MODES[m];
   if (m === 'highway' && !HWY.built){ buildHighway(); laySlopes(HWY.group, 'highway'); }
@@ -3693,6 +3750,7 @@ function setMode(m){
   buildBoundary();
 }
 
+// ### Puts the player back at the start of the map.
 function resetCar(){
   let x = mode === 'city' ? -3.5 : HW.our[1], z = mode === 'city' ? -6 : 5, heading = 0;
   if (mode === 'country'){ const pt = roadPoint(40, ROAD.lane); x = pt.x; z = pt.z; heading = pt.h; roadPos.ri = undefined; roadPos.s = 40; roadPos.lat = ROAD.lane; }
@@ -3702,6 +3760,7 @@ function resetCar(){
   camera.lookAt(x + Math.sin(heading) * 4, car.y + 1.6, z + Math.cos(heading) * 4);
 }
 
+// ### Starts a free ride or a story act: resets the score, car and police.
 function startRun(m, v){
   initAudio();
   setVehicle(v || V.key);
@@ -3723,6 +3782,7 @@ function startRun(m, v){
   else if (mode === 'country') toast('Follow the country road to the village. Shards add +4 s. Watch the oncoming traffic.', '', 4500);
   else toast(`Reach the finish 4 km ahead. Shards add +${M.bonus} s. Police incoming.`, '', 4500);
 }
+// ### Pauses the run and shows the pause card.
 function pause(){
   state = 'pause';
   Object.keys(keys).forEach(k => keys[k] = false);
@@ -3736,8 +3796,10 @@ function pause(){
       <button class="btn ghost" data-action="menu">Main menu</button>
     </div>`);
 }
+// ### Goes back to driving after a pause.
 function resume(){ hideOverlay(); state = 'play'; initAudio(); }
 
+// ### Picks up a shard, adds any bonus time, and opens the finish gate after the last one.
 function collect(it){
   it.taken = true; collected++;
   burst(it.x, it.group.position.y + 1.9, it.z, SPARK, 28);
@@ -3752,6 +3814,7 @@ function collect(it){
   } else if (collected % 3 === 0) toast(`Shard ${collected} / ${items.length}. More police are joining the chase!`, 'red', 2400);
   else toast(`Star shard ${collected} / ${items.length}`, '', 1800);
 }
+// ### Picks up a repair kit: Core.repairDamage removes the damage.
 function repair(kt){
   kt.taken = true;
   burst(kt.x, 1.6, kt.z, GREEN, 18);
@@ -3763,6 +3826,7 @@ function repair(kt){
   toast(`Repair kit: damage ${Math.round(before)}% → ${Math.round(damage)}%`, 'green', 2400);
 }
 
+// ### Applies a crash: damage from Core.crashDamage, sparks, sound and camera shake.
 function crash(impact){
   const add = Core.crashDamage(impact, V);
   car.shake = Math.min(1, impact / 18);
@@ -3776,6 +3840,7 @@ function crash(impact){
   if (damage >= 50 && !warnedDamage){ warnedDamage = true; toast('Engine damaged: top speed reduced. Find a repair kit.', 'red', 3200); }
 }
 
+// ### Ends a run at the gate and shows the score and stars.
 function finish(){
   if (story) return storyFinish();
   state = 'done';
@@ -3803,6 +3868,7 @@ function finish(){
     </div>`);
 }
 
+// ### Ends a run that failed: busted, wrecked or out of time.
 function gameOver(reason){
   if (story) return storyGameOver(reason);
   state = 'over';
@@ -3872,6 +3938,7 @@ const MAP_THUMB = {
 const STAT_NAMES = ['Top speed', 'Acceleration', 'Handling', 'Durability', 'Ramming'];
 const STAT_WORDS = ['', 'Low', 'Fair', 'Good', 'High', 'Max'];
 const { vehStats, zeroTo80 } = Core;
+// ### Shows the chosen vehicle in the menu; its stat bars are computed from the tuning table.
 function renderVehDetail(){
   const v = VEH[sel.veh], el = card.querySelector('#vehDetail');
   if (!el) return;
@@ -3881,6 +3948,7 @@ function renderVehDetail(){
     <div class="vd-stats">${STAT_NAMES.map((n, i) => `<div class="vd-row"><span>${n}</span><span class="vd-bar">${[0, 1, 2, 3, 4].map(j => `<i class="${j < st[i] ? 'on' : ''}"></i>`).join('')}</span><b>${value(i)}</b></div>`).join('')}</div>`;
   $('showName').textContent = v.cls;
 }
+// ### Builds the main menu: story mode, maps, vehicle, radio, graphics.
 function showMenu(){
   state = 'menu';
   hud.classList.add('off');
@@ -3924,6 +3992,7 @@ function menuFraming(on){
   } else camera.clearViewOffset();
 }
 
+// ### Shows a card (result, pause, story) over the game.
 function showCard(html, kind){
   const isMenu = kind === 'menu';
   card.innerHTML = html;
@@ -3932,6 +4001,7 @@ function showCard(html, kind){
   overlay.hidden = false;
   const b = card.querySelector('.btn'); if (b && !COARSE) b.focus({ preventScroll: true });
 }
+// ### Hides the card and returns to the game.
 function hideOverlay(){ overlay.hidden = true; menuFraming(false); }
 function backToMenu(){
   setMode('city'); placeRun(); resetCar(); resetPolice(); damage = 0;
@@ -3994,6 +4064,7 @@ $('btnRadio').addEventListener('click', e => { e.currentTarget.blur(); initAudio
 // ### the impact speed along the contact normal decides the damage. The chase camera follows smoothly and is kept out of
 // ### buildings (camClip) and above hills.
 const collidePoint = Core.collidePoint;
+// ### Player physics each frame: speed with slopes, steering, movement, collisions, and how the vehicle sits on the ground.
 function updateCar(dt){
   if (mode === 'country') Object.assign(roadPos, roadQuery(car.x, car.z, roadPos));
   const offRoad = mode === 'country' && Math.abs(roadPos.lat) > 5.4;
@@ -4079,6 +4150,7 @@ function updateCar(dt){
   car.wheelRot += car.speed * dt;
 }
 
+// ### Moves the 3D vehicle to its physics position; sets brake lights, damage parts, dents, lean and spinning wheels.
 function applyCarMesh(dt){
   carGroup.position.set(car.x, car.y, car.z);
   carGroup.rotation.y = car.heading;
@@ -4131,6 +4203,7 @@ function camClip(tx, tz){
   return Math.max(0.22, tmin - 0.03);
 }
 
+// ### The chase camera: follows behind, stays out of buildings and above the ground, and widens with speed.
 function chaseCam(dt){
   const fx = Math.sin(car.heading), fz = Math.cos(car.heading), sp = Math.abs(car.speed);
   const dist = V.cam[0] + sp * 0.07;
@@ -4152,6 +4225,7 @@ function chaseCam(dt){
   const fov = 62 + sp / (M.max * V.speed) * 14;
   if (Math.abs(camera.fov - fov) > 0.05){ camera.fov = fov; camera.updateProjectionMatrix(); }
 }
+// ### The showroom camera that circles the chosen vehicle in the menu.
 function orbitCam(dt){
   orbitAngle += dt * (REDUCED ? 0.03 : 0.12);
   const [r, h, look] = V.show;
@@ -4173,6 +4247,7 @@ const turntable = new THREE.Group();
   turntable.add(disc, ring);
   scene.add(showKey, showKey.target, showRim, turntable);
 })();
+// ### Turns the showroom lights and the turntable on only while the menu is open.
 function updateShowroom(){
   const on = state === 'menu';
   turntable.visible = on;
@@ -4186,6 +4261,7 @@ function updateShowroom(){
   showRim.position.set(car.x - Math.sin(orbitAngle) * 4 * s, car.y + 2.2 * s, car.z - Math.cos(orbitAngle) * 4 * s);
 }
 
+// ### Spins the shards and kits, picks them up when close, and checks the finish gate.
 function updatePickups(dt, live){
   for (const it of items){
     if (it.taken) continue;
@@ -4223,6 +4299,7 @@ const GFX = { ultra: { ratio: 2, shadow: 4096, post: true }, balanced: { ratio: 
 let gfx = COARSE ? 'balanced' : 'ultra';
 { const g = readStore('shard-heist-gfx'); if (g && Object.hasOwn(GFX, g)) gfx = g; }
 let composer = null, fxaaPass = null;
+// ### Sets up the post-processing chain for Ultra graphics: bloom, then anti-aliasing.
 function buildComposer(){
   if (!THREE.EffectComposer || !THREE.RenderPass || !THREE.UnrealBloomPass || !THREE.ShaderPass || !THREE.GammaCorrectionShader) return null;
   try {
@@ -4240,6 +4317,7 @@ function buildComposer(){
     return c;
   } catch (e) { return null; }
 }
+// ### Applies the Ultra or Balanced graphics setting.
 function applyGfx(){
   const q = GFX[gfx];
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.ratio));
@@ -4283,6 +4361,7 @@ const STORY = {
 };
 const VEH_DESC = { car: 'Steel-blue coupe', bike: 'Black superbike', truck: 'Green tractor unit' };
 
+// ### Shows the story prologue before the first act.
 function showStoryIntro(){
   story = Core.newStory();
   showCard(`
@@ -4298,6 +4377,7 @@ function showStoryIntro(){
     </div>`);
 }
 
+// ### Starts an act of the story on its map.
 function startStoryAct(i){
   if (!Core.beginAct(story, i)) return;
   story.env = null;
@@ -4344,6 +4424,7 @@ function setupCourier(){
   courier.g.position.set(courier.x, hill(courier.x, courier.z), courier.z);
 }
 
+// ### Runs the story during an act: radio messages, the courier, and the conditions for the next act.
 function updateStory(dt){
   // Radio and narrator lines on a timeline
   story.clock += dt;
@@ -4384,6 +4465,7 @@ function updateStory(dt){
   }
 }
 
+// ### Adds the story markers to the radar.
 function drawStoryRadar(toScreen, R, range, pulse){
   if (!story || !courier || !courier.on || story.clasp || mode !== 'highway') return;
   let [sx, sy, dist] = toScreen(courier.x, courier.z);
@@ -4393,6 +4475,7 @@ function drawStoryRadar(toScreen, R, range, pulse){
   rx.strokeStyle = '#1b1406'; rx.lineWidth = 2; rx.strokeRect(sx - 6, sy - 9, 12, 18);
 }
 
+// ### Ends an act and moves on to the next, or to an ending.
 function storyFinish(){
   state = 'done';
   const used = Core.driveTime(mode, M, timeLeft, collected);
@@ -4422,6 +4505,7 @@ function storyFinish(){
   } else showEnding();
 }
 
+// ### Shows one of the three story endings.
 function showEnding(){
   const total = story.times.reduce((a, b) => a + (b || 0), 0);
   const good = Core.storyEnding(story) === 'A';
@@ -4445,6 +4529,7 @@ function showEnding(){
     <div class="actions"><button class="btn" data-action="story">Try for the true ending <small class="desk-only">Enter</small></button><button class="btn ghost" data-action="menu">Main menu</button></div>`);
 }
 
+// ### Offers a retry when an act fails.
 function storyGameOver(reason){
   state = 'over';
   sfx.fail();

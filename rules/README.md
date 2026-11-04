@@ -1,6 +1,6 @@
 # Game rules
 
-> **Status: working draft.** These documents describe what the game does **right now**, as implemented in the code. The group will rework the rules step by step. When a rule changes, update the document and the code together, and the tests with them.
+> These documents describe what the game does, as implemented in the code. When a rule changes, update the document, the code and the tests together, then run `npm run docs` to rebuild the printable version.
 
 The game has two rooms that are played one after the other. Until the group connects them, each room is its own page.
 
@@ -11,7 +11,7 @@ The game has two rooms that are played one after the other. Until the group conn
 
 ## The whole game in one paragraph
 
-You were the detective on the Ashford necklace case. Now you are inmate 4471, convicted of stealing it. **Room 1:** you have ten minutes in a prison washroom to find the code for a hatch in the floor. If you get out (Ending A), a note shows that the guard wanted you out, and a car is waiting at the end of the tunnel. **Room 2:** the police chase begins. You drive a getaway vehicle through Lisbon's Baixa, on the highway and across the countryside, collecting star shards while up to three police cars try to box you in.
+You were the detective on the Ashford necklace case. Now you are inmate 4471, convicted of stealing it. **Room 1:** you have ten minutes in a prison washroom to find the code for a hatch in the floor. If you get out (Ending A), a note shows that the guard wanted you out, and a car is waiting at the end of the tunnel. **Room 2:** the police chase begins. You drive a getaway vehicle through Lisbon's Baixa, on the highway and across the countryside, collecting star shards while up to four police cars and a helicopter hunt you.
 
 ## One night, one look
 

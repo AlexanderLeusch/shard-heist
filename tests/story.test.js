@@ -1,3 +1,4 @@
+// ### Unit tests for the story mode: acts, retries, the hidden letter, the three endings and the radio messages.
 // Story mode "The Necklace Job": acts, items, endings and retries (src/core.js)
 const test = require('node:test');
 const assert = require('node:assert/strict');

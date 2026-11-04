@@ -11,6 +11,7 @@
     "start": "node scripts/serve.js",
     "test": "node --test tests/rules.test.js tests/story.test.js tests/input.test.js tests/page.test.js tests/escape-rules.test.js",
     "test:browser": "node --test tests/browser.test.js",
+    "docs": "node scripts/build-rules.js",
     "test:sri": "node scripts/check-sri.js",
     "test:all": "npm test && npm run test:sri && npm run test:browser"
   }

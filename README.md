@@ -135,11 +135,6 @@ Writing the tests found two real bugs. Both are fixed:
 - **Testing:** the browser test checks the main workflows, but not long play sessions, every map end to end, or sound quality, and the CI browser renders in software.
 - **Persistence:** best times live in one browser only and can be edited by the player.
 
-## Credits
-
-All radio music is composed and synthesised by the game at run time, so there are no music files or licences. The tunes are generated from seeded random walks. The classical station plays J. S. Bach's Prelude in C (BWV 846) and the Ode to Joy from Beethoven's Ninth Symphony, both in the public domain.
-
-
 The street names and their order were checked against [OpenStreetMap](https://www.openstreetmap.org/copyright) (© OpenStreetMap contributors, ODbL). The game ships no map data and calls no map service.
 
 ## How it could change
@@ -152,6 +147,8 @@ The street names and their order were checked against [OpenStreetMap](https://ww
 - Longer browser tests that drive whole runs and story acts with scripted inputs.
 
 ## Credits
+
+All radio music is composed and synthesised by the game at run time, so there are no music files or licences. The tunes are generated from seeded random walks. The classical station plays J. S. Bach's Prelude in C (BWV 846) and the Ode to Joy from Beethoven's Ninth Symphony, both in the public domain.
 
 
 Built with three.js r128 (MIT licence). Fonts: Bricolage Grotesque and JetBrains Mono (Google Fonts, SIL Open Font License). Code written with the help of Claude (Anthropic).
