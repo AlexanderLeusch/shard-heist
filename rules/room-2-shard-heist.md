@@ -72,6 +72,8 @@ The Baixa is the flat centre of Lisbon, rebuilt as a street grid after the 1755 
 | **100 % damage** | **vehicle wrecked: game over** |
 | Repair kit | removes 40 % damage |
 
+Your brake lights come on while you brake, in either direction, and with the handbrake while moving.
+
 ## Police
 
 | Rule | Value |

@@ -221,6 +221,11 @@ test('the motorcycle and the truck are modelled like the real thing', () => {
   assert.equal((truck.match(/false, 0\.26\]/g) || []).length, 4, 'twin tyres on each side of the rear axle');
 });
 
+test('the player has brake lights', () => {
+  assert.match(game, /Core\.isBraking\(car\.speed, keys\.down, keys\.up, keys\.brake\)/);
+  assert.match(game, /brakeLights\.mat\.color\.setHex\(braking/);
+});
+
 test('the wanted stars and the helicopter are wired up', () => {
   assert.equal((html.match(/id="stars"[^>]*>(<i><\/i>){5}/) || []).length > 0, true, 'five stars in the HUD');
   assert.equal((html.match(/id="cops">(<i><\/i>){4}/) || []).length > 0, true, 'four police slots');

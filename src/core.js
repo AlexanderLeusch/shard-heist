@@ -267,20 +267,22 @@
   // ### firing frequency = rpm / 60 x cylinders / 2. The pulses travel through a pipe with a reflection at its open end and a
   // ### muffler, whose resonances stay at the same frequencies whatever the rpm. Under load the pulses are strong; on overrun
   // ### they are weak and irregular. The V8's two banks fire unevenly (L R R L R L L R) into pipes of different length: its burble.
-  // ### gears are the speeds in m/s at which each gear reaches max rpm.
+  // ### Idling is its own sound, not a quiet overrun: the engine still fires at part load, each cycle a little different, with
+  // ### short sharp pulses and the valve train, clutch or diesel knock clearly audible (idling). Gears are the speeds in m/s at
+  // ### which each gear reaches max rpm.
   const ENGINES = {
     car: { layout: 'V8, cross-plane', cyl: 8, idle: 750, max: 6800, launch: 2600, gears: [12, 20, 29, 38, 48, 58], down: 0.62, shift: 0.16, rev: [9, 4, 14],
-      refs: [800, 1500, 2700, 4300, 6300], loop: 1.5, banks: [0, 1, 1, 0, 1, 0, 0, 1], pipes: [0.0079, 0.0094], lag: 0.0016, reflect: -0.72, damp: 0.55,
+      refs: [750, 1500, 2700, 4300, 6300], loop: 1.5, idling: { pulse: 0.0022, lope: 0.18, weak: 0.08, mech: 5, gain: 1.7 }, banks: [0, 1, 1, 0, 1, 0, 0, 1], pipes: [0.0079, 0.0094], lag: 0.0016, reflect: -0.72, damp: 0.55,
       pulse: 0.05, pulseMax: 0.0042, rough: 0.2, spread: 0.2, jitter: 0.1, tick: 0.012, knock: 0,
       body: [[95, 1.1, 1.3], [240, 1.3, 0.8], [620, 1.6, 0.3]], direct: 0.1, lowpass: 3600, intake: [420, 1.6, 0.5], off: 0.42, drive: 1.6,
       pops: 620, turbo: 0, air: false, whine: [24, 0.012], road: 1, vol: 1 },
     bike: { layout: 'Inline four', cyl: 4, idle: 1300, max: 13000, launch: 5200, gears: [20, 30, 39, 48, 57, 66], down: 0.6, shift: 0.07, rev: [16, 7, 30],
-      refs: [1400, 3000, 5500, 8500, 12000], loop: 1.2, banks: [0, 0, 0, 0], pipes: [0.0041], lag: 0, reflect: -0.62, damp: 0.75,
+      refs: [1300, 3000, 5500, 8500, 12000], loop: 1.2, idling: { pulse: 0.0014, lope: 0.1, weak: 0.02, mech: 6, gain: 1.3 }, banks: [0, 0, 0, 0], pipes: [0.0041], lag: 0, reflect: -0.62, damp: 0.75,
       pulse: 0.045, pulseMax: 0.0022, rough: 0.28, spread: 0.05, jitter: 0.05, tick: 0.03, knock: 0,
       body: [[310, 1.2, 0.9], [760, 1.5, 0.8], [1700, 1.8, 0.45]], direct: 0.22, lowpass: 7000, intake: [1050, 2.2, 0.9], off: 0.38, drive: 1.3,
       pops: 1300, turbo: 0, air: false, whine: [46, 0.007], road: 0.55, vol: 0.85 },
     truck: { layout: 'Inline-six diesel', cyl: 6, idle: 600, max: 2300, launch: 1100, gears: [6, 9, 13, 18, 24, 31, 38, 45], down: 0.72, shift: 0.42, rev: [4, 2.5, 7],
-      refs: [650, 1000, 1400, 1800, 2250], loop: 1.8, banks: [0, 0, 0, 0, 0, 0], pipes: [0.0148], lag: 0, reflect: -0.8, damp: 0.42,
+      refs: [600, 1000, 1400, 1800, 2250], loop: 1.8, idling: { pulse: 0.0032, lope: 0.05, weak: 0, mech: 2.4, gain: 1.6 }, banks: [0, 0, 0, 0, 0, 0], pipes: [0.0148], lag: 0, reflect: -0.8, damp: 0.42,
       pulse: 0.06, pulseMax: 0.0062, rough: 0.12, spread: 0.08, jitter: 0.05, tick: 0, knock: 0.2,
       body: [[62, 1.0, 1.4], [150, 1.2, 1.0], [370, 1.4, 0.4]], direct: 0.06, lowpass: 2400, intake: [240, 1.2, 0.35], off: 0.5, drive: 1.9,
       pops: 0, turbo: 0.03, air: true, whine: [15, 0.016], road: 1.5, vol: 1.1 }
@@ -301,6 +303,10 @@
     const wheel = E.max * Math.abs(speed) / range;
     return clamp(Math.max(wheel, throttle ? E.launch : E.idle), E.idle, E.max);
   }
+  // Whether the brake lights are on: the pedal while rolling either way, or the handbrake while moving. S at a standstill is reverse.
+  function isBraking(speed, down, up, handbrake){
+    return !!((down && speed > 0.5) || (up && speed < -0.5) || (handbrake && Math.abs(speed) > 0.5));
+  }
   // A two-pole resonance with its own state, one sample at a time
   function resonance(f, Q, sr){
     const w = 2 * Math.PI * f / sr, alpha = Math.sin(w) / (2 * Q), a0 = 1 + alpha, c = Math.cos(w);
@@ -308,17 +314,21 @@
     let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
     return x => { const y = b * x - b * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = x; y2 = y1; y1 = y; return y; };
   }
-  // One seamless loop of whole engine cycles at one rpm, on load or on overrun. Everything wraps round the end of the
+  // One seamless loop of whole engine cycles at one rpm: kind is 'load', 'overrun' or 'idle'. Everything wraps round the end of the
   // buffer, and the filters run over it twice so their state at the end matches the start.
-  function engineLoop(E, rpm, onLoad, sr, seed){
-    const rnd = mulberry32(seed), cycle = 120 / rpm, cycles = Math.max(2, Math.ceil(E.loop / cycle)), n = Math.round(cycle * cycles * sr);
+  function engineLoop(E, rpm, kind, sr, seed){
+    const onLoad = kind === 'load', idle = kind === 'idle', I = E.idling;
+    const rnd = mulberry32(seed), cycle = 120 / rpm, cycles = Math.max(2, Math.ceil(E.loop * (idle ? 2 : 1) / cycle)), n = Math.round(cycle * cycles * sr);
     const flow = E.pipes.map(() => new Float32Array(n)), mech = new Float32Array(n), out = new Float32Array(n);
     const low = clamp(1 - (rpm - E.idle) / (E.max - E.idle) * 2, 0, 1); // engines run less evenly at low rpm
     const trim = []; for (let i = 0; i < E.cyl; i++) trim.push((rnd() - 0.5) * 2 * E.spread * (0.4 + 0.6 * low));
-    const tau = Math.min(E.pulse * cycle, E.pulseMax), L = Math.round(tau * 9 * sr), step = 1 / (tau * sr);
+    const tau = idle ? I.pulse : Math.min(E.pulse * cycle, E.pulseMax), L = Math.round(tau * 9 * sr), step = 1 / (tau * sr);
+    let cycleAmp = 1;
     for (let c = 0; c < cycles * E.cyl; c++){
-      const ci = c % E.cyl, irregular = E.jitter * (0.5 + low) * (onLoad ? 1 : 2.5);
-      const amp = (onLoad ? 1 : E.off) * Math.max(0, 1 + trim[ci] + (rnd() - 0.5) * 2 * irregular);
+      const ci = c % E.cyl, irregular = E.jitter * (0.5 + low) * (onLoad || idle ? 1 : 2.5);
+      if (idle && ci === 0) cycleAmp = 1 + (rnd() - 0.5) * 2 * I.lope;
+      const weak = idle && rnd() < I.weak ? 0.45 : 1;
+      const amp = (onLoad ? 1 : idle ? 0.7 * cycleAmp * weak : E.off) * Math.max(0, 1 + trim[ci] + (rnd() - 0.5) * 2 * irregular);
       const s0 = Math.round(((c / E.cyl + (rnd() - 0.5) * 0.004 * (0.3 + low)) * cycle + E.banks[ci] * E.lag * (0.25 + 0.75 * low)) * sr), dest = flow[E.banks[ci] % flow.length];
       const rough = E.rough * (onLoad ? 1 : 1.5);
       let turb = 0;
@@ -328,7 +338,7 @@
         dest[((s0 + k) % n + n) % n] += v;
       }
       // what the engine block radiates directly: diesel knock, and the valve train of a petrol engine
-      const knock = E.knock * (onLoad ? 1 : 0.45) * (0.6 + 0.8 * rnd()), tick = E.tick * (0.6 + 0.8 * rnd());
+      const knock = E.knock * (onLoad ? 1 : idle ? I.mech : 0.45) * (0.6 + 0.8 * rnd()), tick = E.tick * (idle ? I.mech : 1) * (0.6 + 0.8 * rnd());
       const M = Math.round(0.006 * sr);
       for (let k = 0; k < M; k++){
         const t = k / sr;
@@ -363,6 +373,7 @@
     return out;
   }
   // All loops of one engine, levelled together: louder with rpm, quieter on overrun, softly saturated, with one peak for all.
+  // The lowest rpm has an idle loop in place of an overrun loop, because that is what the engine does there.
   function engineLoops(E, sr, seed){
     const level = (d, target) => {
       let e = 0; for (let i = 0; i < d.length; i++) e += d[i] * d[i];
@@ -370,8 +381,8 @@
       for (let i = 0; i < d.length; i++) d[i] = Math.tanh(d[i] * g * E.drive) / E.drive;
     };
     const loops = E.refs.map((rpm, i) => {
-      const on = engineLoop(E, rpm, true, sr, seed + i * 2), off = engineLoop(E, rpm, false, sr, seed + i * 2 + 1), target = 0.1 + 0.22 * Math.pow(rpm / E.max, 0.7);
-      level(on, target); level(off, target * E.off);
+      const on = engineLoop(E, rpm, 'load', sr, seed + i * 2), off = engineLoop(E, rpm, i ? 'overrun' : 'idle', sr, seed + i * 2 + 1), target = 0.1 + 0.22 * Math.pow(rpm / E.max, 0.7);
+      level(on, target); level(off, target * (i ? E.off : 0.8));
       return { rpm, on, off };
     });
     let peak = 0;
@@ -418,6 +429,6 @@
     PURSUIT, MAX_STARS, SPOT_RADIUS, wantedStars, pursuit, helicopterDue, copTopSpeed, trackStep, inSpotlight, bustStep, edgeDistance,
     driveTime, runStars, isNewBest,
     newStory, beginAct, retryAct, finishOpen, storyEnding, dueRadio,
-    ENGINES, ENGINE_SR, gearFor, engineTarget, engineLoop, engineLoops, ROTOR, rotorLoop
+    ENGINES, ENGINE_SR, gearFor, engineTarget, isBraking, engineLoop, engineLoops, ROTOR, rotorLoop
   });
 });

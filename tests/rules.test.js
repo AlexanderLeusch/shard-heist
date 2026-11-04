@@ -292,14 +292,14 @@ test('the rpm follows the road speed and stays between idle and the limit', () =
 test('engine loops are periodic at the firing frequency of each real engine', () => {
   const SR = Core.ENGINE_SR;
   for (const key of ['bike', 'truck']){
-    const E = Core.ENGINES[key], rpm = E.refs[2], d = Core.engineLoop(E, rpm, true, SR, 7);
+    const E = Core.ENGINES[key], rpm = E.refs[2], d = Core.engineLoop(E, rpm, 'load', SR, 7);
     const firing = rpm / 60 * E.cyl / 2, lag = Math.round(SR / firing);
     assert.ok(similarity(d, lag) > 0.45, key + ' repeats every firing: ' + similarity(d, lag));
     assert.ok(similarity(d, Math.round(lag * 0.5)) < similarity(d, lag), key + ' not at half the interval');
   }
   // the loop holds whole engine cycles, and the end joins the start without a click
   for (const key of VEHICLES){
-    const E = Core.ENGINES[key], d = Core.engineLoop(E, E.refs[1], true, SR, 7), cycles = d.length / SR / (120 / E.refs[1]);
+    const E = Core.ENGINES[key], d = Core.engineLoop(E, E.refs[1], 'load', SR, 7), cycles = d.length / SR / (120 / E.refs[1]);
     assert.ok(Math.abs(cycles - Math.round(cycles)) < 0.01, key + ' whole cycles: ' + cycles);
     let steps = 0; for (let i = 1; i < d.length; i++) steps += (d[i] - d[i - 1]) ** 2;
     assert.ok(Math.abs(d[0] - d[d.length - 1]) < 5 * Math.sqrt(steps / d.length), key + ' joins without a jump');
@@ -308,7 +308,7 @@ test('engine loops are periodic at the firing frequency of each real engine', ()
 
 test('the V8 burbles: its two banks make each cycle repeat better than each firing, unlike the even four and six', () => {
   const SR = Core.ENGINE_SR, unevenness = key => {
-    const E = Core.ENGINES[key], rpm = E.refs[1], d = Core.engineLoop(E, rpm, true, SR, 7), firing = rpm / 60 * E.cyl / 2;
+    const E = Core.ENGINES[key], rpm = E.refs[1], d = Core.engineLoop(E, rpm, 'load', SR, 7), firing = rpm / 60 * E.cyl / 2;
     return similarity(d, Math.round(SR * 120 / rpm)) - similarity(d, Math.round(SR / firing));
   };
   assert.ok(unevenness('car') > 0.2, 'car ' + unevenness('car'));
@@ -321,13 +321,13 @@ test('engine loops: louder with rpm and under load, within range, the same for t
     const E = Core.ENGINES[key], loops = Core.engineLoops(E, Core.ENGINE_SR, 3);
     assert.equal(loops.length, E.refs.length);
     loops.forEach((l, i) => {
-      assert.ok(rmsOf(l.off) < rmsOf(l.on) * 0.75, key + ' overrun is quieter at ' + l.rpm);
+      assert.ok(rmsOf(l.off) < rmsOf(l.on) * (i ? 0.75 : 1), key + ' overrun or idle is quieter at ' + l.rpm);
       if (i) assert.ok(rmsOf(l.on) > rmsOf(loops[i - 1].on), key + ' louder at ' + l.rpm);
       for (const d of [l.on, l.off]) assert.ok(d.every(v => Math.abs(v) <= 1 && Number.isFinite(v)), key + ' in range');
     });
     assert.ok(E.refs[0] <= E.idle * 1.1 && E.refs[E.refs.length - 1] >= E.max * 0.9, key + ' loops cover the rpm range');
   }
-  const a = Core.engineLoop(Core.ENGINES.car, 1500, true, Core.ENGINE_SR, 9), b = Core.engineLoop(Core.ENGINES.car, 1500, true, Core.ENGINE_SR, 9);
+  const a = Core.engineLoop(Core.ENGINES.car, 1500, 'load', Core.ENGINE_SR, 9), b = Core.engineLoop(Core.ENGINES.car, 1500, 'load', Core.ENGINE_SR, 9);
   assert.deepEqual(a, b);
 });
 
@@ -342,4 +342,28 @@ test('the rotor loop thumps at the blade-pass rate and repeats seamlessly', () =
   let steps = 0; for (let i = 1; i < d.length; i++) steps += (d[i] - d[i - 1]) ** 2;
   assert.ok(Math.abs(d[0] - d[d.length - 1]) < 8 * Math.sqrt(steps / d.length), 'joins without a jump');
   assert.deepEqual(Core.rotorLoop(SR, 7), d, 'the same for the same seed');
+});
+
+test('idling is its own sound: at the idle rpm, each cycle different, with sharper pulses than under load', () => {
+  const SR = Core.ENGINE_SR;
+  for (const key of VEHICLES){
+    const E = Core.ENGINES[key], cycle = Math.round(SR * 120 / E.idle);
+    assert.equal(E.refs[0], E.idle, key + ' has a loop at its exact idle rpm');
+    const idle = Core.engineLoop(E, E.idle, 'idle', SR, 5);
+    assert.ok(E.idling.pulse < E.pulseMax, key + ' sharper pulses');
+    assert.ok(similarity(idle, cycle) < 0.995, key + ' no two cycles are the same');
+    assert.ok(idle.length / SR >= E.loop * 1.9, key + ' the idle loop is long enough not to be heard repeating');
+  }
+  assert.ok(similarity(Core.engineLoop(Core.ENGINES.car, 750, 'idle', SR, 5), Math.round(SR * 120 / 750)) < similarity(Core.engineLoop(Core.ENGINES.truck, 600, 'idle', SR, 5), Math.round(SR * 120 / 600)), 'the V8 lopes more than the diesel six');
+});
+
+test('brake lights: on while braking in either direction, off when reversing or standing still', () => {
+  assert.equal(Core.isBraking(20, true, false, false), true, 'pedal while rolling forward');
+  assert.equal(Core.isBraking(-5, false, true, false), true, 'W while rolling backward');
+  assert.equal(Core.isBraking(20, false, false, true), true, 'handbrake while moving');
+  assert.equal(Core.isBraking(20, false, true, false), false, 'accelerating');
+  assert.equal(Core.isBraking(0, true, false, false), false, 'S at a standstill is reverse');
+  assert.equal(Core.isBraking(-5, true, false, false), false, 'reversing');
+  assert.equal(Core.isBraking(0, false, false, true), false, 'handbrake at a standstill');
+  assert.equal(Core.isBraking(20, false, false, false), false, 'coasting');
 });

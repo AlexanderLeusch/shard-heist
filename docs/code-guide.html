@@ -103,16 +103,16 @@ pre .c{ color:#7fd4e2; }
   <h2>The game at a glance</h2>
   <p><b>Shard Heist</b> is a 3D police-chase game that runs entirely in the browser as a static website: one page, one stylesheet and three scripts. The player picks a map (Lisbon's Baixa, Highway or Countryside) and a getaway vehicle (Car, Motorcycle or Truck), collects glowing star shards, escapes up to three police cars and reaches a finish gate before the clock runs out. Crashes cause damage; repair kits remove it; police can bust the player when they box the vehicle in. The story mode <b>The Necklace Job</b> is an option in the same main menu (section 10).</p>
   <div class="kpis">
-    <div class="kpi"><b>5,140</b><span>lines of game code</span></div>
-    <div class="kpi"><b>4,640</b><span>lines of JavaScript</span></div>
-    <div class="kpi"><b>183</b><span>named functions</span></div>
+    <div class="kpi"><b>5,167</b><span>lines of game code</span></div>
+    <div class="kpi"><b>4,667</b><span>lines of JavaScript</span></div>
+    <div class="kpi"><b>184</b><span>named functions</span></div>
     <div class="kpi"><b>24</b><span>code sections</span></div>
-    <div class="kpi"><b>98</b><span>automated tests</span></div>
+    <div class="kpi"><b>101</b><span>automated tests</span></div>
     <div class="kpi"><b>0</b><span>npm dependencies</span></div>
     <div class="kpi"><b>0</b><span>image / sound files</span></div>
-    <div class="kpi"><b>338 KB</b><span>game code size</span></div>
+    <div class="kpi"><b>340 KB</b><span>game code size</span></div>
   </div>
-  <p class="mono" style="color:var(--muted)">Figures for room 2 (index.html, styles.css, src/). Room 1 is described in section 14. The test count covers both rooms: 84 unit and page tests and 14 browser tests. Tests add 1,189 lines.</p>
+  <p class="mono" style="color:var(--muted)">Figures for room 2 (index.html, styles.css, src/). Room 1 is described in section 14. The test count covers both rooms: 87 unit and page tests and 14 browser tests. Tests add 1,218 lines.</p>
   <h3>The three maps</h3>
   <table>
     <tr><th>Map</th><th>Layout</th><th>Goal</th><th class="num">Car top speed</th><th class="num">Police</th><th class="num">Time</th></tr>
@@ -132,6 +132,7 @@ pre .c{ color:#7fd4e2; }
     <tr><td>1.2</td><td>Engine sound rebuilt as a tested physical model with real engine layouts, per-vehicle gearboxes and separate load and overrun loops (section 09).</td></tr>
     <tr><td>1.3</td><td>Motorcycle and truck rebuilt: a superbike with a visible inline four, twin-spar frame, upside-down fork, brake discs and an anatomically posed rider; a European cab-over tractor with windscreen, grille, mirrors, open chassis, fuel tank, trailer lines, fifth wheel and twin rear tyres.</td></tr>
     <tr><td>1.4</td><td>Five wanted stars replace the heat level, so the chase gets harder over time; a police helicopter with a searchlight comes with the fifth star.</td></tr>
+    <tr><td>1.5</td><td>A real idle sound for each engine; brake lights with a glow on all three vehicles.</td></tr>
   </table>
 </section>
 
@@ -150,14 +151,14 @@ pre .c{ color:#7fd4e2; }
   </div>
   <table>
     <tr><th>Language</th><th class="num">Lines</th><th class="num">Share</th><th class="num">Characters</th><th class="num">Share</th><th>Role in the game</th></tr>
-    <tr><td>JavaScript</td><td class="num">4,640</td><td class="num">90.3 %</td><td class="num">300,820</td><td class="num">87.0 %</td><td>All logic: rules (core.js), worlds, vehicles, AI, physics, audio, HUD, menus, error screen</td></tr>
-    <tr><td>CSS</td><td class="num">339</td><td class="num">6.6 %</td><td class="num">29,006</td><td class="num">8.4 %</td><td>Look of the HUD, cockpit, menus, warnings, error screen</td></tr>
+    <tr><td>JavaScript</td><td class="num">4,667</td><td class="num">90.3 %</td><td class="num">303,252</td><td class="num">87.1 %</td><td>All logic: rules (core.js), worlds, vehicles, AI, physics, audio, HUD, menus, error screen</td></tr>
+    <tr><td>CSS</td><td class="num">339</td><td class="num">6.6 %</td><td class="num">29,006</td><td class="num">8.3 %</td><td>Look of the HUD, cockpit, menus, warnings, error screen</td></tr>
     <tr><td>HTML</td><td class="num">138</td><td class="num">2.7 %</td><td class="num">10,105</td><td class="num">2.9 %</td><td>Page skeleton, HUD panels, gauge and icons (inline SVG), script order, security policy</td></tr>
     <tr><td>GLSL</td><td class="num">17</td><td class="num">0.3 %</td><td class="num">1,554</td><td class="num">0.4 %</td><td>Sky gradient and the boundary force field (run on the GPU)</td></tr>
     <tr><td>SVG in JS strings</td><td class="num">6</td><td class="num">0.1 %</td><td class="num">4,386</td><td class="num">1.3 %</td><td>Vehicle and map icons in the start menu</td></tr>
     <tr><td><b>Python</b></td><td class="num"><b>0</b></td><td class="num"><b>0 %</b></td><td class="num"><b>0</b></td><td class="num"><b>0 %</b></td><td>Not used</td></tr>
   </table>
-  <p class="mono" style="color:var(--muted)">Game code of version 1.0: 5,140 lines, 345,871 characters. The tests (1,189 lines), the dev server and SRI checker are JavaScript too; the CI pipeline is YAML. About 170 of the JavaScript lines are comments, including the “###” explanations.</p>
+  <p class="mono" style="color:var(--muted)">Game code of version 1.0: 5,167 lines, 348,303 characters. The tests (1,218 lines), the dev server and SRI checker are JavaScript too; the CI pipeline is YAML. About 170 of the JavaScript lines are comments, including the “###” explanations.</p>
   <h3>External code that is loaded, not written</h3>
   <table>
     <tr><th>Library</th><th>Language</th><th>Purpose</th></tr>
@@ -279,18 +280,18 @@ composer.render()  or  renderer.render(scene, camera)               <span class=
     <tr><td class="num">1,638</td><td>Highway traffic</td><td>Lane traffic both ways, recycling</td><td><code>updateTraffic</code>, <code>spawnVehicle</code></td></tr>
     <tr><td class="num">1,715</td><td>Countryside</td><td>Spline road, terrain, farms, village, traffic</td><td><code>buildCountry</code>, <code>roadPoint</code>, <code>roadQuery</code></td></tr>
     <tr><td class="num">2,034</td><td>Player vehicles</td><td>Coupe, superbike, tractor unit</td><td><code>setVehicle</code></td></tr>
-    <tr><td class="num">2,373</td><td>Police</td><td>Spawning, chase AI, ramming, bust meter (rules in core.js)</td><td><code>updatePolice</code>, <code>spawnPolice</code>, <code>heat</code></td></tr>
-    <tr><td class="num">2,732</td><td>Pickups</td><td>Shards, repair kits, finish gate and toll</td><td><code>placeRun</code></td></tr>
-    <tr><td class="num">2,815</td><td>Particles &amp; smoke</td><td>Sparks and damage smoke</td><td><code>burst</code>, <code>updateSmoke</code></td></tr>
-    <tr><td class="num">2,868</td><td>Sound</td><td>Plays the engine model, pops, turbo, air brakes, road, wind, tyres, siren</td><td><code>setEngineVoice</code>, <code>updateEngine</code></td></tr>
-    <tr><td class="num">3,021</td><td>Map boundary</td><td>Force-field wall, edge distance, HUD warning</td><td><code>buildBoundary</code>, <code>boundaryDistance</code>, <code>updateBoundary</code></td></tr>
-    <tr><td class="num">3,097</td><td>Input</td><td>Keyboard, touch pads, audio suspend, error-screen and lost-graphics hooks</td><td><code>keys</code></td></tr>
-    <tr><td class="num">3,133</td><td>HUD</td><td>Gauges, pedals, pursuit, radar</td><td><code>updateHud</code>, <code>drawRadar</code>, <code>initGauge</code></td></tr>
-    <tr><td class="num">3,378</td><td>Game state</td><td>Runs, events, result cards, showroom menu, validated clicks</td><td><code>startRun</code>, <code>finish</code>, <code>showMenu</code></td></tr>
-    <tr><td class="num">3,655</td><td>Physics</td><td>Driving model, collisions, cameras</td><td><code>updateCar</code>, <code>chaseCam</code>, <code>camClip</code></td></tr>
-    <tr><td class="num">3,865</td><td>Graphics quality</td><td>Ultra / Balanced, bloom composer</td><td><code>applyGfx</code>, <code>buildComposer</code></td></tr>
-    <tr><td class="num">3,900</td><td>Story mode</td><td>Three acts, radio timeline, letter, courier lorry, endings</td><td><code>startStoryAct</code>, <code>updateStory</code>, <code>showEnding</code>, <code>warmUp</code></td></tr>
-    <tr><td class="num">4,119</td><td>Loop</td><td>Resize handling and the frame loop</td><td><code>frame</code>, <code>resize</code></td></tr>
+    <tr><td class="num">2,382</td><td>Police</td><td>Spawning, chase AI, ramming, bust meter (rules in core.js)</td><td><code>updatePolice</code>, <code>spawnPolice</code>, <code>heat</code></td></tr>
+    <tr><td class="num">2,741</td><td>Pickups</td><td>Shards, repair kits, finish gate and toll</td><td><code>placeRun</code></td></tr>
+    <tr><td class="num">2,824</td><td>Particles &amp; smoke</td><td>Sparks and damage smoke</td><td><code>burst</code>, <code>updateSmoke</code></td></tr>
+    <tr><td class="num">2,877</td><td>Sound</td><td>Plays the engine model, pops, turbo, air brakes, road, wind, tyres, siren</td><td><code>setEngineVoice</code>, <code>updateEngine</code></td></tr>
+    <tr><td class="num">3,031</td><td>Map boundary</td><td>Force-field wall, edge distance, HUD warning</td><td><code>buildBoundary</code>, <code>boundaryDistance</code>, <code>updateBoundary</code></td></tr>
+    <tr><td class="num">3,107</td><td>Input</td><td>Keyboard, touch pads, audio suspend, error-screen and lost-graphics hooks</td><td><code>keys</code></td></tr>
+    <tr><td class="num">3,143</td><td>HUD</td><td>Gauges, pedals, pursuit, radar</td><td><code>updateHud</code>, <code>drawRadar</code>, <code>initGauge</code></td></tr>
+    <tr><td class="num">3,388</td><td>Game state</td><td>Runs, events, result cards, showroom menu, validated clicks</td><td><code>startRun</code>, <code>finish</code>, <code>showMenu</code></td></tr>
+    <tr><td class="num">3,665</td><td>Physics</td><td>Driving model, collisions, cameras</td><td><code>updateCar</code>, <code>chaseCam</code>, <code>camClip</code></td></tr>
+    <tr><td class="num">3,881</td><td>Graphics quality</td><td>Ultra / Balanced, bloom composer</td><td><code>applyGfx</code>, <code>buildComposer</code></td></tr>
+    <tr><td class="num">3,916</td><td>Story mode</td><td>Three acts, radio timeline, letter, courier lorry, endings</td><td><code>startStoryAct</code>, <code>updateStory</code>, <code>showEnding</code>, <code>warmUp</code></td></tr>
+    <tr><td class="num">4,135</td><td>Loop</td><td>Resize handling and the frame loop</td><td><code>frame</code>, <code>resize</code></td></tr>
   </table>
   <h3>src/core.js: the rules</h3>
   <table>
@@ -402,7 +403,7 @@ damage += max(0, (impact − 3) · 1.6 · VEH.dmg)              <span class="c">
   <div class="eyebrow">09 · Sound and interface</div>
   <h2>Sound, HUD and menu</h2>
   <h3>Engine sound</h3>
-  <p>The engine is a small <b>physical model</b> in <code>core.js</code>. <code>engineLoop()</code> sends one pressure pulse per cylinder firing into an exhaust pipe that reflects at its open end, then through muffler resonances that stay at the same frequencies at every rpm. The firing frequency is rpm / 60 × cylinders / 2: a 6,000 rpm V8 fires at 400 Hz, a 1,500 rpm truck six at 75 Hz. <code>engineLoops()</code> renders each engine at five rpms, once under load and once on overrun, because a real engine sounds different when the driver lifts. At runtime <code>updateEngine()</code> pitches the loops to the current rpm and crossfades by rpm and throttle, the way racing games blend recorded engine loops.</p>
+  <p>The engine is a small <b>physical model</b> in <code>core.js</code>. <code>engineLoop()</code> sends one pressure pulse per cylinder firing into an exhaust pipe that reflects at its open end, then through muffler resonances that stay at the same frequencies at every rpm. The firing frequency is rpm / 60 × cylinders / 2: a 6,000 rpm V8 fires at 400 Hz, a 1,500 rpm truck six at 75 Hz. <code>engineLoops()</code> renders each engine at five rpms, once under load and once on overrun, because a real engine sounds different when the driver lifts. The lowest rpm has an idle loop instead: the engine fires at part load with sharp pulses, each cycle a little different, and the valve train, clutch or diesel knock is clearly audible. At runtime its pitch slowly hunts by about 2 %. At runtime <code>updateEngine()</code> pitches the loops to the current rpm and crossfades by rpm and throttle, the way racing games blend recorded engine loops.</p>
   <table>
     <tr><th>Vehicle</th><th>Engine</th><th class="num">rpm range</th><th class="num">Gears</th><th>Character</th></tr>
     <tr><td>Car</td><td>Cross-plane V8</td><td class="num">750–6,800</td><td class="num">6</td><td>Two banks fire L R R L R L L R into pipes of different length: the V8 burble; overrun pops</td></tr>

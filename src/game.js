@@ -2049,6 +2049,8 @@ const limb = (a, b, r0, r1, seg) => {
 const ball = (p, r, sx, sy, sz) => new THREE.SphereGeometry(r, 12, 9).scale(sx || 1, sy || 1, sz || 1).translate(p[0], p[1], p[2]);
 const MODELS = {};
 const headlights = [], beams = [];
+// the player's tail lights: dim red, and bright with a glow around each lamp while braking
+const brakeLights = { mat: new THREE.MeshBasicMaterial({ color: 0x7a0c14 }), glows: [], on: false };
 (function buildPlayerModels(){
   const mk = (geo, mat, parent) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; parent.add(m); return m; };
   const paintMat = (hex, rough, metal) => { const m = new THREE.MeshPhysicalMaterial({ color: hex, roughness: rough, metalness: metal, clearcoat: 1, clearcoatRoughness: 0.05 }); m.userData.env = 1.15; return m; };
@@ -2061,7 +2063,11 @@ const headlights = [], beams = [];
     return extrudeProfile(sh, thick, thick * 0.3).translate(side * x, 0, 0);
   });
   const led = new THREE.MeshBasicMaterial({ color: 0xeef6ff });
-  const red = SHARED.tail;
+  const red = brakeLights.mat;
+  const brakeGlow = (group, lamps, size) => lamps.forEach(p => {
+    const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color: 0xff2030, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
+    s.position.set(p[0], p[1], p[2]); s.scale.setScalar(size); s.visible = false; group.add(s); brakeLights.glows.push(s);
+  });
   const gun = new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 0.32, metalness: 0.85 }); gun.userData.env = 1;
   const alu = new THREE.MeshStandardMaterial({ color: 0xd9dde3, roughness: 0.18, metalness: 0.95 }); alu.userData.env = 1.25;
   const smoke = new THREE.MeshStandardMaterial({ color: 0x10141c, roughness: 0.05, metalness: 0.6, transparent: true, opacity: 0.6 }); smoke.userData.env = 1.3;
@@ -2144,6 +2150,7 @@ const headlights = [], beams = [];
     const wheels = [], pivots = [];
     [[0.86, 1.45, true], [-0.86, 1.45, true], [0.88, -1.35, false], [-0.88, -1.35, false]].forEach(([x, z, f]) =>
       wheel(g, { x, z, r: 0.38, w: 0.3, rim: gun, spokes: 5, caliper: 0xd0202a, front: f, list: wheels, pivots }));
+    brakeGlow(g, [[0.72, 0.82, -2.56], [-0.72, 0.82, -2.56], [0, 0.87, -2.5]], 1.25);
     MODELS.car = { g, paint: pm, base: C(base), wheels, pivots, r: 0.38 };
   }
 
@@ -2251,6 +2258,7 @@ const headlights = [], beams = [];
     mk(mergeGeos([boxG(0.25, 0.035, 0.1, 0, 0.6, -0.24), boxG(0.26, 0.05, 0.1, 0, 0.49, -0.2), ...[-1, 1].map(sd => boxG(0.045, 0.07, 0.07, sd * 0.09, -0.005, 0.005))]), alu, fork);
     mk(mergeGeos([-1, 1].flatMap(sd => [boxG(0.05, 0.13, 0.05, sd * 0.09, 0.09, -0.135, -0.5), boxG(0.03, 0.05, 0.05, sd * 0.06, 0.12, -0.13)])), gold, fork);
     const fender = new THREE.Mesh(extrudeProfile(shp([[0.25, 0.14], [0.14, 0.3], [-0.06, 0.345], [-0.25, 0.2], [-0.2, 0.2], [-0.06, 0.31], [0.12, 0.27], [0.21, 0.13]]), 0.13, 0.008), carbon); fork.add(fender);
+    brakeGlow(root, [[0, 1.1, -1.13]], 0.9);
     MODELS.bike = { g: root, paint: pm, base: C(base), wheels, pivots, r: 0.31 };
   }
 
@@ -2344,6 +2352,7 @@ const headlights = [], beams = [];
     const wheels = [], pivots = [];
     [[1.1, 2.0, true, 0.32], [-1.1, 2.0, true, 0.32], [0.76, -1.7, false, 0.26], [1.06, -1.7, false, 0.26], [-0.76, -1.7, false, 0.26], [-1.06, -1.7, false, 0.26]].forEach(([x, z, f, w]) =>
       wheel(g, { x, z, r: 0.52, w, tyre: 0.22, rim: alu, solid: true, front: f, list: wheels, pivots }));
+    brakeGlow(g, [[0.98, 0.86, -3.32], [-0.98, 0.86, -3.32]], 1.6);
     MODELS.truck = { g, paint: pm, base: C(base), wheels, pivots, r: 0.52 };
   }
 
@@ -2964,7 +2973,7 @@ function engineRpm(){ return eng.rpm; }
 function updateEngine(dt){
   const sp = Math.abs(car.speed), live = state === 'play', E = ENGINES[V.key];
   const pedal = live && (keys.up || (keys.down && car.speed <= 0.5)) ? 1 : 0;
-  const braking = live && (keys.brake || (keys.down && car.speed > 0.5));
+  const braking = live && Core.isBraking(car.speed, keys.down, keys.up, keys.brake);
   if (live){ const g = Core.gearFor(E, eng.gear, car.speed, pedal); if (g > eng.gear) eng.shift = E.shift; eng.gear = g; }
   else if (sp < 1) eng.gear = 1;
   if (eng.shift > 0) eng.shift -= dt;
@@ -2981,7 +2990,8 @@ function updateEngine(dt){
   else if (rpm >= refs[refs.length - 1]) w[refs.length - 1] = 1;
   else { let i = 0; while (rpm > refs[i + 1]) i++; const f = Math.log(rpm / refs[i]) / Math.log(refs[i + 1] / refs[i]); w[i] = Math.cos(f * Math.PI / 2); w[i + 1] = Math.sin(f * Math.PI / 2); }
   const fuel = throttle && rpm > E.max * 0.995 && Math.sin(clock * 55) < 0 ? 0 : eng.load, onW = Math.sin(fuel * Math.PI / 2), offW = Math.cos(fuel * Math.PI / 2);
-  a.layers.forEach((l, i) => { const r = i >> 1; l.src.playbackRate.setTargetAtTime(clamp(rpm / l.ref, 0.4, 2.5), t, 0.02); l.g.gain.setTargetAtTime(w[r] * (i & 1 ? offW : onW), t, 0.03); });
+  const hunt = w[0] * offW * (0.012 * Math.sin(clock * 2.1) + 0.007 * Math.sin(clock * 5.3 + 1));
+  a.layers.forEach((l, i) => { const r = i >> 1; l.src.playbackRate.setTargetAtTime(clamp(rpm / l.ref + hunt, 0.4, 2.5), t, 0.02); l.g.gain.setTargetAtTime(w[r] * (i & 1 ? offW * (r ? 1 : E.idling.gain) : onW), t, 0.03); });
   const on = live && !muted;
   let vol = (0.3 + 0.06 * eng.load) * E.vol;
   // a badly damaged engine misfires
@@ -3746,6 +3756,12 @@ function applyCarMesh(dt){
   carGroup.position.set(car.x, car.y, car.z);
   carGroup.rotation.y = car.heading;
   const sp = Math.abs(car.speed), md = MODELS[V.key];
+  const braking = state === 'play' && Core.isBraking(car.speed, keys.down, keys.up, keys.brake);
+  if (braking !== brakeLights.on){
+    brakeLights.on = braking;
+    brakeLights.mat.color.setHex(braking ? 0xff2a38 : 0x7a0c14);
+    brakeLights.glows.forEach(s => { s.visible = braking; });
+  }
   carTilt.rotation.x = -(car.pitch + car.bodyPitch);
   if (V.key === 'bike'){
     car.lean += (-car.steer * Math.min(1, sp / 18) * 0.5 - car.lean) * Math.min(1, 8 * dt);
