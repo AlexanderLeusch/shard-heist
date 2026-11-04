@@ -180,12 +180,34 @@
   const isWrecked = damage => damage >= 100;
 
   // ---------- Police pressure ----------
-  // ### Heat (1-3) sets how many police cars chase you: in the city it rises every three shards, on the open roads with
-  // ### distance. The bust meter fills while a cop is within 9 m and you are almost stopped, and drains otherwise.
-  function heatLevel(modeKey, collected, distance){
-    if (modeKey === 'city') return 1 + Math.min(2, Math.floor(Math.max(0, collected) / 3));
-    return 1 + (distance > 1200 ? 1 : 0) + (distance > 2500 ? 1 : 0);
+  // ### Wanted stars (1-5) rise with the time on the run and with the progress towards the end, whichever is further along.
+  // ### Each wrecked police car adds a little, and stars never fall. PURSUIT says what each star means. The fifth star comes in
+  // ### the last fifth of a run and brings the helicopter. The bust meter fills while a cop is within 9 m and you are almost
+  // ### stopped, and drains otherwise.
+  const PURSUIT = Object.freeze([
+    Object.freeze({ cops: 1, speed: 1, spawn: 3, respawn: 9, hp: 3 }),
+    Object.freeze({ cops: 2, speed: 1, spawn: 3, respawn: 9, hp: 3 }),
+    Object.freeze({ cops: 3, speed: 1.03, spawn: 3, respawn: 8, hp: 3 }),
+    Object.freeze({ cops: 3, speed: 1.06, spawn: 2.5, respawn: 6, hp: 3.5 }),
+    Object.freeze({ cops: 4, speed: 1.1, spawn: 2, respawn: 4.5, hp: 4 })
+  ]);
+  const MAX_STARS = PURSUIT.length, SPOT_RADIUS = 9;
+  function wantedStars(prev, elapsed, limit, progress, wrecked){
+    const time = limit > 0 ? clamp(elapsed / limit, 0, 1) : 0;
+    const score = Math.max(time, clamp(progress || 0, 0, 1)) + Math.max(0, wrecked || 0) * 0.04;
+    return clamp(Math.max(prev || 1, 1 + Math.floor(score * MAX_STARS)), 1, MAX_STARS);
   }
+  const pursuit = stars => PURSUIT[clamp(Math.round(stars) || 1, 1, MAX_STARS) - 1];
+  const helicopterDue = stars => stars >= MAX_STARS;
+  // A police car's top speed: its map's speed, faster with more stars, when far behind, and when the helicopter has you in its light
+  const copTopSpeed = (base, stars, dist, spotted) => base * pursuit(stars).speed * (dist > 140 ? 1.2 : 1) * (spotted ? 1.06 : 1);
+  // Moves a point towards a target at no more than maxSpeed, and never past it: the helicopter and its searchlight
+  function trackStep(x, z, tx, tz, maxSpeed, dt){
+    const dx = tx - x, dz = tz - z, d = Math.hypot(dx, dz), step = maxSpeed * clamp(dt, 0, MAX_DT);
+    if (d <= step || d === 0) return [tx, tz];
+    return [x + dx / d * step, z + dz / d * step];
+  }
+  const inSpotlight = (sx, sz, x, z) => Math.hypot(x - sx, z - sz) <= SPOT_RADIUS;
   function bustStep(bust, nearestCop, speed, dt){
     dt = clamp(dt, 0, MAX_DT);
     bust = nearestCop < 9 && Math.abs(speed) < 4.5 ? bust + dt / 2.2 : Math.max(0, bust - dt / 3);
@@ -358,15 +380,44 @@
     return loops;
   }
 
+  // ### The helicopter's sound, one seamless loop: every blade passing makes a low thump with a short slap (four blades at six
+  // ### turns a second, 24 passes a second), over the buzz of the tail rotor, the turbine's whine and the rumble of the air.
+  const ROTOR = Object.freeze({ blades: 4, rps: 6, revs: 12, tail: 132, turbine: [3400, 5100] });
+  function rotorLoop(sr, seed){
+    const R = ROTOR, rnd = mulberry32(seed), n = Math.round(sr * R.revs / R.rps), d = new Float32Array(n), TAU = 2 * Math.PI, passes = R.blades * R.revs;
+    const trim = []; for (let i = 0; i < R.blades; i++) trim.push(1 + (rnd() - 0.5) * 0.3);
+    const L = Math.round(0.07 * sr);
+    for (let c = 0; c < passes; c++){
+      const s0 = Math.round((c + (rnd() - 0.5) * 0.02) / passes * n), amp = trim[c % R.blades] * (0.9 + rnd() * 0.2);
+      let slap = 0;
+      for (let k = 0; k < L; k++){
+        const t = k / sr, onset = 1 - Math.exp(-t * 700);
+        slap += 0.3 * (rnd() * 2 - 1 - slap);
+        d[(s0 + k) % n] += amp * onset * (Math.exp(-t * 38) * (Math.sin(TAU * 78 * t) + 0.45 * Math.sin(TAU * 165 * t)) + 0.5 * Math.exp(-t * 130) * slap);
+      }
+    }
+    // tones at whole cycles per loop, so they join without a click
+    const tone = f => Math.round(f * n / sr) / n * TAU;
+    const tail = tone(R.tail), tail2 = tone(R.tail * 2), t0 = tone(R.turbine[0]), t1 = tone(R.turbine[1]);
+    let rumble = 0;
+    for (let pass = 0; pass < 2; pass++) for (let i = 0; i < n; i++){
+      rumble += 0.03 * (rnd() * 2 - 1 - rumble);
+      if (pass) d[i] += 0.1 * Math.sin(tail * i) + 0.05 * Math.sin(tail2 * i) + 0.012 * Math.sin(t0 * i) + 0.007 * Math.sin(t1 * i) + 2.2 * rumble;
+    }
+    let peak = 0; for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(d[i]));
+    for (let i = 0; i < n; i++) d[i] *= 0.95 / peak;
+    return d;
+  }
+
   return Object.freeze({
     MODES, VEH, REV_SPEED, REPAIR_AMOUNT, MAX_DT, STORY_ACTS, KEY_MAP, BAIXA, streetAt, TRAM_LOOP, tramNext,
     isMode, isVeh, clamp, wrapAngle, mulberry32, shuffle, fmtTime, fmtTimeExact, frameDt,
     parsePick, parseBest, applyPick, actionAllowed,
     vehStats, zeroTo80, topSpeed, stepSpeed, collidePoint,
     crashDamage, addDamage, repairDamage, isWrecked,
-    heatLevel, bustStep, edgeDistance,
+    PURSUIT, MAX_STARS, SPOT_RADIUS, wantedStars, pursuit, helicopterDue, copTopSpeed, trackStep, inSpotlight, bustStep, edgeDistance,
     driveTime, runStars, isNewBest,
     newStory, beginAct, retryAct, finishOpen, storyEnding, dueRadio,
-    ENGINES, ENGINE_SR, gearFor, engineTarget, engineLoop, engineLoops
+    ENGINES, ENGINE_SR, gearFor, engineTarget, engineLoop, engineLoops, ROTOR, rotorLoop
   });
 });

@@ -70,6 +70,11 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-display);overflow
 .pur-title{font-size:14px;font-weight:700}
 .pur-state{margin-left:auto;font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .pursuit.close .pur-state{color:var(--stop)}
+.stars{display:flex;gap:3px}
+.stars i{width:17px;height:17px;background:rgba(255,255,255,.16);clip-path:polygon(50% 0,62% 35%,98% 35%,69% 57%,80% 92%,50% 71%,20% 92%,31% 57%,2% 35%,38% 35%);transition:background .25s}
+.stars i.on{background:var(--gold)}
+.stars.max i.on{animation:starflash .5s steps(1) infinite}
+@keyframes starflash{50%{background:var(--stop)}}
 .cops{display:flex;gap:5px}
 .cops i{width:22px;height:8px;border-radius:3px;background:rgba(255,255,255,.1)}
 .cops i.on{background:linear-gradient(90deg,var(--cop-red) 50%,var(--cop-blue) 50%);box-shadow:0 0 8px rgba(47,107,255,.5)}

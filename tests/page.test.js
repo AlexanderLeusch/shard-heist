@@ -220,3 +220,13 @@ test('the motorcycle and the truck are modelled like the real thing', () => {
   for (const piece of ['windscreen', 'grille', 'mirrors', 'fifth wheel', 'fuel tank', 'air and electric lines', 'mudguards']) assert.match(truck, new RegExp(piece), 'truck: ' + piece);
   assert.equal((truck.match(/false, 0\.26\]/g) || []).length, 4, 'twin tyres on each side of the rear axle');
 });
+
+test('the wanted stars and the helicopter are wired up', () => {
+  assert.equal((html.match(/id="stars"[^>]*>(<i><\/i>){5}/) || []).length > 0, true, 'five stars in the HUD');
+  assert.equal((html.match(/id="cops">(<i><\/i>){4}/) || []).length > 0, true, 'four police slots');
+  assert.match(game, /Core\.helicopterDue\(stars\)/);
+  assert.match(game, /Core\.copTopSpeed\(M\.police, stars, dist, heli\.spotted\)/);
+  assert.doesNotMatch(game, /heatLevel|heat\(\)/, 'stars replaced the old heat level');
+  assert.match(game, /Core\.rotorLoop\(/, 'the rotor sound comes from the tested loop');
+  for (const piece of ['bubble canopy', 'engine hump', 'tail boom', 'skids', 'searchlight', 'four tapered', 'tail rotor']) assert.match(game, new RegExp(piece), 'helicopter: ' + piece);
+});

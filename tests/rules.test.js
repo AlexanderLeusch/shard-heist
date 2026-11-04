@@ -132,10 +132,43 @@ test('bust meter: fills only when slow next to a cop, drains otherwise, busts at
   assert.deepEqual(b, { bust: 1, busted: true });
 });
 
-test('heat: more police with more shards (city) or more distance (open road), never above 3', () => {
-  assert.deepEqual([0, 3, 6, 9, 30].map(n => Core.heatLevel('city', n, 0)), [1, 2, 3, 3, 3]);
-  assert.deepEqual([0, 1300, 2600, 9999].map(d => Core.heatLevel('highway', 0, d)), [1, 2, 3, 3]);
-  assert.equal(Core.heatLevel('city', -4, 0), 1);
+test('wanted stars rise with time or progress, never fall, stay within 1-5, and wrecks add to them', () => {
+  assert.deepEqual([0, 35, 37, 73, 109, 145, 180, 999].map(t => Core.wantedStars(1, t, 180, 0, 0)), [1, 1, 2, 3, 4, 5, 5, 5]);
+  assert.deepEqual([0, 0.2, 0.4, 0.6, 0.8, 1, 5].map(p => Core.wantedStars(1, 0, 180, p, 0)), [1, 2, 3, 4, 5, 5, 5]);
+  assert.equal(Core.wantedStars(4, 0, 180, 0, 0), 4, 'stars never fall');
+  assert.equal(Core.wantedStars(1, 0, 180, 0, 5), 2, 'five wrecks are worth a star');
+  // rejected and odd input
+  assert.equal(Core.wantedStars(undefined, -50, 180, -1, -3), 1);
+  assert.equal(Core.wantedStars(1, 10, 0, NaN, NaN), 1);
+  assert.equal(Core.wantedStars(99, 0, 180, 0, 0), 5);
+});
+
+test('every star makes the chase at least as hard', () => {
+  for (let s = 2; s <= Core.MAX_STARS; s++){
+    const a = Core.pursuit(s - 1), b = Core.pursuit(s);
+    assert.ok(b.cops >= a.cops && b.speed >= a.speed && b.spawn <= a.spawn && b.respawn <= a.respawn && b.hp >= a.hp, 'star ' + s);
+  }
+  assert.equal(Core.pursuit(1).cops, 1);
+  assert.equal(Core.pursuit(0), Core.pursuit(1));
+  assert.equal(Core.pursuit(40), Core.pursuit(5));
+  assert.ok(Core.copTopSpeed(33, 5, 50, false) > Core.copTopSpeed(33, 1, 50, false));
+  assert.ok(Core.copTopSpeed(33, 3, 50, true) > Core.copTopSpeed(33, 3, 50, false), 'the spotlight helps the police');
+  assert.ok(Core.copTopSpeed(33, 1, 200, false) > Core.copTopSpeed(33, 1, 100, false), 'far behind they catch up');
+});
+
+test('the helicopter comes only with the fifth star, in the last fifth of a run', () => {
+  assert.deepEqual([1, 2, 3, 4, 5].map(Core.helicopterDue), [false, false, false, false, true]);
+  assert.equal(Core.wantedStars(1, 180 * 0.79, 180, 0, 0), 4);
+  assert.equal(Core.wantedStars(1, 180 * 0.81, 180, 0, 0), 5);
+});
+
+test('the searchlight moves at its speed limit, never overshoots, and catches only a point inside its radius', () => {
+  assert.deepEqual(Core.trackStep(0, 0, 100, 0, 30, 0.05), [1.5, 0]);
+  assert.deepEqual(Core.trackStep(0, 0, 1, 0, 30, 0.05), [1, 0], 'stops on the target');
+  assert.deepEqual(Core.trackStep(5, 5, 5, 5, 30, 0.05), [5, 5]);
+  assert.deepEqual(Core.trackStep(0, 0, 100, 0, 30, 9), [1.5, 0], 'a slow frame cannot teleport it');
+  assert.equal(Core.inSpotlight(0, 0, Core.SPOT_RADIUS, 0), true);
+  assert.equal(Core.inSpotlight(0, 0, Core.SPOT_RADIUS + 0.1, 0), false);
 });
 
 test('boundary distance shrinks towards every edge; the highway only has two ends', () => {
@@ -296,4 +329,17 @@ test('engine loops: louder with rpm and under load, within range, the same for t
   }
   const a = Core.engineLoop(Core.ENGINES.car, 1500, true, Core.ENGINE_SR, 9), b = Core.engineLoop(Core.ENGINES.car, 1500, true, Core.ENGINE_SR, 9);
   assert.deepEqual(a, b);
+});
+
+test('the rotor loop thumps at the blade-pass rate and repeats seamlessly', () => {
+  const SR = Core.ENGINE_SR, R = Core.ROTOR, d = Core.rotorLoop(SR, 7);
+  assert.equal(R.blades * R.rps, 24, 'four blades at six turns a second');
+  assert.equal(d.length, Math.round(SR * R.revs / R.rps));
+  assert.ok(d.every(v => Math.abs(v) <= 1 && Number.isFinite(v)));
+  const lag = Math.round(SR / (R.blades * R.rps));
+  assert.ok(similarity(d, lag) > 0.5, 'repeats at each blade pass: ' + similarity(d, lag));
+  assert.ok(similarity(d, Math.round(lag / 2)) < similarity(d, lag), 'not at half a pass');
+  let steps = 0; for (let i = 1; i < d.length; i++) steps += (d[i] - d[i - 1]) ** 2;
+  assert.ok(Math.abs(d[0] - d[d.length - 1]) < 8 * Math.sqrt(steps / d.length), 'joins without a jump');
+  assert.deepEqual(Core.rotorLoop(SR, 7), d, 'the same for the same seed');
 });

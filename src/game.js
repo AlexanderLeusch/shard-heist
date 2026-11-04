@@ -2038,6 +2038,15 @@ function routeProgress(){ return mode === 'highway' ? [car.z, HW.LEN] : [roadPos
 const carGroup = new THREE.Group(), carTilt = new THREE.Group();
 carGroup.add(carTilt); scene.add(carGroup);
 const PAINT_DEAD = C(0x2a2522);
+// A tapered tube from point a to point b, and a scaled ball: limbs, pipes and joints
+const limb = (a, b, r0, r1, seg) => {
+  const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), d = B.clone().sub(A), L = d.length();
+  const g = new THREE.CylinderGeometry(r1, r0, L, seg || 10), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+  g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(q));
+  const M = A.clone().add(B).multiplyScalar(0.5); g.translate(M.x, M.y, M.z);
+  return g;
+};
+const ball = (p, r, sx, sy, sz) => new THREE.SphereGeometry(r, 12, 9).scale(sx || 1, sy || 1, sz || 1).translate(p[0], p[1], p[2]);
 const MODELS = {};
 const headlights = [], beams = [];
 (function buildPlayerModels(){
@@ -2045,15 +2054,6 @@ const headlights = [], beams = [];
   const paintMat = (hex, rough, metal) => { const m = new THREE.MeshPhysicalMaterial({ color: hex, roughness: rough, metalness: metal, clearcoat: 1, clearcoatRoughness: 0.05 }); m.userData.env = 1.15; return m; };
   const shp = pts => { const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) s.lineTo(pts[i][0], pts[i][1]); s.closePath(); return s; };
   const cyl = (r0, r1, len, seg) => new THREE.CylinderGeometry(r0, r1, len, seg || 14);
-  // A tapered tube from point a to point b, and a scaled ball: limbs, pipes and joints
-  const limb = (a, b, r0, r1, seg) => {
-    const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), d = B.clone().sub(A), L = d.length();
-    const g = cyl(r1, r0, L, seg || 10), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
-    g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(q));
-    const M = A.clone().add(B).multiplyScalar(0.5); g.translate(M.x, M.y, M.z);
-    return g;
-  };
-  const ball = (p, r, sx, sy, sz) => new THREE.SphereGeometry(r, 12, 9).scale(sx || 1, sy || 1, sz || 1).translate(p[0], p[1], p[2]);
   const pipe = (pts, r) => pts.slice(1).flatMap((p, i) => [limb(pts[i], p, r, r, 8), ball(p, r)]);
   // A thin side panel with optional holes, on both sides of the centre line
   const sidePanels = (pts, x, thick, holes) => [-1, 1].map(side => {
@@ -2371,8 +2371,8 @@ function setVehicle(key){
 const car = { x: 0, z: 0, y: 0, heading: 0, speed: 0, steer: 0, pitch: 0, roll: 0, bodyPitch: 0, shake: 0, wheelRot: 0, prevSpeed: 0, lean: 0 };
 
 // ---------- Police ----------
-// ### Up to three police cars with flashing light bars, a real point light and a siren. Heat (how many chase you) rises
-// ### with shards collected or distance driven. In the city police follow the street grid until they see you (line of sight),
+// ### Up to four police cars with flashing light bars, a real point light and a siren. Wanted stars (Core.wantedStars) rise
+// ### with time and progress and set how many chase you, how fast, and how quickly wrecked cars come back. In the city police follow the street grid until they see you (line of sight),
 // ### on the highway they weave around traffic, in the countryside they follow the road. They reverse when stuck, can be
 // ### rammed until wrecked, and fill the bust meter when they are right next to you while you are nearly stopped.
 const police = [];
@@ -2389,7 +2389,7 @@ const policeTex = (() => {
   const black = new THREE.MeshPhysicalMaterial({ color: 0x14161c, roughness: 0.3, metalness: 0.5, clearcoat: 1, clearcoatRoughness: 0.06 }); black.userData.env = 0.9;
   const white = new THREE.MeshPhysicalMaterial({ color: 0xf2f3f6, roughness: 0.3, metalness: 0.3, clearcoat: 1, clearcoatRoughness: 0.06 }); white.userData.env = 0.8;
   const doorMat = new THREE.MeshStandardMaterial({ map: policeTex, roughness: 0.35, metalness: 0.2 });
-  for (let i = 0; i < 3; i++){
+  for (let i = 0; i < Core.pursuit(Core.MAX_STARS).cops; i++){
     const g = new THREE.Group();
     const mk = (geo, mat) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; g.add(m); return m; };
     mk(P.bodyOnly, black); mk(P.roof, white); mk(P.glass, SHARED.glass); mk(P.trim, SHARED.trim); mk(P.chrome, SHARED.chrome); mk(P.tire, SHARED.tire); mk(P.head, SHARED.head); mk(P.tail, SHARED.tail); mk(P.lens, SHARED.lens);
@@ -2409,9 +2409,16 @@ const policeTex = (() => {
     police.push({ g, red, blue, sRed, sBlue, light, idx: i, active: false, x: 0, z: 0, heading: 0, speed: 0, steer: 0, hp: 3, stun: 0, stuck: 0, rev: 0, wp: null, respawn: 0, hitCool: 0 });
   }
 })();
-let spawnTimer = 0, bust = 0, copsWrecked = 0, copsWarned = false, nearestCop = Infinity;
-function heat(){
-  return Core.heatLevel(mode, collected, mode === 'country' ? roadPos.s : car.z);
+let spawnTimer = 0, bust = 0, copsWrecked = 0, copsWarned = false, nearestCop = Infinity, stars = 1;
+function updateWanted(){
+  let progress;
+  if (M.linear){ const [done, total] = routeProgress(); progress = done / total; }
+  else progress = gate && gate.active ? 1 : collected / Math.max(1, M.shards);
+  const next = Core.wantedStars(stars, M.time - timeLeft, M.time, progress, copsWrecked);
+  if (next === stars) return;
+  stars = next;
+  if (Core.helicopterDue(stars)) toast('Five stars: police helicopter overhead! Stay out of its light.', 'red', 3600);
+  else if (stars >= 3) toast('Wanted level up: ' + stars + ' stars. More police, and faster.', 'red', 2400);
 }
 const snapI = v => clamp(Math.round(v / PITCH) * PITCH, -3 * PITCH, 3 * PITCH);
 function segmentBlocked(x0, z0, x1, z1){
@@ -2447,12 +2454,12 @@ function spawnPolice(p){
     if (car.z < HW.Z0 + 150) return false;
     x = HW.our[Math.floor(Math.random() * 3)]; z = car.z - 120 - Math.random() * 40;
   }
-  Object.assign(p, { x, z, heading: Math.atan2(car.x - x, car.z - z), speed: mode !== 'city' ? Math.max(20, car.speed) : 6, ri: undefined, road: null, steer: 0, hp: 3, stun: 0, stuck: 0, rev: 0, wp: null, active: true, hitCool: 0 });
+  Object.assign(p, { x, z, heading: Math.atan2(car.x - x, car.z - z), speed: mode !== 'city' ? Math.max(20, car.speed) : 6, ri: undefined, road: null, steer: 0, hp: Core.pursuit(stars).hp, stun: 0, stuck: 0, rev: 0, wp: null, active: true, hitCool: 0 });
   p.g.visible = true;
   return true;
 }
 function wreckPolice(p){
-  p.active = false; p.respawn = 9; copsWrecked++;
+  p.active = false; p.respawn = Core.pursuit(stars).respawn; copsWrecked++;
   burst(p.x, 1.2, p.z, SPARKS, 40, 1);
   burst(p.x, 1.2, p.z, C(0x2a6bff), 16, 0.8);
   p.g.visible = false; p.light.intensity = 0;
@@ -2461,13 +2468,14 @@ function wreckPolice(p){
 function updatePolice(dt){
   const live = state === 'play';
   if (live){
+    updateWanted();
     spawnTimer -= dt;
     police.forEach(p => { if (!p.active && p.respawn > 0) p.respawn -= dt; });
     const active = police.filter(p => p.active).length;
-    if (active < heat() && spawnTimer <= 0){
+    if (active < Core.pursuit(stars).cops && spawnTimer <= 0){
       const p = police.find(q => !q.active && q.respawn <= 0);
       if (p && spawnPolice(p)){
-        spawnTimer = 3;
+        spawnTimer = Core.pursuit(stars).spawn;
         if (!copsWarned){ copsWarned = true; toast("Police on your tail! Don't let them box you in.", 'red', 3200); }
       } else spawnTimer = 1;
     }
@@ -2482,7 +2490,7 @@ function updatePolice(dt){
     if (mode === 'country') p.road = roadQuery(p.x, p.z, p);
     let tx = car.x + pvx * 0.35, tz = car.z + pvz * 0.35;
     if (mode === 'city'){
-      const los = dist < 110 && !segmentBlocked(p.x, p.z, car.x, car.z);
+      const los = dist < (heli.spotted ? 170 : 110) && !segmentBlocked(p.x, p.z, car.x, car.z);
       if (!los){
         if (!p.wp || Math.hypot(p.wp.x - p.x, p.wp.z - p.z) < 6){
           const ix = snapI(p.x), iz = snapI(p.z);
@@ -2506,7 +2514,7 @@ function updatePolice(dt){
     }
     const desired = Math.atan2(tx - p.x, tz - p.z);
     const diff = wrapAngle(desired - p.heading);
-    const maxP = M.police * (dist > 140 ? 1.2 : 1);
+    const maxP = Core.copTopSpeed(M.police, stars, dist, heli.spotted);
     if (!live){ p.speed *= Math.exp(-dt * 2); }
     else if (p.rev > 0){ p.rev -= dt; p.speed = Math.max(p.speed - 30 * dt, -8); p.steer = -Math.sign(diff) || 1; }
     else {
@@ -2578,7 +2586,116 @@ function updatePoliceVisuals(){
 }
 function resetPolice(){
   police.forEach(p => { p.active = false; p.respawn = 0; p.g.visible = false; p.light.intensity = 0; });
-  spawnTimer = 4; bust = 0; copsWrecked = 0; copsWarned = false; nearestCop = Infinity;
+  spawnTimer = 4; bust = 0; copsWrecked = 0; copsWarned = false; nearestCop = Infinity; stars = 1;
+  heli.on = false; heli.spotted = false; heli.g.visible = false; heli.beam.visible = false; heli.pool.visible = false;
+}
+
+// ---------- Police helicopter ----------
+// ### Comes with the fifth star and stays until the run ends. It flies ahead of the player, so its searchlight is in view from
+// ### the chase camera. The light follows the player a little slower than the police can drive: at full speed on a clear road
+// ### you stay ahead of it, but every sharp turn or crash lets it catch you. While you are in the light the police know
+// ### where you are: they drive 6 % faster and see you from further away. Its beam is a fake (a cone and a glow on the ground),
+// ### not a light source, so the scene's shaders never have to change when it arrives.
+const heli = (() => {
+  const g = new THREE.Group(), rotor = new THREE.Group(), tail = new THREE.Group();
+  // a light twin-engine police helicopter, about 12 m long with a 10 m rotor: bubble canopy, engine hump, slim boom, skids
+  const white = new THREE.MeshPhysicalMaterial({ color: 0xcdd3dc, roughness: 0.3, metalness: 0.35, clearcoat: 1, clearcoatRoughness: 0.1 }); white.userData.env = 1.2;
+  const blue = new THREE.MeshPhysicalMaterial({ color: 0x173777, roughness: 0.3, metalness: 0.45, clearcoat: 1, clearcoatRoughness: 0.1 }); blue.userData.env = 1.2;
+  const dark = new THREE.MeshStandardMaterial({ color: 0x24272d, roughness: 0.5, metalness: 0.5 });
+  const steel = new THREE.MeshStandardMaterial({ color: 0x8b9098, roughness: 0.35, metalness: 0.85 });
+  const shape = pts => { const s = new THREE.Shape(); pts.forEach((p, i) => i ? s.lineTo(p[0], p[1]) : s.moveTo(p[0], p[1])); s.closePath(); return s; };
+  const add = (geo, mat, parent) => { const m = new THREE.Mesh(geo, mat); parent.add(m); return m; };
+  const pod = { half: 2.8, zc: 0.1, belt: 1.25, roof: 2.35, tumble: 0.32, plan: 0.62 };
+  add(smoothGeo(shapeBody(extrudeProfile(shape([[2.55, 1.1], [2.44, 1.42], [2.1, 1.8], [1.5, 2.14], [0.6, 2.28], [-0.9, 2.26], [-1.7, 1.94], [-2.1, 1.56], [-1.92, 1.06], [-0.8, 0.8], [0.9, 0.76], [2.0, 0.84]]), 1.72, 0.12), pod)), white, g);
+  // blue belly and a blue band along the side
+  add(smoothGeo(shapeBody(extrudeProfile(shape([[2.08, 0.85], [0.9, 0.72], [-0.8, 0.76], [-1.98, 1.04], [-2.08, 1.34], [-0.8, 1.14], [0.9, 1.1], [2.2, 1.12]]), 1.76, 0.1), pod)), blue, g);
+  // the bubble canopy, its centre post, the door and cabin windows
+  add(smoothGeo(shapeBody(extrudeProfile(shape([[2.62, 1.14], [2.5, 1.46], [2.15, 1.86], [1.56, 2.2], [1.12, 2.26], [0.86, 1.5], [1.2, 1.06], [2.06, 0.94]]), 1.74, 0.12), pod)), SHARED.glass, g);
+  add(mergeGeos([limb([0, 2.38, 1.42], [0, 1.58, 2.5], 0.035, 0.035, 6), limb([0, 1.58, 2.5], [0, 1.06, 2.58], 0.03, 0.03, 6)]), dark, g);
+  add(extrudeProfile(shape([[0.72, 2.02], [0.72, 1.3], [-0.12, 1.3], [-0.12, 2.04]]), 1.84, 0.012), SHARED.glass, g);
+  add(extrudeProfile(shape([[-0.24, 2.04], [-0.24, 1.32], [-1.1, 1.42], [-1.2, 1.98]]), 1.76, 0.012), SHARED.glass, g);
+  add(mergeGeos([boxG(1.82, 1.02, 0.02, 0, 1.68, 0.82), boxG(1.78, 1.0, 0.02, 0, 1.68, -0.18), boxG(0.04, 0.05, 0.2, 0.9, 1.5, 0.04), boxG(0.04, 0.05, 0.2, -0.9, 1.5, 0.04)]), dark, g);
+  // engine hump with air intakes, twin exhausts and the rotor mast
+  add(smoothGeo(extrudeProfile(shape([[0.74, 2.26], [0.42, 2.56], [-1.1, 2.6], [-1.86, 2.2], [-1.7, 1.98], [0.5, 2.1]]), 0.92, 0.06)), white, g);
+  add(mergeGeos([-1, 1].map(sd => boxG(0.03, 0.17, 0.42, sd * 0.5, 2.36, 0.12))), dark, g);
+  add(mergeGeos([-1, 1].map(sd => limb([sd * 0.3, 2.4, -1.5], [sd * 0.42, 2.44, -2.0], 0.1, 0.12, 10))), dark, g);
+  add(limb([0, 2.55, 0.0], [0, 3.0, 0.0], 0.11, 0.075, 10), steel, g);
+  // tail boom, fin with its lower skid, tailplane with end plates
+  add(limb([0, 1.7, -1.7], [0, 2.1, -6.6], 0.42, 0.13, 14), white, g);
+  add(limb([0, 1.42, -1.8], [0, 1.96, -6.4], 0.14, 0.05, 8), blue, g);
+  add(extrudeProfile(shape([[-6.2, 2.05], [-6.92, 3.4], [-7.36, 3.46], [-7.02, 2.05]]), 0.1, 0.012), blue, g);
+  add(extrudeProfile(shape([[-6.5, 2.0], [-6.96, 1.3], [-7.2, 1.3], [-6.98, 2.0]]), 0.09, 0.01), blue, g);
+  add(mergeGeos([boxG(2.0, 0.05, 0.44, 0, 2.02, -5.3), boxG(0.05, 0.42, 0.5, 1.0, 2.02, -5.32), boxG(0.05, 0.42, 0.5, -1.0, 2.02, -5.32)]), white, g);
+  // skids with their curved front ends, on two arched cross tubes
+  add(mergeGeos([-1, 1].flatMap(sd => [
+    limb([sd * 1.1, 0.06, -1.6], [sd * 1.1, 0.06, 1.3], 0.05, 0.05, 8), limb([sd * 1.1, 0.06, 1.3], [sd * 1.1, 0.26, 1.72], 0.05, 0.045, 8),
+    ...[0.86, -0.82].flatMap(z => [limb([sd * 1.1, 0.06, z], [sd * 0.88, 0.5, z], 0.04, 0.04, 8), limb([sd * 0.88, 0.5, z], [sd * 0.3, 0.8, z], 0.04, 0.04, 8)])
+  ])), dark, g);
+  // searchlight and camera ball under the nose
+  add(mergeGeos([limb([0.28, 0.82, 1.66], [0.28, 0.62, 1.66], 0.06, 0.06, 8), ball([0.28, 0.5, 1.66], 0.17), ball([-0.3, 0.6, 1.8], 0.15)]), dark, g);
+  add(ball([0.28, 0.46, 1.72], 0.125), new THREE.MeshBasicMaterial({ color: 0xf6f8ff }), g);
+  add(ball([-0.3, 0.6, 1.92], 0.06), SHARED.glass, g);
+  // four tapered, slightly drooping blades on a hub, with a soft disc for the blur when they spin
+  rotor.position.set(0, 3.02, 0);
+  const blades = [];
+  for (let k = 0; k < 4; k++){
+    const s = new THREE.Shape(); s.moveTo(0.28, -0.13); s.lineTo(5.15, -0.1); s.lineTo(5.3, 0); s.lineTo(5.15, 0.1); s.lineTo(0.28, 0.13); s.closePath();
+    blades.push(new THREE.ExtrudeGeometry(s, { depth: 0.035, bevelEnabled: false }).rotateX(Math.PI / 2).rotateZ(-0.018).rotateY(k * Math.PI / 2));
+  }
+  add(mergeGeos(blades), dark, rotor);
+  add(mergeGeos([ball([0, 0, 0], 0.22, 1, 0.5, 1), limb([0, -0.14, 0], [0, 0.14, 0], 0.08, 0.05, 8), boxG(0.72, 0.06, 0.12, 0, 0, 0), boxG(0.12, 0.06, 0.72, 0, 0, 0)]), steel, rotor);
+  const blur = new THREE.MeshBasicMaterial({ color: 0x9fb0cc, transparent: true, opacity: 0.09, depthWrite: false, side: THREE.DoubleSide });
+  add(new THREE.CircleGeometry(5.3, 36).rotateX(-Math.PI / 2), blur, rotor);
+  g.add(rotor);
+  // tail rotor on the right of the fin
+  tail.position.set(0.14, 2.86, -6.95);
+  add(mergeGeos([boxG(0.03, 1.5, 0.13, 0, 0, 0), boxG(0.03, 0.13, 1.5, 0, 0, 0), ball([0, 0, 0], 0.09)]), dark, tail);
+  add(new THREE.CircleGeometry(0.75, 18).rotateY(Math.PI / 2), blur, tail);
+  g.add(tail);
+  const strobeR = add(ball([0, 3.5, -7.15], 0.075), new THREE.MeshBasicMaterial({ color: 0xff2a3a }), g);
+  const strobeB = add(ball([0, 0.68, -0.3], 0.1), new THREE.MeshBasicMaterial({ color: 0x4d86ff }), g);
+  add(mergeGeos([ball([1.0, 2.04, -5.32], 0.045)]), new THREE.MeshBasicMaterial({ color: 0x35ff7a }), g);
+  add(mergeGeos([ball([-1.0, 2.04, -5.32], 0.045)]), new THREE.MeshBasicMaterial({ color: 0xff3040 }), g);
+  g.scale.setScalar(1.12);
+  g.visible = false; scene.add(g);
+  const beam = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 24, 1, true).rotateX(-Math.PI / 2).translate(0, 0, 0.5), BEAM_MAT.clone());
+  beam.material.opacity = 0.26; beam.visible = false; scene.add(beam);
+  const pool = new THREE.Mesh(new THREE.CircleGeometry(1, 28).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: glowTexture, color: 0xdfe9ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
+  pool.scale.setScalar(Core.SPOT_RADIUS * 1.5); pool.visible = false; scene.add(pool);
+  return { g, rotor, tail, beam, pool, strobeR, strobeB, on: false, spotted: false, closing: 0, x: 0, z: 0, sx: 0, sz: 0, h: 0, tilt: 0, roll: 0 };
+})();
+function updateHeli(dt){
+  const live = state === 'play', H = heli;
+  if (!H.on){
+    if (!live || !Core.helicopterDue(stars)) return;
+    // it arrives from behind the player and overtakes
+    H.on = true; H.x = car.x - Math.sin(car.heading) * 170; H.z = car.z - Math.cos(car.heading) * 170; H.sx = H.x; H.sz = H.z; H.h = car.heading;
+    H.g.visible = true; H.beam.visible = true; H.pool.visible = true;
+  }
+  const fx = Math.sin(car.heading), fz = Math.cos(car.heading), v = car.speed;
+  const px = H.x, pz = H.z, before = Math.hypot(H.x - car.x, H.z - car.z);
+  [H.x, H.z] = Core.trackStep(H.x, H.z, car.x + fx * 82 + fz * 7, car.z + fz * 82 - fx * 7, Math.max(44, M.max * 1.5), dt);
+  // the light leads the car slightly and moves a little slower than the police can drive
+  [H.sx, H.sz] = Core.trackStep(H.sx, H.sz, car.x + fx * v * 0.2, car.z + fz * v * 0.2, M.police * 0.94, dt);
+  H.spotted = live && Core.inSpotlight(H.sx, H.sz, car.x, car.z);
+  if (dt > 0) H.closing += ((before - Math.hypot(H.x - car.x, H.z - car.z)) / dt - H.closing) * Math.min(1, dt * 2);
+  const vx = dt > 0 ? (H.x - px) / dt : 0, vz = dt > 0 ? (H.z - pz) / dt : 0, sp = Math.hypot(vx, vz);
+  const face = wrapAngle(Math.atan2(car.x - H.x, car.z - H.z) - H.h);
+  H.h += face * Math.min(1, dt * 1.6);
+  const along = vx * Math.sin(H.h) + vz * Math.cos(H.h);
+  H.tilt += (clamp(along / 60, -0.3, 0.3) - H.tilt) * Math.min(1, dt * 2);
+  H.roll += (clamp(face * 0.5, -0.4, 0.4) - H.roll) * Math.min(1, dt * 2);
+  const y = groundH(H.x, H.z) + 31 + Math.sin(clock * 0.9) * 0.6;
+  H.g.position.set(H.x, y, H.z); H.g.rotation.set(H.tilt, H.h, -H.roll, 'YXZ');
+  H.rotor.rotation.y += dt * Core.ROTOR.rps * Math.PI * 2; H.tail.rotation.x += dt * 170;
+  const blink = Math.floor(clock * 4) % 2 === 0; H.strobeR.visible = blink; H.strobeB.visible = !blink;
+  const gy = groundH(H.sx, H.sz) + 0.3;
+  H.pool.position.set(H.sx, gy, H.sz);
+  H.pool.material.color.setHex(H.spotted ? 0xfff0d8 : 0xdfe9ff);
+  const lx = H.x + Math.sin(H.h) * 1.92, lz = H.z + Math.cos(H.h) * 1.92;
+  H.beam.position.set(lx, y + 0.5, lz); H.beam.lookAt(H.sx, gy, H.sz);
+  const L = Math.hypot(H.sx - lx, gy - y - 0.5, H.sz - lz);
+  H.beam.scale.set(Core.SPOT_RADIUS, Core.SPOT_RADIUS, L);
 }
 // moving vehicles as circles (city traffic) for collisions
 let frameNo = 0, obsCache = null, obsStamp = -1;
@@ -2779,6 +2896,10 @@ function initAudio(){
     popF.connect(comp);
     const airF = ctx.createBiquadFilter(); airF.type = 'highpass'; airF.frequency.value = 3000;
     airF.connect(comp);
+    const rotorData = Core.rotorLoop(Core.ENGINE_SR, 7), rotorBuf = ctx.createBuffer(1, rotorData.length, Core.ENGINE_SR); rotorBuf.copyToChannel(rotorData, 0);
+    const rotorSrc = ctx.createBufferSource(); rotorSrc.buffer = rotorBuf; rotorSrc.loop = true; rotorSrc.start();
+    const rotorF = ctx.createBiquadFilter(); rotorF.type = 'lowpass'; rotorF.frequency.value = 900;
+    const rotor = gain(0); rotorSrc.connect(rotorF).connect(rotor).connect(comp);
     const whine = ctx.createOscillator(); whine.type = 'triangle';
     const whineG = gain(0); whine.connect(whineG).connect(comp);
     const turbo = ctx.createOscillator(); turbo.type = 'sine'; turbo.frequency.value = 1800;
@@ -2788,7 +2909,7 @@ function initAudio(){
     const sirenDepth = gain(330); sirenLfo.connect(sirenDepth).connect(siren.frequency);
     const sirenGain = gain(0); siren.connect(sirenGain).connect(comp);
     [turbo, whine, siren, sirenLfo].forEach(o => o.start());
-    audio = { ctx, master, comp, bus, layers: [], voice: null, bufs: {}, noiseBuf, road, wind, tire, popF, airF, turbo, turboG, whine, whineG, sirenGain, sirenLfo };
+    audio = { ctx, master, comp, bus, layers: [], voice: null, bufs: {}, noiseBuf, road, rotor, rotorF, rotorSrc, wind, tire, popF, airF, turbo, turboG, whine, whineG, sirenGain, sirenLfo };
     setEngineVoice();
   } catch (e) { audio = null; }
 }
@@ -2885,6 +3006,10 @@ function updateEngine(dt){
   a.whineG.gain.setTargetAtTime(on ? E.whine[1] * Math.min(1, sp / 12) * (car.speed < -0.3 ? 3 : 0.4 + 0.6 * eng.load) : 0, t, 0.08);
   const rough = mode === 'country' && Math.abs(roadPos.lat) > 5.4 ? 2.2 : 1;
   a.road.gain.setTargetAtTime(on ? Math.pow(sp / 55, 1.4) * 0.16 * E.road * rough : 0, t, 0.15);
+  const rotorDist = heli.on ? Math.hypot(heli.x - car.x, heli.z - car.z) : 300, rotorNear = clamp(1 - rotorDist / 240, 0.2, 1);
+  a.rotor.gain.setTargetAtTime(on && heli.on ? 0.42 * rotorNear : 0, t, 0.3);
+  a.rotorF.frequency.setTargetAtTime(500 + 3500 * rotorNear * rotorNear, t, 0.3);
+  a.rotorSrc.playbackRate.setTargetAtTime(1 + clamp(heli.closing / 340, -0.08, 0.08), t, 0.3);
   a.wind.gain.setTargetAtTime(on ? Math.pow(sp / 55, 2) * 0.09 : 0, t, 0.2);
   const squeal = (keys.brake && sp > 8 ? 0.07 : 0) + (Math.abs(car.steer) > 0.8 && sp > 24 ? 0.035 : 0);
   a.tire.gain.setTargetAtTime(on ? squeal : 0, t, 0.06);
@@ -3016,7 +3141,7 @@ const ui = {
   gVal: $('gVal'), gGlow: $('gGlow'), gTip: $('gTip'), gears: [...document.querySelectorAll('.gearbox [data-g]')], gearD: $('gearD'),
   pBrake: $('pBrake'), pGas: $('pGas'), pBrakeV: $('pBrakeV'), pGasV: $('pGasV'), tBrake: $('tBrake'), tGas: $('tGas'),
   dash: $('dash'), dmg: $('dmg'), dmgPct: $('dmgPct'), dmgState: $('dmgState'), dfill: $('dfill'),
-  pursuit: $('pursuit'), edge: $('edgeWarn'), edgeBanner: $('ewBanner'), edgeArrow: $('ewArrow'), purState: $('purState'), cops: [...$('cops').children], bustPct: $('bustPct'), bfill: $('bfill')
+  pursuit: $('pursuit'), edge: $('edgeWarn'), edgeBanner: $('ewBanner'), edgeArrow: $('ewArrow'), purState: $('purState'), cops: [...$('cops').children], stars: $('stars'), bustPct: $('bustPct'), bfill: $('bfill')
 };
 const DIAMOND = '<svg class="chip" viewBox="0 0 16 16"><path d="M8 1.5 14.5 8 8 14.5 1.5 8Z"/></svg>';
 const STAR = '<svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.2 1.3-6.6L2.5 9.3l6.6-.8z"/></svg>';
@@ -3107,8 +3232,14 @@ function updateHud(dt){
   }
 
   // Pursuit
-  const active = police.filter(p => p.active).length, want = state === 'play' ? heat() : active;
-  const stateTxt = !active ? (copsWarned ? 'Lost them' : 'No police yet') : nearestCop < 25 ? 'On your tail' : nearestCop < 140 ? 'In pursuit' : 'Losing them';
+  if (stars !== last.stars){
+    last.stars = stars;
+    [...ui.stars.children].forEach((s, i) => s.classList.toggle('on', i < stars));
+    ui.stars.classList.toggle('max', Core.helicopterDue(stars));
+    ui.stars.setAttribute('aria-label', 'Wanted level ' + stars + ' of ' + Core.MAX_STARS);
+  }
+  const active = police.filter(p => p.active).length, want = state === 'play' ? Core.pursuit(stars).cops : active;
+  const stateTxt = heli.spotted ? 'In the spotlight' : !active ? (copsWarned ? 'Lost them' : 'No police yet') : nearestCop < 25 ? 'On your tail' : nearestCop < 140 ? 'In pursuit' : 'Losing them';
   const purKey = active + '|' + want + '|' + stateTxt;
   if (purKey !== last.pur){
     last.pur = purKey;
@@ -3229,6 +3360,12 @@ function drawRadar(){
     rx.fillStyle = flash ? '#ff3344' : '#2f6bff';
     rx.beginPath(); rx.arc(sx, sy, 7, 0, Math.PI * 2); rx.fill();
     rx.strokeStyle = 'rgba(255,255,255,.85)'; rx.lineWidth = 2; rx.stroke();
+  }
+  if (heli.on){
+    let [sx, sy, dist] = toScreen(heli.sx, heli.sz);
+    if (dist > range * 0.92){ const ang = Math.atan2(sy - R, sx - R); sx = R + Math.cos(ang) * (R - 10); sy = R + Math.sin(ang) * (R - 10); }
+    rx.strokeStyle = heli.spotted ? '#ffd9a0' : 'rgba(255,255,255,.75)'; rx.lineWidth = 3;
+    rx.beginPath(); rx.arc(sx, sy, 12, 0, Math.PI * 2); rx.stroke();
   }
   drawStoryRadar(toScreen, R, range, pulse);
   rx.fillStyle = '#ff7a3d'; rx.strokeStyle = 'rgba(255,255,255,.9)'; rx.lineWidth = 2;
@@ -4025,6 +4162,7 @@ function frame(now){
     if (mode === 'highway' && state !== 'menu') updateTraffic(dt);
     if (mode === 'country' && state !== 'menu') updateCountryTraffic(dt);
     if (mode === 'city'){ updateSignals(); updateNpcs(dt); }
+    if (state !== 'menu') updateHeli(dt);
     updateParticles(dt); updateSmoke(dt);
   }
   updatePoliceVisuals();

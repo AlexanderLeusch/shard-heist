@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<!-- ### MARKUP: the WebGL canvas, the HUD (mission, timer, pursuit, radar, cockpit), touch pads and the menu overlay. -->
+<!-- ### MARKUP: the WebGL canvas, the HUD (mission, timer, wanted stars and pursuit, radar, cockpit), touch pads and the menu overlay. -->
 <canvas id="game" aria-label="Game world"></canvas>
 
 <div id="hud" class="off">
@@ -45,7 +45,8 @@
   </section>
   <section class="panel pursuit" id="pursuit">
     <div class="pur-row"><span class="siren"></span><span class="pur-title">Pursuit</span><span class="pur-state" id="purState">No police yet</span></div>
-    <div class="cops" id="cops"><i></i><i></i><i></i></div>
+    <div class="stars" id="stars" role="img" aria-label="Wanted level 1 of 5"><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="cops" id="cops"><i></i><i></i><i></i><i></i></div>
     <div class="bust-row"><span>Bust</span><b id="bustPct">0%</b></div>
     <div class="btrack"><i id="bfill"></i></div>
   </section>

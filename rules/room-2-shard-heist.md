@@ -77,11 +77,21 @@ The Baixa is the flat centre of Lisbon, rebuilt as a street grid after the 1755 
 | Rule | Value |
 |---|---|
 | First police car | after 4 seconds |
-| How many chase you (heat) | City: 1, then 2 after 3 shards, then 3 after 6 shards. Highway and countryside: 1, then 2 after 1.2 km, then 3 after 2.5 km |
-| New police car | every 3 seconds until the heat level is reached |
-| Ramming | every hard hit lowers a police car's health by impact × your ramming power; a police car is wrecked after 3 health points and comes back after 9 seconds |
+| **Wanted stars** | 1 to 5, shown under the clock. A new star every fifth of the time limit or of the way to the end (shards in the city, distance on the open roads), whichever is further along. Each wrecked police car counts as 4 % more. Stars never fall. |
+| New police car | until the number for your stars is reached, see the table below |
+| Ramming | every hard hit lowers a police car's health by impact × your ramming power; a police car is wrecked after its health points are gone and comes back after the time in the table below |
 | **Bust meter** | fills while a police car is **within 9 m** and you are **slower than 4.5 m/s** (about 16 km/h): full in 2.2 s. Otherwise it drains (empty from full in 3 s). |
 | **Busted** | bust meter at 100 %: game over |
+
+| Stars | Police cars | Police speed | New car every | Wrecked car returns after | Health |
+|---|---|---|---|---|---|
+| ★ | 1 | 100 % | 3 s | 9 s | 3 |
+| ★★ | 2 | 100 % | 3 s | 9 s | 3 |
+| ★★★ | 3 | 103 % | 3 s | 8 s | 3 |
+| ★★★★ | 3 | 106 % | 2.5 s | 6 s | 3.5 |
+| ★★★★★ | 4 | 110 % | 2 s | 4.5 s | 4 |
+
+**Helicopter.** The fifth star brings a police helicopter for the rest of the run. Its searchlight follows you at 94 % of the police speed. While you are in the light (within 9 m of its centre), the police drive 6 % faster, and in the city they see you from 170 m instead of 110 m. It cannot bust you or damage you. At full speed on a clear road you can stay ahead of the light.
 
 ## Ending a run
 
