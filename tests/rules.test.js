@@ -385,3 +385,41 @@ test('damage shows in four stages, and the smoke thickens and darkens up to flam
   assert.equal(Core.smokeFor(87).fire, false);
   assert.equal(Core.smokeFor(88).fire, true);
 });
+
+test('hills: smooth and bounded on every map, level at the Arco, the river and the ends of the highway', () => {
+  for (const key of ['city', 'highway', 'country']){
+    let steepest = 0, highest = 0;
+    const span = key === 'highway' ? [[0, 0], [0, 4000]] : [[-300, 300], [-300, 300]];
+    for (let x = span[0][0]; x <= span[0][1]; x += 13) for (let z = span[1][0]; z <= span[1][1]; z += 11){
+      for (const h of [0, Math.PI / 2, Math.PI / 4]) steepest = Math.max(steepest, Math.abs(Core.gradeAt(key, x, z, h)));
+      highest = Math.max(highest, Math.abs(Core.hillHeight(key, x, z)));
+    }
+    assert.ok(steepest < 0.24 && steepest > 0.05, key + ' grade ' + steepest);
+    assert.ok(highest > 6 && highest < 30, key + ' height ' + highest);
+  }
+  assert.equal(Core.hillHeight('city', 0, 83), 0, 'level at the Arco');
+  assert.equal(Core.hillHeight('city', 0, 120), 0, 'level at the river');
+  assert.equal(Core.hillHeight('city', 300, 0), 0, 'level outside the old town');
+  assert.equal(Core.hillHeight('highway', -7, 5), 0, 'level at the start');
+  assert.equal(Core.hillHeight('highway', -7, 4000), 0, 'level at the finish');
+  assert.equal(Core.hillHeight('nowhere', 3, 3), 0);
+});
+
+test('slopes: uphill is slower, downhill faster, a heavy truck feels it most, and brakes still hold', () => {
+  const VEH = Core.VEH, idle = { up: false, down: false, brake: false };
+  const pull = (grade, v) => { let s = 0; for (let t = 0; t < 12; t += 1 / 60) s = Core.stepSpeed(s, { ...idle, up: true }, 1 / 60, Core.slopeTop(34 * v.speed, grade, v), v, grade); return s; };
+  for (const key of ['car', 'bike', 'truck']){
+    const v = VEH[key];
+    assert.ok(pull(0.08, v) < pull(0, v) * 0.9, key + ' slower uphill');
+    assert.ok(pull(-0.08, v) > pull(0, v) * 1.05, key + ' faster downhill');
+  }
+  assert.ok(Core.slopeTop(30, 0.08, VEH.truck) < Core.slopeTop(30, 0.08, VEH.bike), 'the truck loses more uphill');
+  assert.equal(Core.slopeTop(30, 0, VEH.car), 30);
+  assert.equal(Core.slopeTop(30, undefined, VEH.car), 30);
+  assert.ok(Core.slopeTop(30, 9, VEH.car) >= 20.39, 'never below 68 %');
+  assert.ok(Core.slopeTop(30, -9, VEH.car) <= 36.61, 'never above 122 %');
+  // rolling and holding on a hill
+  assert.equal(Core.stepSpeed(0, idle, 1 / 60, 30, VEH.car, 0.1), 0, 'a stopped vehicle does not creep');
+  assert.ok(Core.stepSpeed(10, idle, 1 / 60, 30, VEH.car, -0.1) > Core.stepSpeed(10, idle, 1 / 60, 30, VEH.car, 0), 'it coasts on downhill');
+  assert.ok(Core.stepSpeed(10, idle, 1 / 60, 30, VEH.car, 0.1) < Core.stepSpeed(10, idle, 1 / 60, 30, VEH.car, 0), 'and stops sooner uphill');
+});

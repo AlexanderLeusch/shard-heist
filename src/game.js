@@ -301,15 +301,18 @@ class Fleet {
     for (const k of ['body', 'glass', 'cargo', 'lit', 'trim', 'chrome', 'tire', 'head', 'tail', 'lens']){
       if (!parts[k]) continue;
       const m = new THREE.InstancedMesh(parts[k], k === 'body' ? SHARED.paint : SHARED[k], n);
-      m.frustumCulled = false;
+      m.frustumCulled = false; m.userData.dynamic = true;
       m.castShadow = k === 'body' || k === 'cargo' || k === 'glass';
       m.receiveShadow = k === 'body' || k === 'cargo';
       if (k === 'body') for (let i = 0; i < n; i++) m.setColorAt(i, tint.set(color || CAR_COLS[Math.floor((rnd ? rnd() : Math.random()) * CAR_COLS.length)]));
       group.add(m); this.meshes.push(m);
     }
   }
+  // Places one vehicle on the hills, nose up or down with the slope under it
   set(i, x, y, z, h, on){
-    dummy.position.set(x, y, z); dummy.rotation.set(0, h, 0); dummy.scale.setScalar(on ? 1 : 0.0001); dummy.updateMatrix();
+    const fx = Math.sin(h), fz = Math.cos(h), rise = on ? hill(x + fx * 2, z + fz * 2) - hill(x - fx * 2, z - fz * 2) : 0;
+    dummy.position.set(x, y + hill(x, z), z); dummy.rotation.set(-Math.atan2(rise, 4), h, 0, 'YXZ'); dummy.scale.setScalar(on ? 1 : 0.0001); dummy.updateMatrix();
+    dummy.rotation.order = 'XYZ';
     for (const m of this.meshes) m.setMatrixAt(i, dummy.matrix);
   }
   commit(){ for (const m of this.meshes) m.instanceMatrix.needsUpdate = true; }
@@ -318,14 +321,14 @@ class GlowPts {
   constructor(group, n, color, size){
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(n * 3).fill(-999), 3));
     this.p = new THREE.Points(g, new THREE.PointsMaterial({ map: glowTexture, color, size, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-    this.p.frustumCulled = false; group.add(this.p); this.a = g.attributes.position;
+    this.p.frustumCulled = false; this.p.userData.dynamic = true; group.add(this.p); this.a = g.attributes.position;
   }
   set(i, x, y, z){ this.a.setXYZ(i, x, y, z); }
   commit(){ this.a.needsUpdate = true; }
 }
 // head/tail glow for a vehicle at heading h
 function vehicleGlow(head, tail, i, x, z, h, front, back, y, off, on){
-  const fx = Math.sin(h), fz = Math.cos(h), rx = -fz, rz = fx, Y = on ? y : -999;
+  const fx = Math.sin(h), fz = Math.cos(h), rx = -fz, rz = fx, Y = on ? y + hill(x, z) : -999;
   head.set(i * 2, x + fx * front + rx * off, Y, z + fz * front + rz * off); head.set(i * 2 + 1, x + fx * front - rx * off, Y, z + fz * front - rz * off);
   tail.set(i * 2, x - fx * back + rx * off, Y, z - fz * back + rz * off); tail.set(i * 2 + 1, x - fx * back - rx * off, Y, z - fz * back - rz * off);
 }
@@ -763,11 +766,81 @@ scene.add(CITY.group, HWY.group);
 let W = CITY;
 const shardSpots = [], roadSpots = [], intersections = [];
 
+const hill = (x, z) => Core.hillHeight(mode, x, z);
 function groundH(x, z){
-  if (mode === 'country') return terrainH(x, z);
-  if (mode !== 'city' || Math.abs(x) > 192 || Math.abs(z) > 192) return 0;
+  if (mode === 'country') return terrainH(x, z) + hill(x, z);
+  if (mode !== 'city' || Math.abs(x) > 192 || Math.abs(z) > 192) return hill(x, z);
   const lx = x - Math.floor(x / PITCH) * PITCH - PITCH / 2, lz = z - Math.floor(z / PITCH) * PITCH - PITCH / 2;
-  return (Math.abs(lx) <= HALF_BLOCK && Math.abs(lz) <= HALF_BLOCK) ? 0.18 : 0;
+  return hill(x, z) + ((Math.abs(lx) <= HALF_BLOCK && Math.abs(lz) <= HALF_BLOCK) ? 0.18 : 0);
+}
+// ### Bends a finished, flat world over the hills. Big merged meshes get extra vertices wherever a triangle is longer than the
+// ### hills allow (roads are one long quad otherwise), then each vertex moves up or down. Small objects and instances simply
+// ### move as one, so lamps and trees stay upright. Vehicles are placed every frame on the hills, so they are left alone.
+function laySlopes(group, key){
+  const H = (x, z) => Core.hillHeight(key, x, z), [bx0, bx1, bz0, bz1] = Core.HILL_BOX[key];
+  const fine = key === 'city' ? 8 : key === 'highway' ? 24 : 30, coarse = key === 'city' ? 18 : 70;
+  const tmp = new THREE.Vector3(), mat4 = new THREE.Matrix4();
+  const shift = o => { o.getWorldPosition(tmp); o.position.y += H(tmp.x, tmp.z); };
+  function tessellate(geo, mw){
+    const src = geo.index ? geo.toNonIndexed() : geo, names = Object.keys(src.attributes), e = mw.elements;
+    const attrs = names.map(n => src.attributes[n]), sizes = attrs.map(a => a.itemSize), count = src.attributes.position.count;
+    const out = names.map(() => []), wx = (x, y, z) => e[0] * x + e[4] * y + e[8] * z + e[12], wz = (x, y, z) => e[2] * x + e[6] * y + e[10] * z + e[14];
+    const emit = v => v.forEach((a, k) => { for (let i = 0; i < a.length; i++) out[k].push(a[i]); });
+    const read = i => attrs.map((a, k) => { const r = []; for (let c = 0; c < sizes[k]; c++) r.push(a.array[i * sizes[k] + c]); return r; });
+    const xz = v => { const p = v[names.indexOf('position')]; return [wx(p[0], p[1], p[2]), wz(p[0], p[1], p[2])]; };
+    const mid = (a, b) => a.map((q, k) => q.map((c, i) => (c + b[k][i]) / 2));
+    const split = (a, b, c, L, depth) => {
+      const A = xz(a), B = xz(b), C = xz(c), ab = Math.hypot(A[0] - B[0], A[1] - B[1]), bc = Math.hypot(B[0] - C[0], B[1] - C[1]), ca = Math.hypot(C[0] - A[0], C[1] - A[1]), m = Math.max(ab, bc, ca);
+      if (m <= L || depth > 16){ emit(a); emit(b); emit(c); return; }
+      if (m === ab){ const d = mid(a, b); split(a, d, c, L, depth + 1); split(d, b, c, L, depth + 1); }
+      else if (m === bc){ const d = mid(b, c); split(a, b, d, L, depth + 1); split(a, d, c, L, depth + 1); }
+      else { const d = mid(c, a); split(a, b, d, L, depth + 1); split(d, b, c, L, depth + 1); }
+    };
+    const P = src.attributes.position.array;
+    for (let t = 0; t < count; t += 3){
+      let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity, y1 = -Infinity;
+      for (let i = t; i < t + 3; i++){
+        const x = P[i * 3], y = P[i * 3 + 1], z = P[i * 3 + 2], X = wx(x, y, z), Z = wz(x, y, z);
+        x0 = Math.min(x0, X); x1 = Math.max(x1, X); z0 = Math.min(z0, Z); z1 = Math.max(z1, Z); y1 = Math.max(y1, y);
+      }
+      const inside = x1 >= bx0 && x0 <= bx1 && z1 >= bz0 && z0 <= bz1, L = y1 < 1.2 ? fine : coarse, a = read(t), b = read(t + 1), c = read(t + 2);
+      if (inside && Math.max(x1 - x0, z1 - z0) > L) split(a, b, c, L, 0);
+      else { emit(a); emit(b); emit(c); }
+    }
+    const g = new THREE.BufferGeometry();
+    names.forEach((n, k) => g.setAttribute(n, new THREE.Float32BufferAttribute(out[k], sizes[k])));
+    return g;
+  }
+  function displace(g, mw){
+    const p = g.attributes.position, e = mw.elements;
+    for (let i = 0; i < p.count; i++){
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+      p.setY(i, y + H(e[0] * x + e[4] * y + e[8] * z + e[12], e[2] * x + e[6] * y + e[10] * z + e[14]));
+    }
+    p.needsUpdate = true; g.computeBoundingSphere(); g.computeBoundingBox();
+  }
+  const hasInstances = o => { let f = false; o.traverse(c => { if (c.isInstancedMesh) f = true; }); return f; };
+  const visit = o => {
+    if (o.userData.dynamic) return;
+    if (o.isInstancedMesh){
+      for (let i = 0; i < o.count; i++){
+        o.getMatrixAt(i, mat4); const m = mat4.elements;
+        m[13] += H(m[12], m[14]); o.setMatrixAt(i, mat4);
+      }
+      o.instanceMatrix.needsUpdate = true;
+    } else if (o.isPoints){
+      const g = o.geometry.clone(); displace(g, o.matrixWorld); o.geometry = g;
+    } else if (o.isMesh){
+      o.geometry.computeBoundingBox();
+      const b = o.geometry.boundingBox, big = Math.max(b.max.x - b.min.x, b.max.z - b.min.z) > 24;
+      if (!big) shift(o);
+      else { const g = tessellate(o.geometry, o.matrixWorld); displace(g, o.matrixWorld); o.geometry = g; }
+    } else if (o === group || o.children.length && (hasInstances(o) || new THREE.Box3().setFromObject(o).getSize(tmp).x > 40 || new THREE.Box3().setFromObject(o).getSize(tmp).z > 40)){
+      o.children.slice().forEach(visit);
+    } else shift(o);
+  };
+  group.updateMatrixWorld(true);
+  visit(group);
 }
 
 const dummy = new THREE.Object3D(), tint = new THREE.Color();
@@ -2676,7 +2749,7 @@ function updatePoliceVisuals(){
   const phase = Math.floor(clock * 8);
   police.forEach((p, i) => {
     if (!p.active) return;
-    p.g.position.set(p.x, groundH(p.x, p.z), p.z); p.g.rotation.y = p.heading;
+    p.g.position.set(p.x, groundH(p.x, p.z), p.z); p.g.rotation.set(-Math.atan(Core.gradeAt(mode, p.x, p.z, p.heading)), p.heading, 0, 'YXZ');
     const r = (phase + i) % 2 === 0;
     p.red.color.setHex(r ? 0xff2a3a : 0x3a0610); p.blue.color.setHex(r ? 0x0a1640 : 0x2a6bff);
     p.sRed.material.opacity = r ? 1 : 0.05; p.sBlue.material.opacity = r ? 0.05 : 1;
@@ -3181,7 +3254,7 @@ function boundaryRect(){
 }
 function buildBoundary(){
   if (BOUND.mesh){ scene.remove(BOUND.mesh); BOUND.mesh.geometry.dispose(); }
-  const [x0, x1, z0, z1] = boundaryRect(), y0 = mode === 'country' ? -10 : -1, H = mode === 'country' ? 90 : 16;
+  const [x0, x1, z0, z1] = boundaryRect(), y0 = mode === 'country' ? -30 : -24, H = mode === 'country' ? 120 : 56;
   const side = (len, rot, x, z) => { const g = new THREE.PlaneGeometry(len, H, Math.max(1, Math.round(len / 20)), 1); g.rotateY(rot); g.translate(x, y0 + H / 2, z); return g; };
   const parts = mode === 'highway'
     ? [side(x1 - x0, 0, (x0 + x1) / 2, z0), side(x1 - x0, 0, (x0 + x1) / 2, z1)]
@@ -3515,8 +3588,8 @@ for (const k of Object.keys(MODES)){ const b = Core.parseBest(readStore(MODES[k]
 
 function setMode(m){
   mode = m; M = MODES[m];
-  if (m === 'highway' && !HWY.built) buildHighway();
-  if (m === 'country' && !CTRY.built) buildCountry();
+  if (m === 'highway' && !HWY.built){ buildHighway(); laySlopes(HWY.group, 'highway'); }
+  if (m === 'country' && !CTRY.built){ buildCountry(); laySlopes(CTRY.group, 'country'); }
   W = m === 'city' ? CITY : m === 'highway' ? HWY : CTRY;
   CITY.group.visible = m === 'city';
   CTRY.group.visible = m === 'country';
@@ -3782,7 +3855,7 @@ function toggleSound(){
 $('btnSound').addEventListener('click', e => { e.currentTarget.blur(); toggleSound(); });
 
 // ---------- Physics ----------
-// ### Arcade car physics: throttle, brake, coasting drag, speed-dependent steering and a top speed reduced by damage and
+// ### Arcade car physics: throttle, brake, hills (Core.slopeTop, gravity in Core.stepSpeed), coasting drag, speed-dependent steering and a top speed reduced by damage and
 // ### off-road driving. Collisions test a few circles along the vehicle against boxes and circles and push the car out;
 // ### the impact speed along the contact normal decides the damage. The chase camera follows smoothly and is kept out of
 // ### buildings (camClip) and above hills.
@@ -3790,9 +3863,10 @@ const collidePoint = Core.collidePoint;
 function updateCar(dt){
   if (mode === 'country') Object.assign(roadPos, roadQuery(car.x, car.z, roadPos));
   const offRoad = mode === 'country' && Math.abs(roadPos.lat) > 5.4;
-  const maxNow = Core.topSpeed(M, V, damage, offRoad);
+  const grade = Core.gradeAt(mode, car.x, car.z, car.heading);
+  const maxNow = Core.slopeTop(Core.topSpeed(M, V, damage, offRoad), grade, V);
   if (offRoad && Math.abs(car.speed) > 8) car.shake = Math.max(car.shake, 0.06);
-  car.speed = Core.stepSpeed(car.speed, keys, dt, maxNow, V);
+  car.speed = Core.stepSpeed(car.speed, keys, dt, maxNow, V, grade);
 
   const steerIn = (keys.left ? 1 : 0) - (keys.right ? 1 : 0);
   car.steer += (steerIn - car.steer) * Math.min(1, 8 * dt);
@@ -3934,7 +4008,7 @@ function chaseCam(dt){
   camera.position.x += (tx - camera.position.x) * k;
   camera.position.z += (tz - camera.position.z) * k;
   camera.position.y += (car.y + h - camera.position.y) * k;
-  if (mode === 'country'){ const gh = groundH(camera.position.x, camera.position.z) + 1.5; if (camera.position.y < gh) camera.position.y = gh; }
+  const gh = groundH(camera.position.x, camera.position.z) + 1.5; if (camera.position.y < gh) camera.position.y = gh;
   camera.lookAt(car.x + fx * 4, car.y + 1.6, car.z + fz * 4);
   if (car.shake > 0.01 && !REDUCED){
     camera.position.x += (Math.random() - 0.5) * car.shake * 0.6;
@@ -4133,7 +4207,7 @@ function setupCourier(){
   }
   Object.assign(courier, { x: HW.our[2], z: car.z + 600, speed: 26, on: true });
   courier.g.visible = true; courier.mark.visible = true;
-  courier.g.position.set(courier.x, 0, courier.z);
+  courier.g.position.set(courier.x, hill(courier.x, courier.z), courier.z);
 }
 
 function updateStory(dt){
@@ -4166,7 +4240,7 @@ function updateStory(dt){
     if (gap < 40) desired = Math.min(desired, aheadV + (gap - 8) * 0.5);
     courier.speed = Math.max(0, courier.speed + clamp((desired - courier.speed) * Math.min(1, dt * 3), -14 * dt, 3 * dt));
     courier.z += courier.speed * dt;
-    courier.g.position.set(courier.x, 0, courier.z);
+    courier.g.position.set(courier.x, hill(courier.x, courier.z), courier.z);
     if (!story.clasp && Math.hypot(car.x - courier.x, car.z - courier.z) < 9){
       story.clasp = true; courier.mark.visible = false;
       burst(courier.x, 3, courier.z, GOLD, 30);
@@ -4327,6 +4401,7 @@ function frame(now){
 }
 
 buildCity();
+laySlopes(CITY.group, 'city');
 tuneEnv(scene);
 setVehicle(sel.veh);
 setMode('city');

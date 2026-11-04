@@ -244,3 +244,9 @@ test('damage is visible and the rider is posed', () => {
   for (const piece of ['hood up', 'smashed tail light', 'torn mudguard', 'cracked windscreen']) assert.match(game, new RegExp(piece));
   for (const piece of ['two-tone leathers', 'fingers round the grips', 'full-face helmet', 'tuck']) assert.match(game, new RegExp(piece));
 });
+
+test('every world is bent over the hills once, and the car feels them', () => {
+  for (const [group, key] of [['CITY', 'city'], ['HWY', 'highway'], ['CTRY', 'country']]) assert.match(game, new RegExp('laySlopes\\(' + group + '\\.group, \'' + key + '\'\\)'));
+  assert.match(game, /Core\.stepSpeed\(car\.speed, keys, dt, maxNow, V, grade\)/);
+  assert.match(game, /Core\.slopeTop\(/);
+});

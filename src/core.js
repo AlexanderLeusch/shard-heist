@@ -136,8 +136,10 @@
   // ### drag and the handbrake for one frame; gas and brake held together both apply, which is how a real pedal pair works.
   // ### The throttle can never push past the top speed, so the km/h on the menu card is the real maximum.
   const topSpeed = (m, v, damage, offRoad) => m.max * v.speed * (1 - 0.4 * clamp(damage, 0, 100) / 100) * (offRoad ? 0.55 : 1);
-  function stepSpeed(speed, keys, dt, maxNow, v){
+  function stepSpeed(speed, keys, dt, maxNow, v, grade){
     dt = clamp(dt, 0, MAX_DT);
+    // Gravity along the road comes first, so that the brakes and rolling friction can still hold a stopped vehicle on a hill
+    speed -= GRAVITY_PULL * (grade || 0) * dt;
     // Throttle stops at the top speed; above it (just after taking damage) the pull-down below takes over
     if (keys.up){
       if (speed < 0) speed += 40 * dt;
@@ -188,6 +190,33 @@
     if (stage === 2) return { rate: 8 + 6 * within(50, 75), color: 0x26262a, opacity: 0.68, rise: 3, fire: false };
     return { rate: 18 + 10 * within(75, 100), color: 0x0c0c0e, opacity: 0.75, rise: 3.8, fire: damage >= 88 };
   }
+
+  // ---------- Hills ----------
+  // ### hillHeight is the height of the land in metres at a point on a map. Every map is built flat and then bent over this
+  // ### field, so the roads, buildings and all vehicles share one shape. In Lisbon it fades out towards the river, so the Arco
+  // ### and the Praça stay level, and on the highway towards the start and the finish. grade is the rise per metre along the
+  // ### direction of travel: uphill the top speed falls and gravity pulls back, downhill both help. A heavy truck feels it most.
+  const GRAVITY_PULL = 42;
+  const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const HILL_BOX = Object.freeze({ city: [-180, 180, -180, 70], highway: [-Infinity, Infinity, 60, 3950], country: [-Infinity, Infinity, -Infinity, Infinity] });
+  function hillHeight(modeKey, x, z){
+    if (modeKey === 'city'){
+      const w = (1 - smooth(105, 180, Math.abs(x))) * smooth(-180, -105, z) * (1 - smooth(-30, 70, z));
+      return w ? w * (4.5 * Math.sin(x * 0.021 + 0.6) + 3 * Math.sin(z * 0.026 - 0.4) + 2.5 * Math.sin((x + z) * 0.0125 + 1) + 3) : 0;
+    }
+    if (modeKey === 'highway'){
+      const w = smooth(60, 220, z) * (1 - smooth(3700, 3950, z));
+      return w ? w * (13 * Math.sin(z * 0.0046) + 7 * Math.sin(z * 0.0107 + 1)) : 0;
+    }
+    if (modeKey === 'country') return 13 * Math.sin(x * 0.0061 + 0.7) * Math.cos(z * 0.0053) + 4.5 * Math.sin(x * 0.015 + z * 0.011);
+    return 0;
+  }
+  // The rise per metre at a point, looking along a heading
+  function gradeAt(modeKey, x, z, heading){
+    const fx = Math.sin(heading), fz = Math.cos(heading);
+    return (hillHeight(modeKey, x + fx * 2, z + fz * 2) - hillHeight(modeKey, x - fx * 2, z - fz * 2)) / 4;
+  }
+  const slopeTop = (maxNow, grade, v) => maxNow * (1 - clamp((grade || 0) * 2.6 / Math.sqrt(v.accel), -0.22, 0.32));
 
   // ---------- Police pressure ----------
   // ### Wanted stars (1-5) rise with the time on the run and with the progress towards the end, whichever is further along.
@@ -434,7 +463,7 @@
     MODES, VEH, REV_SPEED, REPAIR_AMOUNT, MAX_DT, STORY_ACTS, KEY_MAP, BAIXA, streetAt, TRAM_LOOP, tramNext,
     isMode, isVeh, clamp, wrapAngle, mulberry32, shuffle, fmtTime, fmtTimeExact, frameDt,
     parsePick, parseBest, applyPick, actionAllowed,
-    vehStats, zeroTo80, topSpeed, stepSpeed, collidePoint,
+    vehStats, zeroTo80, topSpeed, stepSpeed, collidePoint, HILL_BOX, hillHeight, gradeAt, slopeTop,
     crashDamage, addDamage, repairDamage, isWrecked, damageStage, smokeFor,
     PURSUIT, MAX_STARS, SPOT_RADIUS, HELI_AFTER, wantedStars, pursuit, helicopterDue, copTopSpeed, trackStep, inSpotlight, bustStep, edgeDistance,
     driveTime, runStars, isNewBest,
