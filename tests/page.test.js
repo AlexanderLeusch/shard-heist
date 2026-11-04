@@ -211,3 +211,12 @@ test('the engines are played from the tested model: loaded and overrun loops per
   assert.doesNotMatch(game, /engineBuffer|GEAR_TOP/, 'the old loops are gone');
   assert.doesNotMatch(game, /\.(mp3|ogg|wav|m4a)\b/, 'no audio files');
 });
+
+test('the motorcycle and the truck are modelled like the real thing', () => {
+  const part = (a, b) => game.slice(game.indexOf(a), game.indexOf(b, game.indexOf(a)));
+  const bike = part('// Motorcycle: superbike', '// Truck: European'), truck = part('// Truck: European', 'Object.values(MODELS)');
+  for (const piece of ['the engine', 'header pipes', 'frame', 'the rider', 'full-face helmet', 'the fork turns']) assert.match(bike, new RegExp(piece), 'bike: ' + piece);
+  assert.match(bike, /rotors: \[0\.058, -0\.058\]/, 'twin front brake discs');
+  for (const piece of ['windscreen', 'grille', 'mirrors', 'fifth wheel', 'fuel tank', 'air and electric lines', 'mudguards']) assert.match(truck, new RegExp(piece), 'truck: ' + piece);
+  assert.equal((truck.match(/false, 0\.26\]/g) || []).length, 4, 'twin tyres on each side of the rear axle');
+});

@@ -2032,7 +2032,8 @@ function updateCountryTraffic(dt){
 function routeProgress(){ return mode === 'highway' ? [car.z, HW.LEN] : [roadPos.s, ROAD.len - 60]; }
 
 // ---------- Player vehicles ----------
-// ### Builds the three getaway vehicles the player can choose: muscle coupe, superbike with rider, and tractor unit.
+// ### Builds the three getaway vehicles the player can choose: muscle coupe, inline-four superbike with a rider in leathers,
+// ### and a European cab-over tractor unit with an open chassis, fifth wheel and twin rear tyres.
 // ### Wheels are separate so they spin and steer. setVehicle swaps the visible model, headlights and engine sound type.
 const carGroup = new THREE.Group(), carTilt = new THREE.Group();
 carGroup.add(carTilt); scene.add(carGroup);
@@ -2044,6 +2045,21 @@ const headlights = [], beams = [];
   const paintMat = (hex, rough, metal) => { const m = new THREE.MeshPhysicalMaterial({ color: hex, roughness: rough, metalness: metal, clearcoat: 1, clearcoatRoughness: 0.05 }); m.userData.env = 1.15; return m; };
   const shp = pts => { const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) s.lineTo(pts[i][0], pts[i][1]); s.closePath(); return s; };
   const cyl = (r0, r1, len, seg) => new THREE.CylinderGeometry(r0, r1, len, seg || 14);
+  // A tapered tube from point a to point b, and a scaled ball: limbs, pipes and joints
+  const limb = (a, b, r0, r1, seg) => {
+    const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), d = B.clone().sub(A), L = d.length();
+    const g = cyl(r1, r0, L, seg || 10), q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+    g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(q));
+    const M = A.clone().add(B).multiplyScalar(0.5); g.translate(M.x, M.y, M.z);
+    return g;
+  };
+  const ball = (p, r, sx, sy, sz) => new THREE.SphereGeometry(r, 12, 9).scale(sx || 1, sy || 1, sz || 1).translate(p[0], p[1], p[2]);
+  const pipe = (pts, r) => pts.slice(1).flatMap((p, i) => [limb(pts[i], p, r, r, 8), ball(p, r)]);
+  // A thin side panel with optional holes, on both sides of the centre line
+  const sidePanels = (pts, x, thick, holes) => [-1, 1].map(side => {
+    const sh = shp(pts); (holes || []).forEach(h => { const p = new THREE.Path(); h.forEach((q, i) => i ? p.lineTo(q[0], q[1]) : p.moveTo(q[0], q[1])); p.closePath(); sh.holes.push(p); });
+    return extrudeProfile(sh, thick, thick * 0.3).translate(side * x, 0, 0);
+  });
   const led = new THREE.MeshBasicMaterial({ color: 0xeef6ff });
   const red = SHARED.tail;
   const gun = new THREE.MeshStandardMaterial({ color: 0x2a2d33, roughness: 0.32, metalness: 0.85 }); gun.userData.env = 1;
@@ -2055,20 +2071,29 @@ const headlights = [], beams = [];
   // Torus tyre, open rim barrel, spokes or a solid face, brake rotor and caliper
   function wheel(group, o){
     const pivot = new THREE.Group(); pivot.position.set(o.x, o.r, o.z); group.add(pivot);
-    const tube = o.r * 0.27, mid = o.r - tube;
+    const tube = o.r * (o.tyre || 0.27), mid = o.r - tube;
     const tg = new THREE.TorusGeometry(mid, tube, 12, 30); tg.rotateY(Math.PI / 2); tg.scale(o.w / (tube * 2), 1, 1);
     const w = new THREE.Mesh(tg, SHARED.tire); w.castShadow = true;
-    const barrel = new THREE.Mesh(cyl(mid, mid, o.w * 0.9, 24).rotateZ(Math.PI / 2), o.rim);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(mid, mid, o.w * 0.9, 24, 1, !!o.rotors).rotateZ(Math.PI / 2), o.rim);
     w.add(barrel);
     if (o.solid){
       const face = cyl(mid * 0.98, mid * 0.98, o.w * 0.94, 24).rotateZ(Math.PI / 2);
       w.add(new THREE.Mesh(face, o.rim));
       const hub = cyl(mid * 0.38, mid * 0.44, o.w * 1.02, 10).rotateZ(Math.PI / 2);
       w.add(new THREE.Mesh(hub, gun));
+      // ten wheel nuts and the ventilation holes of a truck wheel
+      const nuts = [], holes = [];
+      for (let k = 0; k < 10; k++){ const a = k / 10 * Math.PI * 2; for (const side of [-1, 1]) nuts.push(cyl(0.022, 0.022, 0.03, 6).rotateZ(Math.PI / 2).translate(side * o.w * 0.51, Math.cos(a) * mid * 0.5, Math.sin(a) * mid * 0.5)); }
+      for (let k = 0; k < 8; k++){ const a = (k + 0.5) / 8 * Math.PI * 2; holes.push(cyl(0.045, 0.045, o.w * 0.96, 8).rotateZ(Math.PI / 2).translate(0, Math.cos(a) * mid * 0.74, Math.sin(a) * mid * 0.74)); }
+      w.add(new THREE.Mesh(mergeGeos(nuts), gun), new THREE.Mesh(mergeGeos(holes), SHARED.trim));
     } else {
-      w.add(new THREE.Mesh(cyl(mid * 0.95, mid * 0.95, 0.02, 24).rotateZ(Math.PI / 2), alu));
+      if (o.rotors) o.rotors.forEach(x => {
+        w.add(new THREE.Mesh(cyl(o.rotorR, o.rotorR, 0.008, 28).rotateZ(Math.PI / 2).translate(x, 0, 0), alu));
+        w.add(new THREE.Mesh(cyl(o.rotorR * 0.72, o.rotorR * 0.72, 0.012, 20).rotateZ(Math.PI / 2).translate(x, 0, 0), gun));
+      });
+      else w.add(new THREE.Mesh(cyl(mid * 0.95, mid * 0.95, 0.02, 24).rotateZ(Math.PI / 2), alu));
       for (let k = 0; k < o.spokes; k++){
-        const g = new THREE.BoxGeometry(o.w * 0.86, mid * 0.92, mid * 0.16); g.translate(0, mid * 0.46, 0);
+        const g = new THREE.BoxGeometry(o.rotors ? 0.03 : o.w * 0.86, mid * 0.92, mid * (o.rotors ? 0.11 : 0.16)); g.translate(0, mid * 0.46, 0);
         const s = new THREE.Mesh(g, o.rim); s.rotation.x = k / o.spokes * Math.PI * 2; w.add(s);
       }
       w.add(new THREE.Mesh(cyl(mid * 0.2, mid * 0.2, o.w * 0.9, 10).rotateZ(Math.PI / 2), o.rim));
@@ -2122,77 +2147,203 @@ const headlights = [], beams = [];
     MODELS.car = { g, paint: pm, base: C(base), wheels, pivots, r: 0.38 };
   }
 
-  // Motorcycle: superbike with full fairing, red rims and a tucked rider
+  // Motorcycle: superbike with an inline four, twin-spar frame, upside-down fork and a tucked rider in leathers.
+  // The fairing is separate panels with vents, so the engine and its header pipes show through as on a real bike.
   {
-    const g = new THREE.Group(), base = 0x2a2d33, pm = paintMat(base, 0.32, 0.55);
+    // everything above the axles is drawn slightly tall and scaled down to a real seat height of about 0.9 m
+    const root = new THREE.Group(), g = new THREE.Group(), base = 0x30343c, pm = paintMat(base, 0.28, 0.6);
+    root.add(g); g.scale.y = 0.84; g.position.y = 0.31 * (1 - 0.84);
     const acc = new THREE.MeshStandardMaterial({ color: 0xd4f21a, roughness: 0.35, metalness: 0.2, emissive: 0x1e2600 });
     const matte = new THREE.MeshStandardMaterial({ color: 0x15171b, roughness: 0.75 });
     const gold = new THREE.MeshStandardMaterial({ color: 0xc9a04a, roughness: 0.25, metalness: 0.9 }); gold.userData.env = 1.2;
-    const leather = new THREE.MeshStandardMaterial({ color: 0x1b1d22, roughness: 0.6 });
-    mk(smoothGeo(shapeBody(extrudeProfile(shp([[0.98, 0.86], [0.86, 1.08], [0.38, 1.12], [0.18, 0.98], [-0.05, 0.6], [0.22, 0.4], [0.62, 0.43], [0.92, 0.64]]), 0.56, 0.06), { half: 0.62, zc: 0.4, belt: 0.5, roof: 1.2, tumble: 0.15, plan: 0.3 })), pm, g);
-    mk(extrudeProfile(shp([[0.72, 0.95], [0.58, 1.0], [0.13, 0.7], [0.28, 0.65]]), 0.6, 0.01), acc, g);
-    mk(extrudeProfile(shp([[0.96, 0.8], [0.9, 0.9], [0.78, 0.86], [0.83, 0.76]]), 0.58, 0.01), acc, g);
-    mk(extrudeProfile(shp([[0.87, 1.07], [0.63, 1.3], [0.56, 1.29], [0.79, 1.06]]), 0.42, 0.015), smoke, g);
-    mk(smoothGeo(extrudeProfile(shp([[0.42, 1.1], [0.12, 1.21], [-0.2, 1.13], [-0.16, 0.95], [0.34, 0.97]]), 0.48, 0.06)), pm, g);
-    mk(extrudeProfile(shp([[-0.16, 1.08], [-0.5, 1.1], [-0.55, 1.03], [-0.2, 1.0]]), 0.32, 0.03), matte, g);
-    mk(smoothGeo(extrudeProfile(shp([[-0.48, 1.1], [-0.98, 1.3], [-1.04, 1.24], [-0.62, 1.0], [-0.3, 0.98]]), 0.3, 0.05)), pm, g);
-    mk(extrudeProfile(shp([[-0.7, 1.18], [-0.95, 1.28], [-0.98, 1.24], [-0.72, 1.13]]), 0.33, 0.01), acc, g);
-    mk(boxG(0.16, 0.04, 0.04, 0, 1.24, -1.06), red, g);
-    mk(mergeGeos([boxG(0.1, 0.035, 0.04, 0.1, 0.93, 1.0), boxG(0.1, 0.035, 0.04, -0.1, 0.93, 1.0), boxG(0.035, 0.07, 0.04, 0.19, 0.86, 0.97), boxG(0.035, 0.07, 0.04, -0.19, 0.86, 0.97)]), led, g);
-    mk(boxG(0.38, 0.38, 0.5, 0, 0.52, 0.12), gun, g);
-    mk(mergeGeos([boxG(0.07, 0.1, 0.78, 0.13, 0.42, -0.36, -0.15), boxG(0.07, 0.1, 0.78, -0.13, 0.42, -0.36, -0.15)]), alu, g);
-    mk(cyl(0.075, 0.065, 0.46, 16).rotateX(Math.PI / 2 - 0.25).translate(0.21, 0.52, -0.42), alu, g);
-    mk(cyl(0.06, 0.06, 0.04, 12).rotateX(Math.PI / 2 - 0.25).translate(0.21, 0.47, -0.66), matte, g);
-    mk(mergeGeos([cyl(0.036, 0.036, 0.78, 10).rotateX(-0.23).translate(0.09, 0.68, 0.665), cyl(0.036, 0.036, 0.78, 10).rotateX(-0.23).translate(-0.09, 0.68, 0.665)]), gold, g);
-    mk(mergeGeos([boxG(0.62, 0.03, 0.03, 0, 1.07, 0.58), boxG(0.07, 0.05, 0.1, 0.3, 1.11, 0.79), boxG(0.07, 0.05, 0.1, -0.3, 1.11, 0.79)]), matte, g);
-    mk(boxG(0.42, 0.56, 0.3, 0, 1.33, -0.16, 1.0), leather, g);
-    mk(new THREE.SphereGeometry(0.19, 16, 12).translate(0, 1.5, 0.2), matte, g);
-    mk(boxG(0.03, 0.05, 0.36, 0, 1.68, 0.2), acc, g);
-    mk(boxG(0.26, 0.08, 0.06, 0, 1.5, 0.37), smoke, g);
+    const leather = new THREE.MeshStandardMaterial({ color: 0x3a3e47, roughness: 0.48, metalness: 0.1 });
+    const steel = new THREE.MeshStandardMaterial({ color: 0x8d9299, roughness: 0.35, metalness: 0.9 }); steel.userData.env = 1.1;
+    const carbon = new THREE.MeshStandardMaterial({ color: 0x2d3036, roughness: 0.28, metalness: 0.55 }); carbon.userData.env = 1.1;
+    const rimMat = new THREE.MeshStandardMaterial({ color: 0x17181c, roughness: 0.35, metalness: 0.5, side: THREE.DoubleSide });
+    const skin = new THREE.MeshStandardMaterial({ color: 0x0e0f12, roughness: 0.35, metalness: 0.2 });
+
+    // nose with its pointed plan, windscreen, headlights and the air intake under them
+    mk(smoothGeo(shapeBody(extrudeProfile(shp([[1.0, 0.86], [0.92, 0.97], [0.76, 1.06], [0.58, 1.11], [0.44, 1.1], [0.38, 0.98], [0.42, 0.8], [0.62, 0.76], [0.84, 0.76], [0.96, 0.8]]), 0.42, 0.035), { half: 0.62, zc: 0.42, belt: 0.82, roof: 1.12, tumble: 0.28, plan: 0.78 })), pm, g);
+    mk(extrudeProfile(shp([[0.76, 1.08], [0.5, 1.29], [0.44, 1.27], [0.56, 1.12]]), 0.27, 0.01), smoke, g);
+    mk(boxG(0.13, 0.05, 0.04, 0, 0.8, 1.01), skin, g);
+    mk(mergeGeos([-1, 1].map(sd => ball([sd * 0.052, 0.905, 0.955], 0.05, 1, 0.34, 0.6))), led, g);
+    mk(mergeGeos([-1, 1].map(sd => boxG(0.012, 0.02, 0.14, sd * 0.12, 0.84, 0.86))), acc, g);
+    // side panels with cooling vents; yellow graphics on top of them; a belly pan under the engine
+    const side = [[0.5, 0.98], [0.3, 0.96], [0.14, 0.82], [0.0, 0.55], [0.06, 0.4], [0.32, 0.36], [0.42, 0.56], [0.52, 0.72]];
+    mk(mergeGeos(sidePanels(side, 0.205, 0.025, [[[0.42, 0.74], [0.24, 0.8], [0.12, 0.58], [0.3, 0.46]]])), pm, g);
+    mk(mergeGeos(sidePanels([[0.48, 0.95], [0.3, 0.93], [0.18, 0.82], [0.22, 0.81], [0.32, 0.89], [0.49, 0.9]], 0.219, 0.008)), acc, g);
+    mk(mergeGeos(sidePanels([[0.33, 0.43], [0.1, 0.45], [0.08, 0.41], [0.31, 0.39]], 0.219, 0.008)), acc, g);
+    mk(smoothGeo(extrudeProfile(shp([[0.38, 0.32], [0.26, 0.2], [-0.02, 0.19], [-0.08, 0.3], [0.08, 0.3]]), 0.3, 0.025)), carbon, g);
+    // tank, seat, tail and its LED, number-plate hanger
+    mk(smoothGeo(shapeBody(extrudeProfile(shp([[0.38, 1.05], [0.16, 1.2], [-0.12, 1.2], [-0.27, 1.05], [-0.22, 0.9], [0.26, 0.92]]), 0.44, 0.08), { half: 0.5, zc: 0.05, belt: 0.95, roof: 1.2, tumble: 0.42, plan: 0.28 })), pm, g);
+    mk(extrudeProfile(shp([[0.2, 1.07], [-0.1, 1.14], [-0.14, 1.11], [0.18, 1.03]]), 0.05, 0.01).translate(0.13, 0, 0), acc, g);
+    mk(extrudeProfile(shp([[0.2, 1.07], [-0.1, 1.14], [-0.14, 1.11], [0.18, 1.03]]), 0.05, 0.01).translate(-0.13, 0, 0), acc, g);
+    mk(smoothGeo(shapeBody(extrudeProfile(shp([[-0.24, 1.03], [-0.56, 1.1], [-0.68, 1.1], [-0.62, 1.02], [-0.26, 0.94]]), 0.28, 0.04), { half: 0.5, zc: -0.3, belt: 0.95, roof: 1.1, tumble: 0.1, plan: 0.5 })), matte, g);
+    mk(smoothGeo(shapeBody(extrudeProfile(shp([[-0.58, 1.1], [-0.72, 1.14], [-1.06, 1.27], [-1.09, 1.21], [-0.88, 1.05], [-0.56, 0.92], [-0.3, 0.9]]), 0.28, 0.045), { half: 0.8, zc: -0.3, belt: 0.9, roof: 1.3, tumble: 0.2, plan: 0.82 })), pm, g);
+    mk(mergeGeos(sidePanels([[-0.72, 1.12], [-1.02, 1.24], [-1.02, 1.2], [-0.78, 1.06]], 0.095, 0.01)), acc, g);
+    mk(boxG(0.1, 0.03, 0.03, 0, 1.235, -1.09, 0.5), red, g);
+    mk(mergeGeos([boxG(0.04, 0.03, 0.34, 0, 0.95, -0.98, 0.75), boxG(0.16, 0.02, 0.2, 0, 0.84, -1.1, 0.75)]), matte, g);
+    mk(boxG(0.17, 0.1, 0.012, 0, 0.77, -1.2), plateMat, g);
+    mk(mergeGeos([limb([0.08, 0.86, -1.07], [0.2, 0.86, -1.07], 0.008, 0.008, 6), limb([-0.08, 0.86, -1.07], [-0.2, 0.86, -1.07], 0.008, 0.008, 6)]), matte, g);
+    mk(mergeGeos([ball([0.21, 0.86, -1.07], 0.022, 1.3, 0.7, 0.7), ball([-0.21, 0.86, -1.07], 0.022, 1.3, 0.7, 0.7)]), new THREE.MeshBasicMaterial({ color: 0xff9a2a }), g);
+    // the engine: crankcase, four-cylinder block leaning forwards, clutch and alternator covers
     mk(mergeGeos([
-      boxG(0.09, 0.09, 0.58, 0.22, 1.25, 0.3, 0.54), boxG(0.09, 0.09, 0.58, -0.22, 1.25, 0.3, 0.54),
-      boxG(0.14, 0.14, 0.5, 0.21, 1.0, -0.15, 0.64), boxG(0.14, 0.14, 0.5, -0.21, 1.0, -0.15, 0.64),
-      boxG(0.12, 0.45, 0.12, 0.22, 0.7, -0.1, 0.78), boxG(0.12, 0.45, 0.12, -0.22, 0.7, -0.1, 0.78)
+      boxG(0.42, 0.2, 0.44, 0, 0.33, 0.16), boxG(0.38, 0.3, 0.2, 0, 0.56, 0.3, 0.3), boxG(0.4, 0.09, 0.22, 0, 0.73, 0.25, 0.3),
+      cyl(0.11, 0.11, 0.44, 18).rotateZ(Math.PI / 2).translate(0, 0.34, 0.1)
+    ]), gun, g);
+    mk(mergeGeos([0, 1, 2, 3].flatMap(i => [-1, 1].map(sd => boxG(0.37, 0.012, 0.21, 0, 0.47 + i * 0.05, 0.27 + i * 0.015 + sd * 0.001, 0.3)))), steel, g);
+    mk(mergeGeos([cyl(0.1, 0.1, 0.03, 18).rotateZ(Math.PI / 2).translate(0.225, 0.34, 0.04), cyl(0.08, 0.08, 0.03, 16).rotateZ(Math.PI / 2).translate(-0.225, 0.36, 0.16)]), steel, g);
+    mk(boxG(0.3, 0.2, 0.05, 0, 0.62, 0.5, 0.25), SHARED.trim, g);
+    // four header pipes into one, and a short silencer
+    mk(mergeGeos([-0.135, -0.045, 0.045, 0.135].flatMap(x => pipe([[x, 0.62, 0.42], [x * 1.08, 0.52, 0.5], [x * 1.05, 0.34, 0.5], [x * 0.8, 0.22, 0.36], [0.05 + x * 0.3, 0.2, 0.12], [0.08, 0.21, -0.04]], 0.019))), steel, g);
+    mk(mergeGeos(pipe([[0.08, 0.21, -0.04], [0.16, 0.3, -0.26]], 0.03)), steel, g);
+    mk(limb([0.16, 0.3, -0.26], [0.205, 0.45, -0.64], 0.055, 0.082, 14), carbon, g);
+    mk(cyl(0.05, 0.05, 0.03, 12).rotateX(Math.PI / 2 - 0.37).translate(0.207, 0.457, -0.655), matte, g);
+    mk(mergeGeos([limb([0.17, 0.33, -0.3], [0.17, 0.33, -0.3], 0.06, 0.06, 4), cyl(0.086, 0.086, 0.02, 14).rotateX(Math.PI / 2 - 0.37).translate(0.2, 0.43, -0.58)]), alu, g);
+    // frame, rear subframe, swingarm, shock, chain and rear brake
+    mk(mergeGeos([-1, 1].flatMap(sd => [
+      limb([sd * 0.05, 0.98, 0.46], [sd * 0.2, 0.92, 0.22], 0.038, 0.038, 6), limb([sd * 0.2, 0.92, 0.22], [sd * 0.17, 0.72, -0.12], 0.038, 0.04, 6), limb([sd * 0.17, 0.72, -0.12], [sd * 0.14, 0.46, -0.15], 0.04, 0.034, 6),
+      limb([sd * 0.1, 0.46, -0.15], [sd * 0.11, 0.31, -0.74], 0.042, 0.026, 6), limb([sd * 0.1, 0.34, -0.16], [sd * 0.11, 0.31, -0.74], 0.016, 0.016, 6),
+      limb([sd * 0.08, 0.82, -0.14], [sd * 0.08, 1.0, -0.75], 0.014, 0.012, 6)
+    ])), alu, g);
+    mk(mergeGeos([limb([0, 0.7, -0.26], [0, 0.42, -0.34], 0.033, 0.033, 10)]), matte, g);
+    const coil = []; for (let k = 0; k < 7; k++) coil.push(new THREE.TorusGeometry(0.038, 0.007, 5, 12).rotateX(Math.PI / 2 + 0.28).translate(0, 0.46 + k * 0.035, -0.33 + k * 0.0095));
+    mk(mergeGeos(coil), gold, g);
+    mk(mergeGeos([boxG(0.012, 0.012, 0.66, -0.135, 0.42, -0.42, 0.13), boxG(0.012, 0.012, 0.66, -0.135, 0.28, -0.42, 0.02)]), SHARED.trim, g);
+    mk(mergeGeos([boxG(0.03, 0.02, 0.03, 0.14, 0.45, -0.72), boxG(0.03, 0.09, 0.09, 0.13, 0.38, -0.8, 0.6)]), gold, g);
+    // clip-on bars, levers, instruments, mirrors; rear-set pegs
+    mk(mergeGeos([-1, 1].flatMap(sd => [limb([sd * 0.07, 1.12, 0.47], [sd * 0.3, 1.08, 0.5], 0.014, 0.014, 8), limb([sd * 0.21, 1.1, 0.53], [sd * 0.31, 1.09, 0.58], 0.006, 0.005, 6), limb([sd * 0.25, 1.1, 0.74], [sd * 0.2, 1.1, 0.65], 0.008, 0.008, 6)])), matte, g);
+    mk(mergeGeos([-1, 1].map(sd => boxG(0.1, 0.055, 0.03, sd * 0.28, 1.12, 0.76, 0.15))), matte, g);
+    mk(mergeGeos([-1, 1].map(sd => boxG(0.085, 0.04, 0.008, sd * 0.28, 1.12, 0.742, 0.15))), smoke, g);
+    mk(boxG(0.13, 0.03, 0.09, 0, 1.17, 0.5, 0.6), SHARED.trim, g);
+    mk(mergeGeos([-1, 1].flatMap(sd => [limb([sd * 0.15, 0.56, -0.22], [sd * 0.22, 0.5, -0.27], 0.014, 0.012, 6), boxG(0.04, 0.09, 0.03, sd * 0.15, 0.6, -0.2, 0.3)])), alu, g);
+    // the rider: arms to the bars, knees against the tank, feet on the pegs, head down behind the screen
+    const J = { hip: [0.11, 1.09, -0.38], knee: [0.27, 0.85, 0.06], ankle: [0.22, 0.56, -0.25], sh: [0.18, 1.39, 0.03], el: [0.3, 1.2, 0.26], wr: [0.25, 1.09, 0.46] };
+    const lr = (p, sd) => [p[0] * sd, p[1], p[2]];
+    mk(mergeGeos([
+      limb([0, 1.08, -0.38], [0, 1.38, 0.0], 0.155, 0.185, 14).scale(1.14, 1, 1), ball([0, 1.1, -0.38], 0.175, 1.1, 0.88, 1.05), ball([0, 1.38, 0.02], 0.185, 1.16, 0.8, 0.84),
+      ...[-1, 1].flatMap(sd => [
+        limb(lr(J.hip, sd), lr(J.knee, sd), 0.105, 0.072, 12), ball(lr(J.knee, sd), 0.076), limb(lr(J.knee, sd), lr(J.ankle, sd), 0.07, 0.046, 12),
+        limb(lr(J.sh, sd), lr(J.el, sd), 0.072, 0.052, 12), ball(lr(J.sh, sd), 0.08), ball(lr(J.el, sd), 0.054), limb(lr(J.el, sd), lr(J.wr, sd), 0.052, 0.036, 12)
+      ])
     ]), leather, g);
+    // armour and stripes on the suit, hump behind the helmet
+    mk(mergeGeos([ball([0, 1.47, -0.09], 0.075, 0.9, 1.25, 1), ...[-1, 1].flatMap(sd => [ball(lr(J.sh, sd), 0.052, 1.25, 0.9, 1).translate(0, 0.045, 0), ball(lr(J.el, sd), 0.036, 1, 1, 1.2).translate(sd * 0.02, 0, 0)])]), matte, g);
+    mk(mergeGeos([-1, 1].flatMap(sd => [ball(lr(J.knee, sd), 0.05, 1.05, 0.7, 1.1).translate(sd * 0.04, -0.01, 0.03), limb([sd * 0.2, 1.3, -0.1], [sd * 0.2, 1.12, -0.33], 0.016, 0.016, 6)])), acc, g);
+    // boots and gloves
+    mk(mergeGeos([-1, 1].flatMap(sd => [
+      limb(lr(J.ankle, sd), lr([0.22, 0.5, -0.28], sd), 0.046, 0.05, 10), boxG(0.09, 0.05, 0.25, sd * 0.225, 0.47, -0.19, 0.08), ball([sd * 0.225, 0.48, -0.07], 0.046, 1, 0.65, 1.1),
+      ball(lr(J.wr, sd), 0.042, 1.1, 0.8, 1.35), ball([sd * 0.25, 1.09, 0.51], 0.038, 1.2, 0.72, 0.8)
+    ])), matte, g);
+    // full-face helmet with chin bar, visor and a small aero fin
+    mk(mergeGeos([ball([0, 1.54, 0.22], 0.137, 0.96, 0.96, 1.08), ball([0, 1.47, 0.3], 0.1, 0.92, 0.72, 1.1), limb([0, 1.42, 0.08], [0, 1.47, 0.17], 0.065, 0.075, 10)]), carbon, g);
+    const visor = new THREE.MeshStandardMaterial({ color: 0x3f7c9c, roughness: 0.08, metalness: 0.95 }); visor.userData.env = 1.5;
+    mk(ball([0, 1.555, 0.298], 0.094, 1.17, 0.46, 0.8), visor, g);
+    mk(mergeGeos([ball([0, 1.62, 0.16], 0.1, 0.22, 0.62, 1.05), ...[-1, 1].map(sd => boxG(0.012, 0.028, 0.15, sd * 0.126, 1.5, 0.14))]), acc, g);
     const wheels = [], pivots = [];
-    wheel(g, { x: 0, z: 0.76, r: 0.31, w: 0.13, rim: new THREE.MeshStandardMaterial({ color: 0xc8202a, roughness: 0.3, metalness: 0.5 }), spokes: 5, caliper: 0xc9a04a, front: true, list: wheels, pivots });
-    wheel(g, { x: 0, z: -0.74, r: 0.31, w: 0.19, rim: new THREE.MeshStandardMaterial({ color: 0xc8202a, roughness: 0.3, metalness: 0.5 }), spokes: 5, front: false, list: wheels, pivots });
-    MODELS.bike = { g, paint: pm, base: C(base), wheels, pivots, r: 0.31 };
+    const rimF = rimMat, rimR = rimMat;
+    wheel(root, { x: 0, z: 0.76, r: 0.31, w: 0.12, rim: rimF, spokes: 6, tyre: 0.16, rotors: [0.058, -0.058], rotorR: 0.158, front: true, list: wheels, pivots });
+    wheel(root, { x: 0, z: -0.74, r: 0.31, w: 0.19, rim: rimR, spokes: 6, tyre: 0.18, rotors: [0.075], rotorR: 0.11, front: false, list: wheels, pivots });
+    // the fork turns with the front wheel: thick outer tubes above, gold inner tubes and radial calipers at the axle
+    const fork = new THREE.Group(); pivots[0].add(fork);
+    mk(mergeGeos([-1, 1].map(sd => limb([sd * 0.09, 0.26, -0.1], [sd * 0.08, 0.62, -0.25], 0.041, 0.041, 12))), gun, fork);
+    mk(mergeGeos([-1, 1].map(sd => limb([sd * 0.09, 0.0, 0], [sd * 0.09, 0.3, -0.115], 0.027, 0.027, 12))), gold, fork);
+    mk(mergeGeos([boxG(0.25, 0.035, 0.1, 0, 0.6, -0.24), boxG(0.26, 0.05, 0.1, 0, 0.49, -0.2), ...[-1, 1].map(sd => boxG(0.045, 0.07, 0.07, sd * 0.09, -0.005, 0.005))]), alu, fork);
+    mk(mergeGeos([-1, 1].flatMap(sd => [boxG(0.05, 0.13, 0.05, sd * 0.09, 0.09, -0.135, -0.5), boxG(0.03, 0.05, 0.05, sd * 0.06, 0.12, -0.13)])), gold, fork);
+    const fender = new THREE.Mesh(extrudeProfile(shp([[0.25, 0.14], [0.14, 0.3], [-0.06, 0.345], [-0.25, 0.2], [-0.2, 0.2], [-0.06, 0.31], [0.12, 0.27], [0.21, 0.13]]), 0.13, 0.008), carbon); fork.add(fender);
+    MODELS.bike = { g: root, paint: pm, base: C(base), wheels, pivots, r: 0.31 };
   }
 
-  // Truck: modern tractor unit with a high-roof cab in sage green
+  // Truck: European cab-over tractor unit in sage green. A tall sleeper cab sits over the front axle; behind it the
+  // chassis is open: tanks, air and electric lines to the trailer, a fifth wheel over twin rear tyres, mudguards and tail lights.
   {
     const g = new THREE.Group(), base = 0xa8c6bc, pm = paintMat(base, 0.26, 0.55);
-    mk(smoothGeo(shapeBody(extrudeProfile(shp([[0.55, 1.0], [3.0, 1.0], [3.1, 1.45], [3.02, 2.55], [2.95, 3.2], [2.78, 3.45], [2.5, 3.95], [0.55, 3.98]]), 2.5, 0.12), { half: 1.4, zc: 1.8, belt: 1.5, roof: 3.9, tumble: 0.04, plan: 0.1 })), pm, g);
+    const plastic = new THREE.MeshStandardMaterial({ color: 0x24272c, roughness: 0.62, metalness: 0.1 });
+    const grey = new THREE.MeshStandardMaterial({ color: 0x585e65, roughness: 0.5, metalness: 0.45 }); grey.userData.env = 0.8;
+    const amber = new THREE.MeshBasicMaterial({ color: 0xff9a2a });
+    const rubber = new THREE.MeshStandardMaterial({ color: 0x09090b, roughness: 0.85 });
+    // cab shell above the door sills
+    mk(smoothGeo(shapeBody(extrudeProfile(shp([[0.72, 1.26], [3.0, 1.26], [3.03, 1.7], [2.98, 2.42], [2.87, 3.12], [2.74, 3.44], [2.38, 3.72], [1.6, 3.86], [0.84, 3.84], [0.72, 3.68]]), 2.5, 0.1), { half: 1.5, zc: 1.86, belt: 1.5, roof: 3.9, tumble: 0.075, plan: 0.09 })), pm, g);
+    // lower cab and bumper in grey plastic with the front wheel arch cut out
+    const low = new THREE.Shape();
+    low.moveTo(0.62, 0.6); low.lineTo(1.3, 0.6); low.absarc(2.0, 0.56, 0.7, Math.PI, 0, true);
+    low.lineTo(3.0, 0.46); low.lineTo(3.2, 0.46); low.lineTo(3.25, 0.68); low.lineTo(3.23, 1.2); low.lineTo(0.62, 1.2); low.closePath();
+    mk(extrudeProfile(low, 2.44, 0.03), plastic, g);
+    mk(mergeGeos([boxG(2.5, 0.17, 2.3, 0, 1.3, 1.86), boxG(2.5, 0.03, 2.3, 0, 1.43, 1.86)]), new THREE.MeshStandardMaterial({ color: 0x3f5a54, roughness: 0.4, metalness: 0.4 }), g);
+    // windscreen in a rubber frame, wipers, sun visor
+    mk(extrudeProfile(shp([[3.11, 2.4], [2.98, 3.14], [2.9, 3.14], [3.03, 2.4]]), 2.28, 0.015), rubber, g);
+    mk(extrudeProfile(shp([[3.125, 2.45], [3.0, 3.1], [2.95, 3.1], [3.08, 2.45]]), 2.18, 0.01), SHARED.glass, g);
+    mk(mergeGeos([limb([0.08, 2.47, 3.14], [1.0, 2.62, 3.1], 0.012, 0.012, 5), limb([-1.0, 2.47, 3.14], [-0.08, 2.62, 3.1], 0.012, 0.012, 5)]), rubber, g);
+    mk(smoothGeo(extrudeProfile(shp([[3.08, 3.22], [3.0, 3.34], [2.84, 3.44], [2.84, 3.36], [2.96, 3.25]]), 2.3, 0.015)), pm, g);
+    // door and sleeper windows run across the cab, so only their outer faces show; door seams, handles, grab rails
+    mk(extrudeProfile(shp([[2.89, 2.28], [2.76, 3.06], [1.82, 3.06], [1.78, 2.28]]), 2.44, 0.015), SHARED.glass, g);
+    mk(extrudeProfile(shp([[1.1, 2.86], [1.1, 3.14], [0.72, 3.14], [0.72, 2.86]]), 2.43, 0.012), SHARED.glass, g);
     mk(mergeGeos([
-      extrudeProfile(shp([[3.21, 2.6], [3.14, 3.24], [3.08, 3.24], [3.15, 2.6]]), 2.3, 0.02),
-      boxG(0.04, 0.8, 1.0, 1.38, 2.85, 2.3), boxG(0.04, 0.8, 1.0, -1.38, 2.85, 2.3)
-    ]), SHARED.glass, g);
-    mk(boxG(2.1, 0.62, 0.06, 0, 1.95, 3.22), darkGrille, g);
-    mk(boxG(2.54, 0.62, 0.48, 0, 0.8, 3.06), pm, g);
-    mk(boxG(1.5, 0.36, 0.05, 0, 0.8, 3.31), darkGrille, g);
+      boxG(2.5, 1.86, 0.018, 0, 2.12, 2.92), boxG(2.5, 1.9, 0.018, 0, 2.15, 1.7), boxG(2.5, 0.018, 1.2, 0, 1.2, 2.31),
+      boxG(2.47, 0.018, 1.0, 0, 3.12, 2.27), boxG(2.44, 0.03, 1.22, 0, 3.16, 2.27)
+    ]), rubber, g);
+    mk(mergeGeos([-1, 1].flatMap(sd => [boxG(0.04, 0.05, 0.22, sd * 1.235, 2.12, 1.88), limb([sd * 1.255, 1.3, 2.86], [sd * 1.225, 2.2, 2.86], 0.016, 0.016, 6), limb([sd * 1.25, 1.3, 1.74], [sd * 1.23, 2.0, 1.74], 0.016, 0.016, 6)])), plastic, g);
+    // steps in a recess behind the wheel arch
+    mk(mergeGeos([-1, 1].map(sd => boxG(0.04, 0.72, 0.56, sd * 1.21, 0.86, 1.02))), SHARED.trim, g);
+    mk(mergeGeos([-1, 1].flatMap(sd => [boxG(0.2, 0.035, 0.52, sd * 1.15, 0.62, 1.02), boxG(0.2, 0.035, 0.52, sd * 1.15, 0.98, 1.02)])), alu, g);
+    // grille with its horizontal bars, front panel, headlights in the bumper
+    mk(boxG(2.12, 0.86, 0.04, 0, 1.76, 3.125), plastic, g);
+    mk(mergeGeos([1.45, 1.62, 1.79, 1.96, 2.12].map(y => boxG(2.06 - (y - 1.45) * 0.05, 0.075, 0.05, 0, y, 3.15))), grey, g);
+    mk(mergeGeos([boxG(2.3, 0.13, 0.05, 0, 1.28, 3.16), boxG(0.42, 0.1, 0.04, 0, 2.26, 3.11)]), pm, g);
+    mk(boxG(0.34, 0.06, 0.02, 0, 2.26, 3.135), alu, g);
+    mk(mergeGeos([-1, 1].flatMap(sd => [boxG(0.56, 0.3, 0.05, sd * 0.87, 0.95, 3.235), boxG(0.5, 0.1, 0.05, sd * 0.87, 0.66, 3.225)])), SHARED.trim, g);
+    mk(mergeGeos([-1, 1].flatMap(sd => [boxG(0.22, 0.17, 0.04, sd * 0.97, 0.95, 3.26), boxG(0.18, 0.17, 0.04, sd * 0.72, 0.95, 3.26)])), SHARED.lens, g);
+    mk(mergeGeos([-1, 1].flatMap(sd => [boxG(0.5, 0.025, 0.04, sd * 0.87, 1.06, 3.265), boxG(0.14, 0.06, 0.04, sd * 0.87, 0.66, 3.26)])), led, g);
+    mk(mergeGeos([-1, 1].flatMap(sd => [boxG(0.1, 0.1, 0.04, sd * 1.14, 0.95, 3.25), boxG(0.03, 0.05, 0.14, sd * 1.23, 1.13, 2.92)])), amber, g);
+    mk(mergeGeos([boxG(0.56, 0.13, 0.02, 0, 0.72, 3.26)]), plateMat, g);
+    mk(boxG(0.6, 0.1, 0.05, 0, 0.53, 3.21), grey, g);
+    // roof: marker lights, hatch, aerial; large mirrors on arms, a kerb mirror over the door
+    mk(mergeGeos([-0.7, -0.35, 0, 0.35, 0.7].map(x => boxG(0.13, 0.04, 0.05, x, 3.86, 2.3, -0.5))), amber, g);
+    mk(mergeGeos([boxG(0.82, 0.07, 0.72, 0, 3.98, 1.3), limb([0.76, 3.92, 0.9], [0.8, 4.3, 0.75], 0.007, 0.005, 5)]), plastic, g);
+    mk(mergeGeos([-1, 1].flatMap(sd => [
+      limb([sd * 1.15, 3.2, 2.72], [sd * 1.5, 3.14, 2.92], 0.02, 0.02, 6), limb([sd * 1.18, 2.42, 2.82], [sd * 1.5, 2.56, 2.92], 0.02, 0.02, 6),
+      boxG(0.25, 0.56, 0.1, sd * 1.54, 2.86, 2.92), boxG(0.25, 0.2, 0.1, sd * 1.54, 2.46, 2.92),
+      limb([sd * 0.72, 3.3, 2.9], [sd * 0.72, 3.36, 3.16], 0.012, 0.012, 5), boxG(0.28, 0.17, 0.06, sd * 0.72, 3.3, 3.2)
+    ])), plastic, g);
+    mk(mergeGeos([-1, 1].flatMap(sd => [boxG(0.21, 0.5, 0.012, sd * 1.54, 2.86, 2.865), boxG(0.21, 0.16, 0.012, sd * 1.54, 2.46, 2.865)])), SHARED.glass, g);
+    // side fairings behind the cab close the gap to a trailer
+    mk(mergeGeos(sidePanels([[0.66, 3.7], [0.26, 3.56], [0.26, 1.62], [0.66, 1.3]], 1.215, 0.05)), pm, g);
+    mk(boxG(2.4, 2.4, 0.04, 0, 2.5, 0.6), plastic, g);
+    // chassis: two rails with cross members, catwalk plate behind the cab
     mk(mergeGeos([
-      boxG(0.34, 0.14, 0.05, 0.92, 0.92, 3.31), boxG(0.34, 0.14, 0.05, -0.92, 0.92, 3.31),
-      boxG(0.44, 0.03, 0.05, 0.9, 1.03, 3.31), boxG(0.44, 0.03, 0.05, -0.9, 1.03, 3.31),
-      boxG(0.03, 0.24, 0.05, 0.7, 0.85, 3.31), boxG(0.03, 0.24, 0.05, -0.7, 0.85, 3.31)
-    ]), led, g);
-    mk(mergeGeos([
-      boxG(2.5, 0.08, 0.45, 0, 3.4, 3.2, -0.15),
-      boxG(0.38, 0.08, 0.08, 1.42, 3.15, 2.95), boxG(0.38, 0.08, 0.08, -1.42, 3.15, 2.95),
-      boxG(0.1, 0.2, 0.14, 1.6, 3.1, 2.95), boxG(0.1, 0.2, 0.14, -1.6, 3.1, 2.95),
-      boxG(0.35, 0.06, 0.32, 1.15, 0.55, 2.2), boxG(0.35, 0.06, 0.32, -1.15, 0.55, 2.2),
-      boxG(0.35, 0.06, 0.32, 1.15, 0.92, 2.2), boxG(0.35, 0.06, 0.32, -1.15, 0.92, 2.2),
-      boxG(0.03, 0.35, 0.6, 1.38, 3.55, 1.9), boxG(0.03, 0.35, 0.6, -1.38, 3.55, 1.9),
-      boxG(1.8, 0.35, 6.4, 0, 0.72, -0.1),
-      boxG(1.3, 0.12, 1.2, 0, 1.0, -1.7),
-      boxG(0.62, 0.06, 1.25, 1.05, 1.12, -1.7), boxG(0.62, 0.06, 1.25, -1.05, 1.12, -1.7)
+      boxG(0.09, 0.28, 4.75, 0.42, 0.88, -0.82), boxG(0.09, 0.28, 4.75, -0.42, 0.88, -0.82),
+      boxG(0.9, 0.1, 0.1, 0, 0.8, 0.5), boxG(0.9, 0.1, 0.1, 0, 0.8, -0.9), boxG(0.9, 0.2, 0.12, 0, 0.86, -3.1), boxG(0.24, 0.5, 0.6, 0, 0.56, -1.7)
     ]), SHARED.trim, g);
-    mk(mergeGeos([boxG(0.06, 2.6, 0.9, 1.4, 2.7, 0.35), boxG(0.06, 2.6, 0.9, -1.4, 2.7, 0.35), boxG(0.45, 0.6, 1.7, 1.05, 0.78, -0.05), boxG(0.45, 0.6, 1.7, -1.05, 0.78, -0.05)]), pm, g);
-    mk(mergeGeos([boxG(0.3, 0.12, 0.04, 0.85, 0.85, -3.33), boxG(0.3, 0.12, 0.04, -0.85, 0.85, -3.33)]), red, g);
-    mk(boxG(0.52, 0.12, 0.02, 0, 0.55, 3.31), plateMat, g);
+    mk(boxG(1.5, 0.05, 0.62, 0, 1.08, 0.12), grey, g);
+    // fifth wheel: the coupling plate with its slot, on two mounting rails
+    mk(mergeGeos([boxG(0.14, 0.16, 1.1, 0.42, 1.09, -1.55), boxG(0.14, 0.16, 1.1, -0.42, 1.09, -1.55)]), grey, g);
+    mk(cyl(0.68, 0.72, 0.09, 26).translate(0, 1.2, -1.55), SHARED.trim, g);
+    mk(mergeGeos([extrudeProfile(shp([[-1.5, 1.255], [-2.26, 1.255], [-2.26, 1.24], [-1.5, 1.24]]), 0.2, 0.002), boxG(0.1, 0.02, 0.1, 0, 1.25, -1.5)]), grey, g);
+    // fuel tank with straps on the right, air tanks and battery box on the left, and the silencer
+    mk(mergeGeos([cyl(0.33, 0.33, 1.42, 22).rotateX(Math.PI / 2).translate(0.86, 0.72, -0.25)]), alu, g);
+    mk(mergeGeos([-0.72, -0.25, 0.22].map(z => new THREE.TorusGeometry(0.335, 0.012, 5, 22).translate(0.86, 0.72, z))), SHARED.trim, g);
+    mk(mergeGeos([boxG(0.62, 0.62, 0.92, -0.86, 0.72, -0.42)]), plastic, g);
+    mk(boxG(0.03, 0.5, 0.8, -1.18, 0.72, -0.42), grey, g);
+    mk(mergeGeos([0.56, 0.72, 0.88].map(y => boxG(0.03, 0.03, 0.74, -1.2, y, -0.42))), SHARED.trim, g);
+    mk(mergeGeos([limb([-0.72, 0.56, 0.1], [-0.72, 0.56, 0.5], 0.13, 0.13, 12), limb([-0.72, 0.84, 0.1], [-0.72, 0.84, 0.5], 0.1, 0.1, 12)]), grey, g);
+    mk(limb([0.72, 0.62, 0.55], [0.72, 0.62, 1.05], 0.2, 0.2, 14), grey, g);
+    // air and electric lines to the trailer, coiled, on a rack behind the cab
+    [[0x2a6fd0, -0.28], [0xd8392f, 0], [0xe6c52a, 0.28]].forEach(([hex, x]) => {
+      const rings = []; for (let k = 0; k < 5; k++) rings.push(new THREE.TorusGeometry(0.11, 0.012, 5, 12).rotateX(Math.PI / 2 + 0.35).translate(x, 1.42 + k * 0.17, 0.4 - k * 0.01));
+      mk(mergeGeos(rings), new THREE.MeshStandardMaterial({ color: hex, roughness: 0.5 }), g);
+    });
+    mk(mergeGeos([limb([-0.5, 1.1, 0.5], [-0.5, 2.3, 0.5], 0.02, 0.02, 6), limb([0.5, 1.1, 0.5], [0.5, 2.3, 0.5], 0.02, 0.02, 6), limb([-0.5, 2.3, 0.5], [0.5, 2.3, 0.5], 0.02, 0.02, 6)]), SHARED.trim, g);
+    // mudguards over the twin tyres, mud flaps, tail-light bar, underrun bar
+    mk(mergeGeos([-1, 1].flatMap(sd => [boxG(0.72, 0.03, 0.82, sd * 0.93, 1.2, -1.7), boxG(0.72, 0.03, 0.46, sd * 0.93, 1.06, -1.05, 0.72), boxG(0.72, 0.03, 0.44, sd * 0.93, 1.06, -2.34, -0.72)])), plastic, g);
+    mk(mergeGeos([-1, 1].flatMap(sd => [boxG(0.72, 0.5, 0.02, sd * 0.93, 0.62, -2.5), boxG(0.5, 0.42, 0.02, sd * 1.0, 0.34, 1.15)])), rubber, g);
+    mk(mergeGeos([boxG(2.3, 0.1, 0.1, 0, 0.7, -3.22), ...[-1, 1].map(sd => boxG(0.5, 0.18, 0.07, sd * 0.86, 0.86, -3.22))]), SHARED.trim, g);
+    mk(mergeGeos([-1, 1].map(sd => boxG(0.22, 0.12, 0.04, sd * 0.98, 0.86, -3.26))), red, g);
+    mk(mergeGeos([-1, 1].flatMap(sd => [boxG(0.11, 0.12, 0.04, sd * 0.8, 0.86, -3.26)])), amber, g);
+    mk(mergeGeos([-1, 1].map(sd => boxG(0.08, 0.12, 0.04, sd * 0.69, 0.86, -3.26))), led, g);
+    mk(boxG(0.52, 0.12, 0.02, 0, 0.7, -3.285), plateMat, g);
     const wheels = [], pivots = [];
-    [[1.08, 2.0, true, 0.36], [-1.08, 2.0, true, 0.36], [1.02, -1.7, false, 0.56], [-1.02, -1.7, false, 0.56]].forEach(([x, z, f, w]) =>
-      wheel(g, { x, z, r: 0.52, w, rim: alu, solid: true, front: f, list: wheels, pivots }));
+    [[1.1, 2.0, true, 0.32], [-1.1, 2.0, true, 0.32], [0.76, -1.7, false, 0.26], [1.06, -1.7, false, 0.26], [-0.76, -1.7, false, 0.26], [-1.06, -1.7, false, 0.26]].forEach(([x, z, f, w]) =>
+      wheel(g, { x, z, r: 0.52, w, tyre: 0.22, rim: alu, solid: true, front: f, list: wheels, pivots }));
     MODELS.truck = { g, paint: pm, base: C(base), wheels, pivots, r: 0.52 };
   }
 

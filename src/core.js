@@ -20,7 +20,7 @@
   };
   const VEH = {
     car: { key: 'car', name: 'Car', cls: 'Muscle coupe', blurb: 'A fastback V8 coupe. Balanced speed and grip, average toughness.', speed: 1.0, accel: 1.0, handling: 1.0, dmg: 1.0, ram: 1.0, samples: [-1.1, 1.1], r: 1.2, cam: [10, 4.4], show: [7.5, 2.0, 0.7], light: 2.45, lightY: 0.7 },
-    bike: { key: 'bike', name: 'Motorcycle', cls: 'Superbike', blurb: 'Fastest and most agile. Slips through gaps, but barely nudges a police car.', speed: 1.12, accel: 1.3, handling: 1.4, dmg: 1.0, ram: 0.4, samples: [-0.45, 0.45], r: 0.8, cam: [8.5, 3.7], show: [4.6, 1.6, 0.8], light: 1.0, lightY: 0.93 },
+    bike: { key: 'bike', name: 'Motorcycle', cls: 'Superbike', blurb: 'Fastest and most agile. Slips through gaps, but barely nudges a police car.', speed: 1.12, accel: 1.3, handling: 1.4, dmg: 1.0, ram: 0.4, samples: [-0.45, 0.45], r: 0.8, cam: [8.5, 3.7], show: [4.6, 1.6, 0.8], light: 1.0, lightY: 0.8 },
     truck: { key: 'truck', name: 'Truck', cls: 'Tractor unit', blurb: 'A high-roof tractor unit. Slow, but built like a tank and shoves police cars aside.', speed: 0.78, accel: 0.7, handling: 0.72, dmg: 0.55, ram: 2.4, samples: [-2.1, 0, 2.0], r: 1.4, cam: [12.5, 5.8], show: [11, 3.4, 1.9], light: 3.35, lightY: 0.92 }
   };
   const REV_SPEED = -11, REPAIR_AMOUNT = 40, MAX_DT = 0.05, STORY_ACTS = 3;
