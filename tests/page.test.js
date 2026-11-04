@@ -256,3 +256,12 @@ test('the menu previews come from the real models, and every map picture fills i
   assert.match(game, /renderPreviews\(\);/);
   assert.equal((game.match(/viewBox="0 0 160 80" preserveAspectRatio="xMidYMid slice"/g) || []).length, 3);
 });
+
+test('the radio is synthesised, wired to a key and a button, and its stored choice is validated', () => {
+  assert.match(game, /Core\.radioBar\(radio\.key, radio\.bar\)/);
+  assert.match(game, /e\.code === 'KeyR'/);
+  assert.match(game, /radio\.key = Core\.parseRadio\(key\)/);
+  assert.match(html, /id="btnRadio"/);
+  assert.match(html, /id="radioTag"/);
+  assert.doesNotMatch(game, /new Audio\(|\.(mp3|ogg|wav|m4a)\b/, 'no audio files anywhere');
+});

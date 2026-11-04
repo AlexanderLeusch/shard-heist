@@ -96,6 +96,16 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       assert.deepEqual(errors, []);
     });
 
+    await t.test('the radio chips change the station and refuse nothing silently', async () => {
+      assert.equal(await evaluate("document.querySelectorAll('[data-radio]').length"), 8);
+      await click('[data-radio="techno"]');
+      assert.equal(await evaluate("document.getElementById('radioTag').textContent"), 'Techno');
+      assert.equal(await evaluate("localStorage.getItem('shard-heist-radio')"), 'techno');
+      await click('[data-radio="off"]');
+      assert.equal(await evaluate("document.getElementById('radioTag').hidden"), true);
+      assert.deepEqual(errors, []);
+    });
+
     await t.test('choosing a vehicle updates the stats card', async () => {
       await click('[data-pick="veh"][data-val="bike"]');
       assert.equal(await evaluate("document.querySelector('[data-pick=\"veh\"][data-val=\"bike\"]').getAttribute('aria-pressed')"), 'true');

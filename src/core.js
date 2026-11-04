@@ -459,6 +459,116 @@
     return d;
   }
 
+  // ---------- Radio ----------
+  // ### Seven stations with no music files. radioBar writes one bar of a station as a list of notes, and game.js plays them on
+  // ### synthesised instruments. Each genre's sound comes from its tempo, drum pattern and chords. The tunes are generated from a
+  // ### seeded random walk, so they are original to this game and repeat in sections like a real song (form: A and B, eight bars
+  // ### each). The classical station plays works long in the public domain: Bach's Prelude in C (BWV 846) and Beethoven's Ode to Joy.
+  const RADIO = Object.freeze({
+    reggae: { name: 'Reggae', bpm: 76, form: 'AABA', prog: [[57, 'm'], [55, 'M'], [53, 'M'], [55, 'M']], scale: [0, 3, 5, 7, 10] },
+    techno: { name: 'Techno', bpm: 132, form: 'AAAB', prog: [[45, 'm'], [45, 'm'], [48, 'M'], [43, 'M']], scale: [0, 3, 5, 7, 10] },
+    hardstyle: { name: 'Hardstyle', level: 0.7, bpm: 150, form: 'AABA', prog: [[40, 'm'], [36, 'M'], [43, 'M'], [38, 'M']], scale: [0, 2, 3, 5, 7, 8, 10] },
+    schlager: { name: 'Schlager', bpm: 124, form: 'AABA', prog: [[48, 'M'], [43, 'M'], [45, 'm'], [41, 'M'], [41, 'M'], [43, 'M'], [48, 'M'], [48, 'M']], scale: [0, 2, 4, 5, 7, 9, 11] },
+    pop: { name: 'Sing-Along Pop', bpm: 118, form: 'ABAB', prog: [[45, 'm'], [41, 'M'], [48, 'M'], [43, 'M']], scale: [0, 2, 3, 5, 7, 8, 10] },
+    classical: { name: 'Classical', bpm: 72, form: 'A', prog: [[48, 'M']], scale: [0, 2, 4, 5, 7, 9, 11] },
+    metal: { name: 'Heavy Metal', level: 0.65, bpm: 168, form: 'AABA', prog: [[40, 'm'], [40, 'm'], [43, 'M'], [41, 'M']], scale: [0, 1, 3, 5, 7, 8, 10] }
+  });
+  const RADIO_ORDER = Object.freeze(['off', ...Object.keys(RADIO)]);
+  const parseRadio = raw => RADIO_ORDER.includes(raw) ? raw : 'off';
+  function radioNext(key, dir){
+    const n = RADIO_ORDER.length, i = RADIO_ORDER.indexOf(parseRadio(key));
+    return RADIO_ORDER[(i + (dir < 0 ? -1 : 1) + n) % n];
+  }
+  // Bach, Prelude in C: each bar plays five notes as a rising pattern. Beethoven, Ode to Joy: [note, length in beats].
+  const BACH = [[60, 64, 67, 72, 76], [60, 62, 69, 74, 77], [59, 62, 67, 74, 77], [60, 64, 67, 72, 76], [60, 64, 69, 76, 81], [60, 62, 66, 69, 74], [59, 62, 67, 74, 79], [59, 60, 64, 67, 72], [57, 60, 64, 67, 72], [50, 57, 62, 66, 72], [55, 59, 62, 67, 71], [48, 60, 64, 67, 72]];
+  const ODE = [[[64, 1], [64, 1], [65, 1], [67, 1]], [[67, 1], [65, 1], [64, 1], [62, 1]], [[60, 1], [60, 1], [62, 1], [64, 1]], [[64, 1.5], [62, 0.5], [62, 2]], [[64, 1], [64, 1], [65, 1], [67, 1]], [[67, 1], [65, 1], [64, 1], [62, 1]], [[60, 1], [60, 1], [62, 1], [64, 1]], [[62, 1.5], [60, 0.5], [60, 2]]];
+  const ODE_CHORDS = [48, 43, 48, 43, 48, 43, 48, 48];
+  const textSeed = s => { let h = 7; for (let i = 0; i < s.length; i++) h = h * 31 + s.charCodeAt(i) | 0; return h; };
+  function radioBar(key, bar){
+    const S = Object.hasOwn(RADIO, key) ? RADIO[key] : null, ev = [];
+    if (!S) return ev;
+    const add = (t, i, n, d, v) => ev.push({ t, i, n: n || 0, d: d || 0.25, v: v === undefined ? 0.8 : v });
+    bar = Math.max(0, Math.floor(bar) || 0);
+    const b8 = bar % 8, sec = S.form[Math.floor(bar / 8) % S.form.length], rnd = mulberry32(textSeed(key + sec) + b8 * 131);
+    const [root, q] = S.prog[bar % S.prog.length], triad = [root, root + (q === 'm' ? 3 : 4), root + 7], pick = a => a[Math.floor(rnd() * a.length)];
+    const tone = (base, deg) => { const sc = S.scale, o = Math.floor(deg / sc.length); return base + 12 * o + sc[((deg % sc.length) + sc.length) % sc.length]; };
+    const each = (list, fn) => list.forEach(fn);
+    if (key === 'reggae'){
+      // one drop: nothing on the first beat, kick and rim together on the third; chords on the off-beats
+      add(2, 'kick', 0, 0.3, 0.9); add(2, 'rim', 0, 0.1, 0.85);
+      for (let i = 0; i < 8; i++) add(i / 2 + (i % 2 ? 0.08 : 0), 'hat', 0, 0.1, i % 2 ? 0.28 : 0.4);
+      each([0.5, 1.5, 2.5, 3.5], t => triad.forEach(n => add(t, 'skank', n + 12, 0.22, 0.42)));
+      each([0.75, 1.75, 2.75, 3.75], t => add(t, 'organ', root + 12, 0.14, 0.2));
+      add(0, 'bass', root - 12, 0.65, 0.95); add(0.75, 'bass', root - 12, 0.4, 0.8); add(1.5, 'bass', root - 5, 0.4, 0.75); add(3, 'bass', pick([root, root - 5, root - 2]) - 12, 0.4, 0.85); add(3.5, 'bass', root - 12, 0.4, 0.8);
+      if (sec === 'B') each([0, 1, 1.5, 2.5, 3], t => { if (rnd() < 0.7) add(t, 'melodica', tone(69, Math.floor(rnd() * 6)), 0.5, 0.45); });
+    } else if (key === 'techno'){
+      const drop = sec === 'B';
+      if (!drop) for (let i = 0; i < 4; i++) add(i, 'kick', 0, 0.28, 1);
+      each([0.5, 1.5, 2.5, 3.5], t => add(t, 'ohat', 0, 0.2, 0.42));
+      each([1, 3], t => add(t, 'clap', 0, 0.15, 0.55));
+      if (!drop) for (let i = 0; i < 16; i++) if (i % 4 === 2 || i % 4 === 3) add(i / 4, 'sub', root - 12, 0.2, 0.75);
+      const steps = []; for (let i = 0; i < 16; i++) steps.push(rnd() < 0.68 ? tone(root + 12, Math.floor(rnd() * 7)) : 0);
+      steps.forEach((n, i) => { if (n) add(i / 4, 'acid', n, 0.22, 0.25 + 0.75 * (b8 + i / 16) / 8); });
+      if (bar % 2 === 1) triad.forEach(n => add(1.5, 'stab', n + 24, 0.5, 0.35));
+      if (drop && b8 >= 6) for (let i = 0; i < 16; i++) add(i / 4, 'rim', 0, 0.05, 0.3 + i / 30);
+    } else if (key === 'hardstyle'){
+      const drop = sec === 'B';
+      if (!drop) for (let i = 0; i < 4; i++){ add(i, 'hkick', root, 0.36, 1); add(i + 0.5, 'rbass', root + 12, 0.4, 0.6); add(i + 0.5, 'ohat', 0, 0.16, 0.42); }
+      each([1, 3], t => add(t, 'clap', 0, 0.18, drop ? 0.25 : 0.6));
+      // the anthem: a screeching lead that climbs and falls on the chord
+      const rhythm = [[0, 0.75], [0.75, 0.75], [1.5, 0.5], [2, 1], [3, 0.5], [3.5, 0.5]];
+      let deg = b8 % 2 ? 4 : 2;
+      rhythm.forEach(([t, d]) => { deg = Math.max(0, Math.min(9, deg + pick([-2, -1, 1, 2]))); add(t, 'screech', tone(root + 24, deg), d * 0.95, drop ? 0.4 : 0.6); });
+      if (drop) triad.forEach(n => add(0, 'strings', n + 24, 4, 0.5));
+    } else if (key === 'schlager'){
+      // disco foxtrot: a straight kick, oom-pah bass, brass on the off-beats and an accordion tune to sing along to
+      for (let i = 0; i < 4; i++) add(i, 'kick', 0, 0.2, 0.85);
+      each([1, 3], t => add(t, 'snare', 0, 0.16, 0.6));
+      each([0.5, 1.5, 2.5, 3.5], t => add(t, 'hat', 0, 0.08, 0.42));
+      each([0, 2], t => add(t, 'bass', root - 12, 0.8, 0.85)); each([1, 3], t => add(t, 'bass', root - 5, 0.7, 0.7));
+      each([0.5, 1.5, 2.5, 3.5], t => triad.forEach(n => add(t, 'brass', n + 12, 0.22, 0.26)));
+      const shapes = [[[0, 1], [1, 1], [2, 1], [3, 1]], [[0, 0.5], [0.5, 0.5], [1, 1], [2, 2]], [[0, 1.5], [1.5, 0.5], [2, 1], [3, 1]]], chordTones = [root + 24, triad[1] + 24, triad[2] + 24];
+      pick(shapes).forEach(([t, d], i) => add(t, 'accordion', i % 2 === 0 ? pick(chordTones) : tone(60, 4 + Math.floor(rnd() * 5)), d * 0.92, 0.55));
+      if (b8 === 7) for (let i = 0; i < 4; i++) add(3 + i / 4, 'snare', 0, 0.1, 0.4 + i * 0.1);
+    } else if (key === 'pop'){
+      // a bright party-pop bed: four-on-the-floor, claps, plucked arpeggios, a pumping bass and a hook in the chorus
+      const chorus = sec === 'B';
+      for (let i = 0; i < 4; i++) add(i, 'kick', 0, 0.22, chorus ? 0.9 : 0.75);
+      each([1, 3], t => add(t, 'clap', 0, 0.14, 0.55));
+      for (let i = 0; i < 8; i++){ add(i / 2, 'hat', 0, 0.06, i % 2 ? 0.34 : 0.2); add(i / 2, 'pluck', triad[[0, 1, 2, 1][i % 4]] + 24, 0.24, 0.35); if (i % 2) add(i / 2, 'sub', root - 12, 0.32, 0.75); }
+      const hook = [[0, 0.5], [0.5, 0.5], [1, 0.5], [1.5, 1], [3, 0.5], [3.5, 0.5]], walk = chorus ? 4 : 2;
+      hook.forEach(([t, d], i) => { if (chorus || i % 2 === 0) add(t, 'lead', tone(69, walk + pick([-1, 0, 0, 1, 2])), d * 0.9, chorus ? 0.55 : 0.38); });
+      if (chorus) triad.forEach(n => add(0, 'strings', n + 12, 4, 0.34));
+    } else if (key === 'classical'){
+      const total = BACH.length + ODE.length, b = bar % total;
+      if (b < BACH.length){
+        // the prelude's pattern, twice per bar: two held low notes, then the three upper notes rising twice
+        const [p, q2, r, s, u] = BACH[b];
+        each([0, 2], h => { add(h, 'piano', p, 1.9, 0.5); add(h + 0.25, 'piano', q2, 1.6, 0.45); [r, s, u, r, s, u].forEach((n, i) => add(h + 0.5 + i * 0.25, 'piano', n, 0.7, 0.5 + 0.1 * (i % 3 === 2))); });
+      } else {
+        const k = b - BACH.length, c = ODE_CHORDS[k], third = c === 48 ? 4 : 4;
+        [c + 12, c + 12 + third, c + 19].forEach(n => add(0, 'strings', n, 4, 0.5));
+        let t = 0; ODE[k].forEach(([n, d]) => { add(t, 'piano', n + 12, d * 1.4, 0.62); t += d; });
+      }
+    } else if (key === 'metal'){
+      // chugging palm-muted low E, power chords on the accents, a double-kick drummer, and a solo in the bridge
+      const bridge = sec === 'B', riff = [];
+      for (let i = 0; i < 16; i++) riff.push(i % 8 === 0 ? 2 : rnd() < 0.72 ? 1 : 0);
+      riff.forEach((m, i) => {
+        const t = i / 4;
+        if (m === 2 || (m === 1 && i % 8 === 6)){ const n = i % 8 === 6 ? root + pick([1, 3, 6]) : root; [n, n + 7].forEach(x => add(t, 'guitar', x, 0.5, 0.75)); add(t, 'gbass', n - 12, 0.4, 0.8); }
+        else if (m === 1){ add(t, 'chug', root, 0.14, 0.7); add(t, 'gbass', root - 12, 0.14, 0.55); }
+      });
+      for (let i = 0; i < (bridge ? 16 : 8); i++) add(i * (bridge ? 0.25 : 0.5), 'kick', 0, 0.12, 0.85);
+      each([1, 3], t => add(t, 'snare', 0, 0.16, 0.95));
+      for (let i = 0; i < 8; i++) add(i / 2, 'hat', 0, 0.06, 0.34);
+      if (b8 === 0) add(0, 'crash', 0, 1.8, 0.6);
+      if (bridge) for (let i = 0; i < 16; i++) if (rnd() < 0.8) add(i / 4, 'solo', tone(64 + 12, Math.floor(rnd() * 9) - 2), 0.23, 0.42);
+      if (b8 === 7) for (let i = 0; i < 4; i++) add(3 + i / 4, 'snare', 0, 0.1, 0.5 + i * 0.1);
+    }
+    return ev.sort((a, b) => a.t - b.t);
+  }
+
   return Object.freeze({
     MODES, VEH, REV_SPEED, REPAIR_AMOUNT, MAX_DT, STORY_ACTS, KEY_MAP, BAIXA, streetAt, TRAM_LOOP, tramNext,
     isMode, isVeh, clamp, wrapAngle, mulberry32, shuffle, fmtTime, fmtTimeExact, frameDt,
@@ -468,6 +578,7 @@
     PURSUIT, MAX_STARS, SPOT_RADIUS, HELI_AFTER, wantedStars, pursuit, helicopterDue, copTopSpeed, trackStep, inSpotlight, bustStep, edgeDistance,
     driveTime, runStars, isNewBest,
     newStory, beginAct, retryAct, finishOpen, storyEnding, dueRadio,
-    ENGINES, ENGINE_SR, gearFor, engineTarget, isBraking, engineLoop, engineLoops, ROTOR, rotorLoop
+    ENGINES, ENGINE_SR, gearFor, engineTarget, isBraking, engineLoop, engineLoops, ROTOR, rotorLoop,
+    RADIO, RADIO_ORDER, BACH, parseRadio, radioNext, radioBar
   });
 });

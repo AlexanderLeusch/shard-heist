@@ -278,7 +278,10 @@ kbd{font-family:var(--f-mono);font-size:12px;color:var(--ink);background:rgba(25
 .m-start kbd{background:rgba(4,34,43,.12);border-color:rgba(4,34,43,.28);color:var(--spark-ink)}
 .m-foot{display:flex;flex-wrap:wrap;gap:8px 16px;font-family:var(--f-mono);font-size:11px;color:var(--muted);line-height:1.8}
 .m-foot kbd{font-size:10px;padding:1px 5px}
-.gfx{display:inline-flex;align-items:center;gap:6px}
+.gfx{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.radio-tag{margin-top:3px;font-family:var(--f-mono);font-size:10px;letter-spacing:.06em;color:var(--spark);white-space:nowrap}
+.radio-tag::before{content:'\266A  '}
+#btnRadio.on{color:var(--spark);border-color:var(--spark)}
 .gfx button{appearance:none;cursor:pointer;font-family:var(--f-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--muted)}
 .gfx button[aria-pressed="true"]{background:var(--ink);color:#12142a;border-color:var(--ink)}
 .gfx button:focus-visible{outline:2px solid var(--spark);outline-offset:2px}

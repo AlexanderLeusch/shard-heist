@@ -423,3 +423,50 @@ test('slopes: uphill is slower, downhill faster, a heavy truck feels it most, an
   assert.ok(Core.stepSpeed(10, idle, 1 / 60, 30, VEH.car, -0.1) > Core.stepSpeed(10, idle, 1 / 60, 30, VEH.car, 0), 'it coasts on downhill');
   assert.ok(Core.stepSpeed(10, idle, 1 / 60, 30, VEH.car, 0.1) < Core.stepSpeed(10, idle, 1 / 60, 30, VEH.car, 0), 'and stops sooner uphill');
 });
+
+test('radio: seven stations, the dial wraps both ways, and junk from storage means off', () => {
+  assert.equal(Object.keys(Core.RADIO).length, 7);
+  assert.deepEqual(Core.RADIO_ORDER, ['off', 'reggae', 'techno', 'hardstyle', 'schlager', 'pop', 'classical', 'metal']);
+  let k = 'off'; const seen = []; for (let i = 0; i < 8; i++){ k = Core.radioNext(k, 1); seen.push(k); }
+  assert.equal(seen[7], 'off', 'round the dial and back');
+  assert.equal(Core.radioNext('off', -1), 'metal');
+  assert.equal(Core.radioNext('reggae', -1), 'off');
+  for (const bad of [null, undefined, '', 'polka', 42, {}, '__proto__', 'constructor']) assert.equal(Core.parseRadio(bad), 'off');
+  assert.equal(Core.parseRadio('techno'), 'techno');
+  assert.deepEqual(Core.radioBar('polka', 0), [], 'no such station plays nothing');
+  assert.deepEqual(Core.radioBar('constructor', 0).length, 0);
+});
+
+test('radio: every bar is valid, in time and the same each time', () => {
+  for (const key of Object.keys(Core.RADIO)){
+    for (let bar = 0; bar < 40; bar++){
+      const ev = Core.radioBar(key, bar);
+      assert.ok(ev.length > 0, key + ' bar ' + bar + ' has notes');
+      for (const e of ev){
+        assert.ok(e.t >= 0 && e.t < 4.2, key + ' note inside the bar: ' + e.t);
+        assert.ok(e.d > 0 && e.v > 0 && e.v <= 1.2, key + ' sane length and level');
+        assert.ok(Number.isFinite(e.n) && e.n >= 0 && e.n < 110, key + ' sane pitch: ' + e.n);
+        assert.ok(typeof e.i === 'string');
+      }
+    }
+    assert.deepEqual(Core.radioBar(key, 3), Core.radioBar(key, 3), key + ' is the same each time');
+    assert.deepEqual(Core.radioBar(key, -5), Core.radioBar(key, 0), key + ' bad bar numbers start at the top');
+  }
+});
+
+test('radio: each station plays by the rules of its genre', () => {
+  const at = (key, bar, inst) => Core.radioBar(key, bar).filter(e => e.i === inst).map(e => e.t);
+  const bpm = k => Core.RADIO[k].bpm;
+  assert.ok(bpm('reggae') < 90 && bpm('techno') >= 125 && bpm('techno') <= 140 && bpm('hardstyle') >= 145 && bpm('metal') >= 160 && bpm('classical') < 90);
+  assert.deepEqual(at('reggae', 0, 'kick'), [2], 'reggae: one drop, the kick only on the third beat');
+  assert.ok(at('reggae', 0, 'skank').every(t => t % 1 === 0.5), 'reggae: chords on the off-beats');
+  assert.deepEqual(at('techno', 0, 'kick'), [0, 1, 2, 3], 'techno: four on the floor');
+  assert.deepEqual(at('hardstyle', 0, 'hkick'), [0, 1, 2, 3], 'hardstyle: distorted kick on every beat');
+  assert.deepEqual(at('schlager', 0, 'kick'), [0, 1, 2, 3], 'schlager: disco foxtrot');
+  assert.deepEqual(at('schlager', 0, 'snare'), [1, 3]);
+  assert.ok(at('metal', 0, 'chug').length > 3 && at('metal', 0, 'guitar').length > 0, 'metal: chugs and power chords');
+  assert.equal(Core.radioBar('classical', 0).some(e => ['kick', 'snare', 'hat', 'clap'].includes(e.i)), false, 'classical: no drums');
+  // the prelude follows Bach's notes
+  const bar0 = Core.radioBar('classical', 0).filter(e => e.t < 2).map(e => e.n);
+  assert.deepEqual(bar0, [60, 64, 67, 72, 76, 67, 72, 76]);
+});

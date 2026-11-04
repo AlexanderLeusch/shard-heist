@@ -39,8 +39,8 @@ A 3D police-chase driving game that runs in any modern browser. Pick a map and a
 | Maps | Lisbon's Baixa (real street names, Arco da Rua Augusta, traffic lights, 26 AI cars, 3 trams), Highway (4 km, 200 km/h, traffic both ways), Countryside (hills, farms, village) |
 | Vehicles | Muscle coupe (balanced), Superbike (fastest, most agile), Tractor unit (slowest, toughest, best at ramming) |
 | Story mode | *The Necklace Job*, after the escape: 3 acts on the 3 maps, Officer Hale on the radio, 2 story items (a hidden letter, a clasp), 3 endings. Which one you get depends on whether you found the letter in act 1 |
-| Systems | Police AI with a bust meter, crash damage and repair kits, synthesised engine sounds, map-boundary force field, radar, Ultra/Balanced graphics |
-| Controls | `W A S D` or arrow keys to drive, `Space` handbrake, `P` / `Esc` pause, `M` sound, `Enter` confirms. Touch pads on phones |
+| Systems | Seven synthesised radio stations, hills on every map, wanted stars and a police helicopter, visible damage, police AI with a bust meter, crash damage and repair kits, synthesised engine sounds, map-boundary force field, radar, Ultra/Balanced graphics |
+| Controls | `W A S D` or arrow keys to drive, `Space` handbrake, `P` / `Esc` pause, `M` sound, `R` radio, `Enter` confirms. Touch pads on phones |
 
 ## Run it locally
 
@@ -137,6 +137,9 @@ Writing the tests found two real bugs. Both are fixed:
 
 ## Credits
 
+All radio music is composed and synthesised by the game at run time, so there are no music files or licences. The tunes are generated from seeded random walks. The classical station plays J. S. Bach's Prelude in C (BWV 846) and the Ode to Joy from Beethoven's Ninth Symphony, both in the public domain.
+
+
 The street names and their order were checked against [OpenStreetMap](https://www.openstreetmap.org/copyright) (© OpenStreetMap contributors, ODbL). The game ships no map data and calls no map service.
 
 ## How it could change
@@ -149,5 +152,6 @@ The street names and their order were checked against [OpenStreetMap](https://ww
 - Longer browser tests that drive whole runs and story acts with scripted inputs.
 
 ## Credits
+
 
 Built with three.js r128 (MIT licence). Fonts: Bricolage Grotesque and JetBrains Mono (Google Fonts, SIL Open Font License). Code written with the help of Claude (Anthropic).

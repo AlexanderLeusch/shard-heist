@@ -3101,6 +3101,7 @@ function initAudio(){
     const rotorSrc = ctx.createBufferSource(); rotorSrc.buffer = rotorBuf; rotorSrc.loop = true; rotorSrc.start();
     const rotorF = ctx.createBiquadFilter(); rotorF.type = 'lowpass'; rotorF.frequency.value = 900;
     const rotor = gain(0); rotorSrc.connect(rotorF).connect(rotor).connect(comp);
+    const radioBus = gain(0), radioComp = ctx.createDynamicsCompressor(); radioComp.threshold.value = -14; radioComp.ratio.value = 6; radioBus.connect(radioComp).connect(master);
     const whine = ctx.createOscillator(); whine.type = 'triangle';
     const whineG = gain(0); whine.connect(whineG).connect(comp);
     const turbo = ctx.createOscillator(); turbo.type = 'sine'; turbo.frequency.value = 1800;
@@ -3110,7 +3111,7 @@ function initAudio(){
     const sirenDepth = gain(330); sirenLfo.connect(sirenDepth).connect(siren.frequency);
     const sirenGain = gain(0); siren.connect(sirenGain).connect(comp);
     [turbo, whine, siren, sirenLfo].forEach(o => o.start());
-    audio = { ctx, master, comp, bus, layers: [], voice: null, bufs: {}, noiseBuf, road, rotor, rotorF, rotorSrc, wind, tire, popF, airF, turbo, turboG, whine, whineG, sirenGain, sirenLfo };
+    audio = { ctx, master, comp, bus, layers: [], voice: null, bufs: {}, noiseBuf, radioBus, road, rotor, rotorF, rotorSrc, wind, tire, popF, airF, turbo, turboG, whine, whineG, sirenGain, sirenLfo };
     setEngineVoice();
   } catch (e) { audio = null; }
 }
@@ -3130,6 +3131,95 @@ function setEngineVoice(){
   })).flat();
   if (E.pops) audio.popF.frequency.value = E.pops;
   audio.voice = V.key;
+}
+// ### The radio: every note of Core.radioBar is played on a small synthesised instrument. Drums are filtered noise and pitched
+// ### sines; guitars and leads go through a distortion bus; the melodica has a dub echo. Notes are scheduled a little ahead on the
+// ### audio clock, one bar at a time, so they stay in time even when the frame rate drops. The stations have no audio files.
+const radio = { key: 'off', out: null, drive: null, echo: null, bar: 0, next: 0 };
+const mtof = n => 440 * Math.pow(2, (n - 69) / 12);
+function radioBuses(){
+  const ctx = audio.ctx, out = ctx.createGain(); out.connect(audio.radioBus);
+  const curve = new Float32Array(1024); for (let i = 0; i < 1024; i++){ const x = i / 512 - 1; curve[i] = Math.tanh(x * 7) * 0.8; }
+  const drive = ctx.createWaveShaper(); drive.curve = curve; drive.oversample = '2x';
+  const tone = ctx.createBiquadFilter(); tone.type = 'lowpass'; tone.frequency.value = 3600;
+  drive.connect(tone).connect(out);
+  const echo = ctx.createDelay(1.5); echo.delayTime.value = 0.75 * 60 / Core.RADIO[radio.key].bpm;
+  const back = ctx.createGain(); back.gain.value = 0.42; echo.connect(back).connect(echo); echo.connect(out);
+  radio.out = out; radio.drive = drive; radio.echo = echo;
+}
+function radioOsc(type, f, at, dur, level, dest, opt){
+  const o = opt || {}, ctx = audio.ctx, osc = ctx.createOscillator(), g = ctx.createGain(), stop = at + dur + (o.release || 0.03);
+  osc.type = type; osc.frequency.setValueAtTime(f, at); if (o.detune) osc.detune.value = o.detune;
+  if (o.to) osc.frequency.exponentialRampToValueAtTime(o.to, at + (o.glide || dur));
+  g.gain.setValueAtTime(0.0001, at); g.gain.exponentialRampToValueAtTime(level, at + (o.attack || 0.006));
+  if (o.hold) g.gain.setValueAtTime(level, at + dur);
+  g.gain.exponentialRampToValueAtTime(0.0001, stop);
+  let last = osc.connect(g);
+  if (o.lp){ const fl = ctx.createBiquadFilter(); fl.type = 'lowpass'; fl.Q.value = o.q || 0.7; fl.frequency.setValueAtTime(o.lp, at); if (o.lpTo) fl.frequency.exponentialRampToValueAtTime(o.lpTo, at + dur); last = last.connect(fl); }
+  last.connect(dest); osc.start(at); osc.stop(stop + 0.02);
+}
+function radioNoise(type, f, Q, at, dur, level, dest){
+  const ctx = audio.ctx, s = ctx.createBufferSource(), fl = ctx.createBiquadFilter(), g = ctx.createGain();
+  s.buffer = audio.noiseBuf; fl.type = type; fl.frequency.value = f; fl.Q.value = Q;
+  g.gain.setValueAtTime(level, at); g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+  s.connect(fl).connect(g).connect(dest); s.start(at, Math.random() * 1.5, dur + 0.02);
+}
+function radioNote(e, at, beat){
+  const out = radio.out, drive = radio.drive, f = mtof(e.n), dur = e.d * beat, v = e.v;
+  switch (e.i){
+    case 'kick': radioOsc('sine', 130, at, 0.24, v * 0.95, out, { to: 46, glide: 0.09 }); break;
+    case 'hkick': radioOsc('sine', mtof(e.n + 36), at, 0.34, v * 0.5, drive, { to: mtof(e.n + 12), glide: 0.1 }); radioNoise('highpass', 2500, 0.7, at, 0.03, 0.35, out); break;
+    case 'rbass': radioOsc('sawtooth', f, at, dur, v * 0.3, drive, { attack: dur * 0.85, lp: 900 }); break;
+    case 'snare': radioNoise('bandpass', 1900, 0.7, at, 0.17, v * 0.7, out); radioOsc('triangle', 190, at, 0.1, v * 0.3, out); break;
+    case 'rim': radioNoise('bandpass', 2500, 3, at, 0.06, v * 0.7, out); break;
+    case 'clap': radioNoise('bandpass', 1400, 1, at, 0.16, v * 0.7, out); break;
+    case 'hat': radioNoise('highpass', 7500, 0.7, at, 0.045, v * 0.32, out); break;
+    case 'ohat': radioNoise('highpass', 6500, 0.7, at, 0.16, v * 0.3, out); break;
+    case 'crash': radioNoise('highpass', 4200, 0.7, at, dur, v * 0.45, out); break;
+    case 'sub': radioOsc('sine', f, at, dur, v * 0.6, out); break;
+    case 'bass': radioOsc('sine', f, at, dur, v * 0.6, out); radioOsc('triangle', f, at, dur, v * 0.28, out, { lp: 500 }); break;
+    case 'acid': radioOsc('sawtooth', f, at, dur, 0.24, out, { lp: 240 + 2800 * v, lpTo: 200, q: 11 }); break;
+    case 'skank': radioOsc('square', f, at, dur, v * 0.18, out, { lp: 2100 }); break;
+    case 'organ': radioOsc('square', f, at, dur, v * 0.2, out, { lp: 900 }); break;
+    case 'stab': radioOsc('sawtooth', f, at, dur, v * 0.3, radio.echo, { lp: 1500, lpTo: 400 }); radioOsc('sawtooth', f, at, dur, v * 0.3, out, { lp: 1500, lpTo: 400 }); break;
+    case 'brass': radioOsc('sawtooth', f, at, dur, v * 0.3, out, { lp: 2300, attack: 0.015 }); break;
+    case 'pluck': radioOsc('triangle', f, at, dur, v * 0.5, out); radioOsc('sawtooth', f, at, dur * 0.5, v * 0.14, out, { lp: 3000 }); break;
+    case 'accordion': radioOsc('square', f, at, dur, v * 0.2, out, { lp: 2600, detune: -7, attack: 0.02, hold: true }); radioOsc('square', f, at, dur, v * 0.2, out, { lp: 2600, detune: 7, attack: 0.02, hold: true }); break;
+    case 'lead': radioOsc('sawtooth', f, at, dur, v * 0.17, out, { lp: 3400, detune: 6, hold: true }); radioOsc('triangle', f, at, dur, v * 0.32, out, { hold: true }); break;
+    case 'melodica': radioOsc('triangle', f, at, dur, v * 0.34, out, { attack: 0.03 }); radioOsc('triangle', f, at, dur, v * 0.22, radio.echo, { attack: 0.03 }); break;
+    case 'screech': [-16, 0, 16].forEach(d => radioOsc('sawtooth', f, at, dur, v * 0.14, drive, { detune: d, hold: true })); break;
+    case 'strings': [-6, 6].forEach(d => radioOsc('sawtooth', f, at, dur, v * 0.1, out, { lp: 1700, detune: d, attack: Math.min(0.5, dur * 0.25), hold: true, release: 0.25 })); break;
+    case 'piano': radioOsc('triangle', f, at, Math.min(dur, 2.4), v * 0.42, out, { attack: 0.004 }); radioOsc('sine', f * 2, at, Math.min(dur, 1.2), v * 0.12, out, { attack: 0.004 }); break;
+    case 'guitar': radioOsc('sawtooth', f, at, dur, v * 0.24, drive, { hold: true }); radioOsc('square', f * 1.003, at, dur, v * 0.14, drive, { hold: true }); break;
+    case 'chug': radioOsc('sawtooth', f, at, dur, v * 0.3, drive, { lp: 650 }); break;
+    case 'gbass': radioOsc('sawtooth', f, at, dur, v * 0.3, out, { lp: 480 }); break;
+    case 'solo': radioOsc('sawtooth', f, at, dur, v * 0.2, drive, { hold: true }); break;
+  }
+}
+function updateRadio(){
+  if (!audio) return;
+  const t = audio.ctx.currentTime, playing = radio.key !== 'off' && state === 'play' && !muted;
+  audio.radioBus.gain.setTargetAtTime(playing ? 0.72 * (Core.RADIO[radio.key].level || 1) : 0, t, 0.08);
+  if (!playing){ radio.next = 0; return; }
+  if (!radio.out) radioBuses();
+  if (radio.next < t) radio.next = t + 0.06;
+  const beat = 60 / Core.RADIO[radio.key].bpm;
+  while (radio.next < t + 0.6){
+    Core.radioBar(radio.key, radio.bar).forEach(e => radioNote(e, radio.next + e.t * beat, beat));
+    radio.bar++; radio.next += 4 * beat;
+  }
+}
+// Switch station: the old station's notes, already scheduled, fade out on their own bus
+function setStation(key, announce){
+  radio.key = Core.parseRadio(key);
+  writeStore('shard-heist-radio', radio.key);
+  if (radio.out){ const old = radio.out, ctx = audio.ctx; old.gain.setTargetAtTime(0, ctx.currentTime, 0.05); setTimeout(() => old.disconnect(), 400); }
+  radio.out = null; radio.bar = 0; radio.next = 0;
+  const on = radio.key !== 'off', name = on ? Core.RADIO[radio.key].name : 'Off';
+  $('radioTag').hidden = !on; $('radioTag').textContent = on ? name : '';
+  $('btnRadio').classList.toggle('on', on);
+  $('btnRadio').setAttribute('aria-label', 'Radio: ' + name + '. Press to change station');
+  if (announce) toast('Radio: ' + name, 'gold', 1600);
 }
 function noiseBurst(at, dest, vol, len){
   const a = audio, s = a.ctx.createBufferSource(), g = a.ctx.createGain();
@@ -3305,6 +3395,7 @@ addEventListener('keydown', e => {
   if (Object.hasOwn(keyMap, e.code)){ keys[keyMap[e.code]] = true; e.preventDefault(); }
   if (e.code === 'KeyP' || e.code === 'Escape'){ if (state === 'play') pause(); else if (state === 'pause') resume(); }
   if (e.code === 'KeyM') toggleSound();
+  if (e.code === 'KeyR'){ initAudio(); setStation(Core.radioNext(radio.key, e.shiftKey ? -1 : 1), true); }
   if (e.code === 'Enter' && !overlay.hidden){ const b = card.querySelector('.btn'); if (b){ e.preventDefault(); b.click(); } }
 });
 addEventListener('keyup', e => { if (Object.hasOwn(keyMap, e.code)) keys[keyMap[e.code]] = false; });
@@ -3816,9 +3907,10 @@ function showMenu(){
     </section>
     <button class="btn m-start" data-action="go"><span>Start the getaway</span><kbd class="desk-only">Enter</kbd></button>
     <div class="m-foot">
-      <span class="desk-only"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive · <kbd>Space</kbd> handbrake · <kbd>P</kbd> pause · <kbd>M</kbd> sound</span>
+      <span class="desk-only"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive · <kbd>Space</kbd> handbrake · <kbd>P</kbd> pause · <kbd>M</kbd> sound · <kbd>R</kbd> radio</span>
       <span class="touch-only">Steer on the left, brake and gas on the right.</span>
       <span>Best · Lisbon ${bestNote('city')} · Highway ${bestNote('highway')} · Country ${bestNote('country')}</span>
+      <span class="gfx">Radio ${Core.RADIO_ORDER.map(k => `<button data-radio="${k}" aria-pressed="${radio.key === k}">${k === 'off' ? 'Off' : Core.RADIO[k].name}</button>`).join('')}</span>
       <span class="gfx">Graphics <button data-gfx="ultra" aria-pressed="${gfx === 'ultra'}">Ultra</button><button data-gfx="balanced" aria-pressed="${gfx === 'balanced'}">Balanced</button></span>
     </div>`, 'menu');
   renderVehDetail();
@@ -3849,6 +3941,12 @@ function backToMenu(){
 }
 
 card.addEventListener('click', e => {
+  const rb = e.target.closest('[data-radio]');
+  if (rb){
+    setStation(rb.dataset.radio, false);
+    card.querySelectorAll('[data-radio]').forEach(b => b.setAttribute('aria-pressed', String(b === rb)));
+    return;
+  }
   const gb = e.target.closest('[data-gfx]');
   if (gb){
     gfx = gb.dataset.gfx;
@@ -3888,6 +3986,7 @@ function toggleSound(){
   if (!muted) initAudio();
 }
 $('btnSound').addEventListener('click', e => { e.currentTarget.blur(); toggleSound(); });
+$('btnRadio').addEventListener('click', e => { e.currentTarget.blur(); initAudio(); setStation(Core.radioNext(radio.key, 1), true); });
 
 // ---------- Physics ----------
 // ### Arcade car physics: throttle, brake, hills (Core.slopeTop, gravity in Core.stepSpeed), coasting drag, speed-dependent steering and a top speed reduced by damage and
@@ -4430,11 +4529,13 @@ function frame(now){
   sun.target.position.set(car.x, 0, car.z);
 
   updateEngine(dt);
+  updateRadio();
   updateHud(dt);
   if (state !== 'menu') drawRadar();
   if (composer && GFX[gfx].post) composer.render(); else renderer.render(scene, camera);
 }
 
+setStation(readStore('shard-heist-radio'), false);
 buildCity();
 laySlopes(CITY.group, 'city');
 tuneEnv(scene);
