@@ -250,3 +250,9 @@ test('every world is bent over the hills once, and the car feels them', () => {
   assert.match(game, /Core\.stepSpeed\(car\.speed, keys, dt, maxNow, V, grade\)/);
   assert.match(game, /Core\.slopeTop\(/);
 });
+
+test('the menu previews come from the real models, and every map picture fills its frame', () => {
+  assert.match(game, /function renderPreviews\(\)/);
+  assert.match(game, /renderPreviews\(\);/);
+  assert.equal((game.match(/viewBox="0 0 160 80" preserveAspectRatio="xMidYMid slice"/g) || []).length, 3);
+});

@@ -90,6 +90,7 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       await load();
       assert.equal(await evaluate("document.querySelectorAll('[data-pick=\"mode\"]').length"), 3);
       assert.equal(await evaluate("document.querySelectorAll('[data-pick=\"veh\"]').length"), 3);
+      assert.equal(await evaluate("[...document.querySelectorAll('.vtab img')].filter(i => i.src.startsWith('data:image/png') && i.complete && i.naturalWidth > 100).length"), 3, 'the previews are pictures of the real models');
       assert.ok(await evaluate("!!document.querySelector('[data-action=\"story\"]')"));
       assert.ok(await evaluate("document.getElementById('fatal').hidden"), 'no error screen');
       assert.deepEqual(errors, []);

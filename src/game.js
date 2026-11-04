@@ -3738,10 +3738,45 @@ const ICONS = {
   bike: '<svg viewBox="0 0 120 44" aria-hidden="true"><circle cx="32" cy="32" r="10" fill="#111215"/><circle cx="90" cy="32" r="10" fill="#111215"/><circle cx="32" cy="32" r="6.6" fill="none" stroke="#c8202a" stroke-width="2.4"/><circle cx="90" cy="32" r="6.6" fill="none" stroke="#c8202a" stroke-width="2.4"/><path d="M90 32l-7-16" stroke="#c9a04a" stroke-width="3"/><path d="M32 32l20-8" stroke="#9aa0aa" stroke-width="3"/><path d="M99 22l-6-9-21-2-9 4-9 13 15 4 18-2z" fill="#2a2d33"/><path d="M80 15l-11 13h-5l11-13z" fill="#d4f21a"/><path d="M93 13l5-6 2 3-4 5z" fill="#3b4250"/><path d="M58 16l-24 2-9 6 10 1 12-4h12z" fill="#2a2d33"/><path d="M38 19.5l-10 3" stroke="#d4f21a" stroke-width="1.6"/><path d="M56 13l7-6 8 3-4 6z" fill="#1b1d22"/><circle cx="69" cy="6.5" r="4.6" fill="#1b1d22"/><rect x="96" y="20" width="4" height="1.6" fill="#eef6ff"/></svg>',
   truck: '<svg viewBox="0 0 120 44" aria-hidden="true"><rect x="10" y="27" width="96" height="4" fill="#15171d"/><rect x="24" y="23" width="26" height="3" fill="#2a2d33"/><path d="M58 3h31c4.5 0 6.5 2.4 7.5 5.5L101 27H58z" fill="#a8c6bc"/><path d="M92 9h4.5l3 13H94z" fill="#1c2533"/><rect x="65" y="11" width="15" height="10" rx="1.5" fill="#1c2533"/><path d="M90 6.5h9" stroke="#0c0d10" stroke-width="2"/><rect x="95" y="22" width="9" height="6" fill="#0c0d10"/><rect x="100" y="24" width="5" height="1.6" fill="#eef6ff"/><circle cx="30" cy="33" r="7" fill="#111215"/><circle cx="30" cy="33" r="4.2" fill="#d9dde3"/><circle cx="88" cy="33" r="7" fill="#111215"/><circle cx="88" cy="33" r="4.2" fill="#d9dde3"/></svg>'
 };
+// ### The menu shows the real vehicles: each model is rendered once at start-up to a small transparent picture, seen from the front
+// ### three-quarters, so the previews can never go out of date. If that fails, the drawn icons in ICONS are shown instead.
+const PREVIEWS = {};
+function renderPreviews(){
+  const W = 640, H = 340, rt = new THREE.WebGLRenderTarget(W, H), s = new THREE.Scene(), cam = new THREE.PerspectiveCamera(24, W / H, 0.1, 200);
+  rt.texture.encoding = THREE.sRGBEncoding;
+  s.environment = scene.environment;
+  const key = new THREE.DirectionalLight(0xfff4e6, 2.4); key.position.set(4, 8, 6);
+  const rim = new THREE.DirectionalLight(0x8fdcff, 1.5); rim.position.set(-6, 3, -5);
+  const fill = new THREE.HemisphereLight(0xcfe0ff, 0x252a3a, 1.1);
+  s.add(key, rim, fill);
+  const shadows = renderer.shadowMap.enabled, clear = renderer.getClearAlpha(), pixels = new Uint8Array(W * H * 4);
+  renderer.shadowMap.enabled = false; renderer.setClearAlpha(0);
+  try {
+    for (const k of Object.keys(MODELS)){
+      const md = MODELS[k], parent = md.g.parent;
+      s.add(md.g); md.g.visible = true;
+      const box = new THREE.Box3().setFromObject(md.g), c = box.getCenter(new THREE.Vector3()), r = box.getSize(new THREE.Vector3()).length() / 2;
+      const d = r / Math.sin(cam.fov * Math.PI / 360) * 0.66;
+      cam.position.set(c.x + d * 0.72, c.y + d * 0.2, c.z + d * 0.66); cam.lookAt(c);
+      renderer.setRenderTarget(rt); renderer.clear(); renderer.render(s, cam);
+      renderer.readRenderTargetPixels(rt, 0, 0, W, H, pixels);
+      const big = document.createElement('canvas'); big.width = W; big.height = H;
+      const b = big.getContext('2d'), img = b.createImageData(W, H);
+      for (let y = 0; y < H; y++) img.data.set(pixels.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4);
+      b.putImageData(img, 0, 0);
+      const out = document.createElement('canvas'); out.width = W / 2; out.height = H / 2;
+      out.getContext('2d').drawImage(big, 0, 0, W / 2, H / 2);
+      PREVIEWS[k] = out.toDataURL('image/png');
+      parent.add(md.g); md.g.visible = false;
+    }
+  } catch (e) { /* the drawn icons stay */ }
+  renderer.setRenderTarget(null); renderer.shadowMap.enabled = shadows; renderer.setClearAlpha(clear);
+  rt.dispose();
+}
 const MAP_THUMB = {
-  country: '<svg viewBox="0 0 52 38" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="tco" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#060a1c"/><stop offset="1" stop-color="#463352"/></linearGradient></defs><rect width="52" height="38" fill="url(#tco)"/><path d="M0 22c8-6 16-7 26-3s18 2 26-4v23H0z" fill="#2c4529"/><path d="M0 27c10-4 20-3 30 1s16 2 22-1v11H0z" fill="#5f7c3a"/><path d="M30 38c-2-6 4-9 0-13s-5-4-3-6" stroke="#2b2f3b" stroke-width="5" fill="none"/><path d="M30 38c-2-6 4-9 0-13s-5-4-3-6" stroke="#e6e8ee" stroke-width=".6" stroke-dasharray="1.5 1.5" fill="none"/><path d="M8 24l2-6 2 6z" fill="#1e3322"/><path d="M42 21l2-6 2 6z" fill="#1e3322"/></svg>',
-  city: '<svg viewBox="0 0 52 38" aria-hidden="true"><defs><linearGradient id="tc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#060a1c"/><stop offset="1" stop-color="#463352"/></linearGradient></defs><rect width="52" height="38" fill="url(#tc)"/><path d="M0 24h13v14H0zM39 24h13v14H39z" fill="#e8bb45"/><path d="M13 38V11h26v27h-6V25a7 7 0 0 0-14 0v13z" fill="#d6ccb4"/><path d="M19 11V7h14v4zM24.6 7V2h2.8v5z" fill="#d6ccb4"/><circle cx="26" cy="15" r="2.2" fill="#fff4d8"/><path d="M0 24l13-4v4zM52 24l-13-4v4z" fill="#a45a3d"/></svg>',
-  highway: '<svg viewBox="0 0 52 38" aria-hidden="true"><defs><linearGradient id="th" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#060a1c"/><stop offset="1" stop-color="#463352"/></linearGradient></defs><rect width="52" height="38" fill="url(#th)"/><path d="M0 18h52v20H0z" fill="#26332b"/><path d="M22 18h8l16 20H6z" fill="#2b2f3b"/><path d="M25.6 18h.8l1 20h-2.8z" fill="#b4b6c2"/><circle cx="19" cy="31" r="1.4" fill="#ff3344"/><circle cx="21.5" cy="31" r="1.4" fill="#ff3344"/><circle cx="33" cy="24" r="1.1" fill="#fff1cc"/><circle cx="34.6" cy="24" r="1.1" fill="#fff1cc"/></svg>'
+  country: '<svg viewBox="0 0 160 80" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="tco" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#070a1f"/><stop offset=".62" stop-color="#2a2348"/><stop offset="1" stop-color="#6a3f5c"/></linearGradient></defs><rect width="160" height="80" fill="url(#tco)"/><circle cx="34" cy="17" r="6" fill="#f4eed8"/><path d="M0 40c24-16 48-18 76-8s58 6 84-8v56H0z" fill="#27412f"/><path d="M0 54c30-14 60-12 88-2s50 8 72-4v32H0z" fill="#46683a"/><path d="M0 68c34-8 66-6 98 0s44 4 62-2v14H0z" fill="#648643"/><path d="M92 80c-8-10 18-14 6-24s-22-8-14-20" stroke="#2b2f3b" stroke-width="7" fill="none"/><path d="M92 80c-8-10 18-14 6-24s-22-8-14-20" stroke="#ecedf2" stroke-width=".8" stroke-dasharray="2.5 2.5" fill="none"/><path d="M116 37h9v-5l5-4 5 4v5h9v8h-28z" fill="#d9c9a8"/><path d="M125 32l5-4 5 4zM116 37l5-3 4 3zM135 37l4-3 5 3z" fill="#a4553a"/><path d="M120 40h2v3h-2zM128 34h4v3h-4zM138 40h2v3h-2z" fill="#ffe2a4"/><path d="M26 50l4-13 4 13zM42 46l3-10 3 10zM14 56l4-13 4 13z" fill="#172a1f"/><circle cx="62" cy="56" r="5" fill="#23402b"/><rect x="61" y="58" width="2" height="6" fill="#2d2118"/></svg>',
+  city: '<svg viewBox="0 0 160 80" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="tc" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#070a1f"/><stop offset=".62" stop-color="#2a2348"/><stop offset="1" stop-color="#6a3f5c"/></linearGradient></defs><rect width="160" height="80" fill="url(#tc)"/><path d="M0 42c20-12 44-14 64-6h32c22-10 44-6 64 6v38H0z" fill="#1c1d38"/><path d="M0 34h34v46H0zM126 34h34v46h-34z" fill="#d9ad3c"/><path d="M0 34l34-5v5zM160 34l-34-5v5z" fill="#a4553a"/><path d="M6 80V60a5 5 0 0 1 10 0v20zM20 80V60a5 5 0 0 1 10 0v20zM130 80V60a5 5 0 0 1 10 0v20zM144 80V60a5 5 0 0 1 10 0v20z" fill="#3a2c1e"/><path d="M8 40h6v8H8zM20 40h6v8h-6zM134 40h6v8h-6zM146 40h6v8h-6z" fill="#ffe2a4"/><path d="M50 80V25h60v55H96V54a16 16 0 0 0-32 0v26z" fill="#d8ceb6"/><path d="M58 25V15h44v10zM74 15V6h12v9z" fill="#e3dac4"/><rect x="72" y="18" width="16" height="6" rx="1" fill="#f6efdc"/><circle cx="80" cy="31" r="4" fill="#fff6dc" stroke="#6b6250" stroke-width=".6"/><path d="M64 80h32l-6-26a10 10 0 0 0-20 0z" fill="#4a3454"/><path d="M58 80l16-26M102 80L86 54" stroke="#c9ced8" stroke-width=".8"/><rect x="72" y="52" width="16" height="10" rx="2" fill="#f2c335"/><rect x="74" y="54" width="12" height="4" fill="#27304a"/></svg>',
+  highway: '<svg viewBox="0 0 160 80" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><linearGradient id="th" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#070a1f"/><stop offset=".62" stop-color="#2a2348"/><stop offset="1" stop-color="#6a3f5c"/></linearGradient></defs><rect width="160" height="80" fill="url(#th)"/><circle cx="128" cy="16" r="5" fill="#f4eed8"/><path d="M0 46c26-14 52-16 80-8s54 4 80-8v50H0z" fill="#1d2d2c"/><path d="M0 56c30-12 56-12 80-4s54 8 80-4v32H0z" fill="#16231f"/><path d="M78 36h4l40 44H38z" fill="#2c303d"/><path d="M58 80l21-44M102 80L81 36" stroke="#d8dbe4" stroke-width=".9"/><path d="M80 40v5M80 49v7M80 61v9M80 74v6" stroke="#f1d874" stroke-width="1.1"/><path d="M46 52V30M46 30h9" stroke="#8b92a4" stroke-width=".9"/><circle cx="55" cy="31" r="2.2" fill="#ffe7ad"/><path d="M116 52V30M116 30h-9" stroke="#8b92a4" stroke-width=".9"/><circle cx="107" cy="31" r="2.2" fill="#ffe7ad"/><rect x="66" y="58" width="13" height="9" rx="2" fill="#1a1e2c"/><circle cx="68.5" cy="63" r="1.5" fill="#ff3344"/><circle cx="76.5" cy="63" r="1.5" fill="#ff3344"/><circle cx="85" cy="44" r="1" fill="#fff1cc"/><circle cx="88" cy="44" r="1" fill="#fff1cc"/></svg>'
 };
 const STAT_NAMES = ['Top speed', 'Acceleration', 'Handling', 'Durability', 'Ramming'];
 const STAT_WORDS = ['', 'Low', 'Fair', 'Good', 'High', 'Max'];
@@ -3776,7 +3811,7 @@ function showMenu(){
     </section>
     <section class="m-sec">
       <div class="m-label"><span>02</span>Choose your getaway vehicle</div>
-      <div class="vtabs">${['car', 'bike', 'truck'].map(k => `<button class="vtab" data-pick="veh" data-val="${k}" aria-pressed="${sel.veh === k}">${ICONS[k]}<span>${VEH[k].name}</span></button>`).join('')}</div>
+      <div class="vtabs">${['car', 'bike', 'truck'].map(k => `<button class="vtab" data-pick="veh" data-val="${k}" aria-pressed="${sel.veh === k}">${PREVIEWS[k] ? `<img src="${PREVIEWS[k]}" alt="">` : ICONS[k]}<span>${VEH[k].name}<small>${VEH[k].cls}</small></span></button>`).join('')}</div>
       <div class="vdetail" id="vehDetail"></div>
     </section>
     <button class="btn m-start" data-action="go"><span>Start the getaway</span><kbd class="desk-only">Enter</kbd></button>
@@ -4403,6 +4438,7 @@ function frame(now){
 buildCity();
 laySlopes(CITY.group, 'city');
 tuneEnv(scene);
+renderPreviews();
 setVehicle(sel.veh);
 setMode('city');
 placeRun();
