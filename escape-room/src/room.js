@@ -483,7 +483,7 @@ function act(action, target){
   S = r.state;
   if (action !== 'new') save();
   if (S.scene !== before.scene) goView(S.scene === 'tunnel' ? 'hatch' : S.scene);
-  if (action === 'read' && S.clues.includes(target) && R.CLUES[target]) showClue(target);
+  if (action === 'read' && S.clues.includes(target) && R.CLUES[target] && !(target === 'mirror' && !S.steam)) showClue(target);
   else if (r.message && !S.ending) say(r.message, action === 'try' && !S.ending ? 'warn' : action === 'take' || action === 'pry' ? 'good' : '');
   if (action === 'try' && !S.ending){ guardShow = 3; renderLock(); }
   if (S.ending === 'A' && before.ending !== 'A'){ hideCard(); endingA(); }
@@ -629,24 +629,29 @@ card.addEventListener('click', e => {
   else if (d === 'back') showBrief(Math.max(0, briefStep - 1));
   else if (d === 'brief') showBrief(0);
   else if (d === 'start'){ const r = act('start'); if (r.ok){ hideCard(); hud.classList.remove('off'); } }
-  else if (d === 'resume'){ paused = false; hideCard(); hud.classList.remove('off'); }
+  else if (d === 'resume') resumeRoom();
   else if (d === 'pause') showPause();
   else if (d === 'ask-new') showAskNew();
-  else if (d === 'new'){ paused = false; hatchAnim = -1; tileVel = 0; endingShown = false; act('new'); writeStore(R.SAVE_KEY, ''); hud.classList.add('off'); goView('intro', .8); doorFlash = 0; showBrief(0); }
+  else if (d === 'new'){ paused = false; hatchAnim = -1; tileVel = 0; endingShown = false; act('new'); writeStore(R.SAVE_KEY, ''); hud.classList.add('off'); goView('intro', .8); doorFlash = 0; windowLight.intensity = .9; showBrief(0); }
   else if (d === 'close') hideCard();
   else if (d === 'try') act('try');
 });
-$('btnPause').addEventListener('click', e => { e.currentTarget.blur(); if (S.ending || S.scene === 'intro') return; if (paused){ paused = false; hideCard(); } else showPause(); });
+$('btnPause').addEventListener('click', e => { e.currentTarget.blur(); if (S.ending || S.scene === 'intro') return; if (paused) resumeRoom(); else showPause(); });
 $('btnNotes').addEventListener('click', e => { e.currentTarget.blur(); if (!paused) showNotes(); });
 let muted = false;
+// ### Back to the room from the pause or continue card: the clock runs again, the HUD shows, and so does the sound.
+function resumeRoom(){ paused = false; hideCard(); hud.classList.remove('off'); if (ac && !muted && !document.hidden) ac.resume(); }
 $('btnSound').addEventListener('click', e => { e.currentTarget.blur(); toggleSound(); });
 // ### Turns the sound on or off.
 function toggleSound(){ muted = !muted; $('soundWaves').style.display = muted ? 'none' : ''; $('btnSound').setAttribute('aria-label', muted ? 'Turn sound on' : 'Mute sound'); if (master) master.gain.value = muted ? 0 : .8; }
 addEventListener('keydown', e => {
+  if (!$('fatal').hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+  // a held Enter must not repeat an action: each wrong code costs 30 seconds
+  if (e.code === 'Enter' && e.repeat){ e.preventDefault(); return; }
   if (e.code === 'Enter' && !overlay.hidden){ const b = card.querySelector('.btn'); if (b && document.activeElement && document.activeElement.closest && document.activeElement.closest('.card') && document.activeElement.tagName === 'BUTTON') return; if (b){ e.preventDefault(); b.click(); } return; }
   if ((e.code === 'KeyP' || e.code === 'Escape') && !e.repeat){
     if (S.ending || S.scene === 'intro') return;
-    if (paused){ paused = false; hideCard(); } else if (!overlay.hidden && e.code === 'Escape') hideCard(); else showPause();
+    if (paused) resumeRoom(); else if (!overlay.hidden && e.code === 'Escape') hideCard(); else showPause();
     return;
   }
   if (e.code === 'KeyM') toggleSound();
@@ -663,7 +668,7 @@ document.addEventListener('visibilitychange', () => {
 });
 addEventListener('blur', () => { if (S.scene !== 'intro' && !S.ending && !paused) showPause(); });
 addEventListener('pagehide', () => { if (ac) ac.suspend(); save(); });
-addEventListener('shardheist:fatal', () => { paused = true; if (ac) ac.suspend(); });
+addEventListener('shardheist:fatal', () => { if (S.scene !== 'intro' && !S.ending && !paused) showPause(); if (ac) ac.suspend(); $('fatalReload').focus(); });
 
 // ---------- Sound ----------
 // ### Synthesised with Web Audio: the hum of the fluorescent tube, dripping water, running water while the tap is on,
@@ -737,9 +742,9 @@ let clock = 0, last = performance.now(), guardShow = 0, flicker = 0, tileVel = 0
 // ### The room loop each frame: clock, camera, markers and drawing.
 function frame(now){
   requestAnimationFrame(frame);
-  const dt = clamp((now - last) / 1000, 0, .05); last = now; clock += dt;
+  const elapsed = clamp((now - last) / 1000, 0, 1), dt = Math.min(elapsed, .05); last = now; clock += dt;
   if (!paused && S.scene !== 'intro' && !S.ending){
-    const r = R.tick(S, dt);
+    const r = R.tick(S, elapsed);
     if (r.state !== S){
       S = r.state;
       if (r.message){ if (!S.ending) say(r.message, 'warn'); cue(r.cue); if (r.cue === 'warn' || r.cue === 'rattle') guardShow = 3; }

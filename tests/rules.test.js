@@ -347,13 +347,13 @@ test('the rotor loop thumps at the blade-pass rate and repeats seamlessly', () =
   assert.deepEqual(Core.rotorLoop(SR, 7), d, 'the same for the same seed');
 });
 
-test('idling is its own sound: at the idle rpm, each cycle different, with sharper pulses than under load', () => {
+test('idling is its own sound: at the idle rpm, each cycle different, through a closed-down muffler', () => {
   const SR = Core.ENGINE_SR;
   for (const key of VEHICLES){
     const E = Core.ENGINES[key], cycle = Math.round(SR * 120 / E.idle);
     assert.equal(E.refs[0], E.idle, key + ' has a loop at its exact idle rpm');
     const idle = Core.engineLoop(E, E.idle, 'idle', SR, 5);
-    assert.ok(E.idling.pulse < E.pulseMax, key + ' sharper pulses');
+    assert.ok(E.idling.lowpass < E.lowpass, key + ' a darker sound than under load');
     assert.ok(similarity(idle, cycle) < 0.995, key + ' no two cycles are the same');
     assert.ok(idle.length / SR >= E.loop * 1.9, key + ' the idle loop is long enough not to be heard repeating');
   }
@@ -470,4 +470,84 @@ test('radio: each station plays by the rules of its genre', () => {
   // the prelude follows Bach's notes
   const bar0 = Core.radioBar('classical', 0).filter(e => e.t < 2).map(e => e.n);
   assert.deepEqual(bar0, [60, 64, 67, 72, 76, 67, 72, 76]);
+});
+
+test('audit: a stopped vehicle holds on the steepest street, and rolling needs a running start', () => {
+  const idle = { up: false, down: false, brake: false };
+  let s = 0; for (let t = 0; t < 5; t += 1 / 60) s = Core.stepSpeed(s, idle, 1 / 60, 30, VEH.car, 0.2);
+  assert.equal(s, 0, 'no creeping at 20 %');
+  s = 10; for (let t = 0; t < 6; t += 1 / 60) s = Core.stepSpeed(s, idle, 1 / 60, 30, VEH.car, 0.2);
+  assert.equal(s, 0, 'coasting uphill ends at rest, and stays there');
+  s = 10; for (let t = 0; t < 2; t += 1 / 60) s = Core.stepSpeed(s, idle, 1 / 60, 30, VEH.car, -0.2);
+  assert.ok(s > 10, 'rolling downhill keeps going');
+});
+
+test('audit: the top gear and the gauge fit the fastest speed a hill allows', () => {
+  for (const key of VEHICLES){
+    const E = Core.ENGINES[key], v = VEH[key];
+    for (const m of Object.values(MODES)){
+      const fastest = Core.slopeTop(Core.topSpeed(m, v, 0, false), -0.2, v);
+      assert.ok(E.gears[E.gears.length - 1] >= fastest, key + ' on ' + m.key + ': top gear reaches ' + fastest);
+      assert.ok(m.gaugeMax / 3.6 >= fastest, key + ' on ' + m.key + ': gauge reaches ' + fastest);
+    }
+  }
+  const E = Core.ENGINES.car;
+  assert.equal(Core.gearFor(E, 1, E.gears[0] * 1.05, 0), 2, 'overspeed down a hill shifts up without throttle');
+});
+
+test('audit: every vehicle can earn three stars and beat the clock on the highway, hills included', () => {
+  const M = MODES.highway, keys = { up: true, down: false, brake: false };
+  for (const key of VEHICLES){
+    const V = VEH[key]; let z = 5, s = 0, t = 0;
+    while (z < 4000 && t < 400){
+      const g = Core.gradeAt('highway', -7, z, 0);
+      s = Core.stepSpeed(s, keys, 1 / 60, Core.slopeTop(Core.topSpeed(M, V, 0, false), g, V), V, g);
+      z += s / 60; t += 1 / 60;
+    }
+    assert.ok(t < M.time - 5, key + ' finishes with time to spare: ' + t);
+    assert.equal(Core.runStars('highway', M, M.time - t, t, 0, V), 3, key + ' three stars for a clean run');
+  }
+  assert.equal(Core.runStars('highway', M, 0, 100, 0), 2, 'without a vehicle the limits are the car\'s');
+});
+
+test('audit: police slow down uphill, and times never read 0:60.0', () => {
+  assert.ok(Core.copTopSpeed(33, 1, 50, false, 0.1) < Core.copTopSpeed(33, 1, 50, false, 0));
+  assert.ok(Core.copTopSpeed(33, 1, 50, false, -0.1) > Core.copTopSpeed(33, 1, 50, false, 0));
+  assert.equal(Core.fmtTimeExact(59.96), '1:00.0');
+  assert.equal(Core.fmtTimeExact(119.97), '2:00.0');
+  assert.equal(Core.fmtTimeExact(61.24), '1:01.2');
+});
+
+test('the drawn ground matches the hills, is continuous, and is flat outside them', () => {
+  for (const key of ['city', 'highway', 'country']){
+    const L = Core.HILL_GRID[key], span = key === 'highway' ? [0, 0, 0, 4000] : [-170, 170, -170, 170];
+    let worst = 0;
+    for (let x = span[0]; x <= span[1]; x += 3.7) for (let z = span[2]; z <= span[3]; z += 3.3){
+      worst = Math.max(worst, Math.abs(Core.hillMesh(key, x, z) - Core.hillHeight(key, x, z)));
+      // no step between two points a millimetre apart, also across grid lines and diagonals
+      const step = Math.abs(Core.hillMesh(key, x + 0.001, z + 0.001) - Core.hillMesh(key, x, z));
+      assert.ok(step < 0.001, key + ' jump at ' + x + ',' + z);
+    }
+    assert.ok(worst < 0.3, key + ' within 30 cm of the smooth hill: ' + worst);
+    assert.equal(Core.hillMesh(key, L * 2, L * 2), Core.hillHeight(key, key === 'highway' ? 0 : L * 2, L * 2), key + ' exact on a grid point');
+  }
+  assert.equal(Core.hillMesh('city', 0, 83), 0, 'level at the Arco');
+  assert.equal(Core.hillMesh('city', 400, 0), 0);
+  assert.equal(Core.hillMesh('nowhere', 3, 3), 0);
+  assert.equal(Core.hillMesh('constructor', 3, 3), 0);
+  // the edge of the hills must be on the grid and at height zero, so the flat land joins without a step
+  for (const key of ['city', 'highway']){
+    const [x0, x1, z0, z1] = Core.HILL_BOX[key], L = Core.HILL_GRID[key];
+    for (const v of [x0, x1, z0, z1]) if (Number.isFinite(v)) assert.equal(Math.abs(v % L), 0, key + ' box on the grid: ' + v);
+    for (const z of [z0, z1]) assert.equal(Core.hillHeight(key, 0, z), 0, key + ' level at the edge');
+  }
+});
+
+test('idling is low and round: most of its sound is below 400 Hz', () => {
+  const SR = Core.ENGINE_SR;
+  for (const key of ['car', 'truck']){
+    const E = Core.ENGINES[key], d = Core.engineLoop(E, E.idle, 'idle', SR, 5);
+    let low = 0, high = 0, lp = 0; for (let i = 0; i < d.length; i++){ lp += 0.075 * (d[i] - lp); low += lp * lp; high += (d[i] - lp) ** 2; }
+    assert.ok(low > high, key + ' low ' + low + ' high ' + high);
+  }
 });

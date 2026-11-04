@@ -177,14 +177,18 @@
     const ok = typeof s.scene === 'string' && scenes.includes(s.scene)
       && Number.isFinite(s.time) && s.time >= 0 && s.time <= TIME_LIMIT
       && Array.isArray(s.inventory) && s.inventory.length <= 2 && s.inventory.every(i => Object.prototype.hasOwnProperty.call(ITEMS, i)) && new Set(s.inventory).size === s.inventory.length
-      && Array.isArray(s.clues) && s.clues.length <= 3 && s.clues.every(c => Object.prototype.hasOwnProperty.call(CLUES, c))
+      && Array.isArray(s.clues) && s.clues.length <= 3 && s.clues.every(c => Object.prototype.hasOwnProperty.call(CLUES, c)) && new Set(s.clues).size === s.clues.length
       && Array.isArray(s.lock) && s.lock.length === 4 && s.lock.every(d => Number.isInteger(d) && d >= 0 && d <= 9)
       && Array.isArray(s.warned) && s.warned.every(w => WARNINGS.some(([at]) => at === w))
       && ['tileOpen', 'steam', 'wedged', 'graceUsed'].every(k => typeof s[k] === 'boolean')
       && Number.isInteger(s.wrongTries) && s.wrongTries >= 0
       && (s.ending === null || s.ending === 'A' || s.ending === 'B')
       && !(s.wedged && s.inventory.includes('mop'))
-      && !(s.clues.includes('scrap') && !s.tileOpen);
+      && !(s.clues.includes('scrap') && !s.tileOpen)
+      // only an ending leads to the cell or the tunnel; the grace minute needs the jammed door, and the tile needs the spoon
+      && (s.ending === 'A' ? s.scene === 'tunnel' : s.ending === 'B' ? s.scene === 'cell' : s.scene !== 'tunnel' && s.scene !== 'cell')
+      && !(s.graceUsed && !s.wedged)
+      && !(s.tileOpen && !s.inventory.includes('spoon'));
     if (!ok) return null;
     return { scene: s.scene, time: s.time, inventory: s.inventory.slice(), clues: s.clues.slice(), tileOpen: s.tileOpen, steam: s.steam,
       wedged: s.wedged, graceUsed: s.graceUsed, lock: s.lock.slice(), wrongTries: s.wrongTries, ending: s.ending, warned: s.warned.slice() };

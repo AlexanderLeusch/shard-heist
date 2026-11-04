@@ -22,7 +22,7 @@ The clock only starts when the player presses **Start the clock** after the brie
 | Warnings from Hale | at 5:00, 2:00, 1:00 and 0:30, each only once |
 | Wrong code | costs **30 seconds** (`WRONG_CODE_PENALTY`), never below 0:00 |
 | Jammed door | when the clock hits 0:00 the first time, you get **one extra minute** (`WEDGE_GRACE`), once only |
-| The clock stops | in the briefing, in the pause menu, when the browser tab is hidden, and after an ending |
+| The clock stops | in the briefing, in the pause menu (which also opens when the browser tab is hidden or the window loses focus), and after an ending |
 | The clock keeps running | while reading a clue and while turning the lock |
 
 ## Scenes and how to move

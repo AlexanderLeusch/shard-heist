@@ -57,7 +57,8 @@ test('every external library is pinned to one exact version and checked with an 
 test('the Content Security Policy only allows this site and the two CDNs to run scripts', () => {
   const csp = html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1];
   const dir = Object.fromEntries(csp.split(';').map(d => d.trim().split(/\s+/)).map(([k, ...v]) => [k, v]));
-  assert.deepEqual(dir['script-src'], ["'self'", 'https://cdnjs.cloudflare.com', 'https://cdn.jsdelivr.net']);
+  assert.deepEqual(dir['script-src'], ["'self'", 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/', 'https://cdn.jsdelivr.net/npm/three@0.128.0/']);
+  assert.ok(!csp.includes("'unsafe-inline'"), 'no inline scripts or styles');
   assert.deepEqual(dir['object-src'], ["'none'"]);
   assert.deepEqual(dir['base-uri'], ["'none'"]);
   assert.ok(!csp.includes("'unsafe-eval'"));
@@ -141,7 +142,8 @@ test('escape room: scripts load in order, the library is pinned and SRI-checked,
 test('escape room: the security policy only allows this site and the one CDN to run scripts', () => {
   const csp = escHtml.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1];
   const dir = Object.fromEntries(csp.split(';').map(d => d.trim().split(/\s+/)).map(([k, ...v]) => [k, v]));
-  assert.deepEqual(dir['script-src'], ["'self'", 'https://cdnjs.cloudflare.com']);
+  assert.deepEqual(dir['script-src'], ["'self'", 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/']);
+  assert.ok(!csp.includes("'unsafe-inline'"), 'no inline scripts or styles');
   assert.deepEqual(dir['object-src'], ["'none'"]);
   assert.ok(!csp.includes("'unsafe-eval'"));
 });
@@ -231,7 +233,7 @@ test('the wanted stars and the helicopter are wired up', () => {
   assert.equal((html.match(/id="stars"[^>]*>(<i><\/i>){5}/) || []).length > 0, true, 'five stars in the HUD');
   assert.equal((html.match(/id="cops">(<i><\/i>){4}/) || []).length > 0, true, 'four police slots');
   assert.match(game, /Core\.helicopterDue\(H\.runTime, stars\)/);
-  assert.match(game, /Core\.copTopSpeed\(M\.police, stars, dist, heli\.spotted\)/);
+  assert.match(game, /Core\.copTopSpeed\(M\.police, stars, dist, heli\.spotted, /);
   assert.doesNotMatch(game, /heatLevel|heat\(\)/, 'stars replaced the old heat level');
   assert.match(game, /Core\.rotorLoop\(/, 'the rotor sound comes from the tested loop');
   for (const piece of ['bubble canopy', 'engine hump', 'tail boom', 'skids', 'searchlight', 'four tapered', 'tail rotor']) assert.match(game, new RegExp(piece), 'helicopter: ' + piece);
@@ -272,4 +274,32 @@ test('the printable rules are built from rules/*.md and are up to date', () => {
   assert.equal(fs.readFileSync(path.join(ROOT, 'docs/rules.html'), 'utf8'), buildRulesHtml(), 'run npm run docs');
   assert.match(markdown('| a | b |\n|---|---|\n| 1 | **2** |'), /<td><b>2<\/b><\/td>/);
   assert.equal(markdown('<script>'), '<p>&lt;script&gt;</p>', 'text stays text');
+});
+
+test('audit: everything placed in a run stands on the hills, and the keyboard rules hold', () => {
+  assert.match(game, /const g = new THREE\.Group\(\); g\.position\.set\(s\.x, groundH\(s\.x, s\.z\), s\.z\);/, 'repair kits');
+  assert.match(game, /pg\.position\.set\(gp\.x, groundH\(gp\.x, gp\.z\), gp\.z\)/, 'the finish gate');
+  assert.match(game, /if \(!\$\('fatal'\)\.hidden \|\| e\.ctrlKey \|\| e\.metaKey \|\| e\.altKey\) return;/, 'nothing behind the error screen, no browser shortcuts');
+  assert.match(game, /\(e\.code === 'Enter' \|\| e\.code === 'Space'\) && onButton/, 'a focused button does its own job');
+  assert.doesNotMatch(game, /radio\.next = 0; return;/, 'stopping the radio does not lose its place');
+  assert.match(game, /car\.z = HW\.LEN - 0\.1/, 'the toll stops you without the clasp');
+});
+
+test('audit: no page needs inline styles, which the policy now refuses', () => {
+  for (const [name, src] of [['game', game], ['page', html], ['room', read('escape-room/src/room.js')], ['room page', escHtml]]){
+    assert.doesNotMatch(src, /<style|\sstyle="/, name);
+    assert.doesNotMatch(src, /setAttribute\('style'/, name);
+  }
+});
+
+test('the ground is one surface: the vehicle, every layer and the shadows follow it', () => {
+  assert.match(game, /const hill = \(x, z\) => Core\.hillMesh\(mode, x, z\)/);
+  assert.match(game, /const onGrid = tri =>/, 'ground triangles are cut on the grid');
+  assert.match(game, /car\.y = land \+ car\.lift/, 'no lag on a climb');
+  assert.match(game, /sun\.target\.position\.set\(car\.x, car\.y, car\.z\)/, 'the shadow box follows the height');
+});
+
+test('big ground planes are bent in world space, so none stays flat', () => {
+  assert.match(game, /o\.geometry\.clone\(\)\.applyMatrix4\(o\.matrixWorld\)/);
+  assert.match(game, /o\.rotation\.set\(0, 0, 0\)/);
 });

@@ -12,8 +12,10 @@ test('accepted: each menu action works in the states whose cards show it', () =>
   assert.deepEqual(allowedIn('resume', null), ['pause']);
   assert.deepEqual(allowedIn('again', null), ['pause', 'done', 'over']);
   assert.deepEqual(allowedIn('menu', null), ['menu', 'pause', 'done', 'over']);
-  assert.deepEqual(allowedIn('story', null), ['menu', 'done']);
+  assert.deepEqual(allowedIn('story', null), ['menu']);
   const story = Core.newStory();
+  assert.deepEqual(allowedIn('story', story), ['menu'], 'not after an early act');
+  assert.deepEqual(allowedIn('story', { ...story, act: Core.STORY_ACTS - 1 }), ['menu', 'done'], 'after the final ending');
   assert.deepEqual(allowedIn('act', story), ['menu', 'done']);
   assert.deepEqual(allowedIn('retry-act', story), ['pause', 'over']);
   assert.deepEqual(allowedIn('next-act', story), ['done']);
@@ -60,7 +62,7 @@ test('stored selection: valid data is restored, tampered data falls back to defa
 test('stored best times: only plausible positive seconds are accepted', () => {
   assert.equal(Core.parseBest('83.4'), 83.4);
   assert.equal(Core.parseBest(' 120 '), 120);
-  for (const raw of [null, '', 'abc', '-5', '0', 'NaN', 'Infinity', '1e9', '99999', '12abc', '0x10', '[]']) assert.equal(Core.parseBest(raw), null, String(raw));
+  for (const raw of [null, '', 'abc', '-5', '0', '0.01', '9.9', '901', '3599', 'NaN', 'Infinity', '1e9', '99999', '12abc', '0x10', '[]']) assert.equal(Core.parseBest(raw), null, String(raw));
 });
 
 test('keys: WASD and arrows drive, space is the handbrake, other keys do nothing', () => {

@@ -30,7 +30,7 @@ Progress is saved in the browser after every accepted action, and a reload offer
 
 ## Room 2 · Shard Heist
 
-A 3D police-chase driving game that runs in any modern browser. Pick a map and a getaway vehicle, grab the glowing star shards, shake off up to three police cars and reach the finish before the clock runs out. Or play **The Necklace Job**, a three-act story with three endings.
+A 3D police-chase driving game that runs in any modern browser. Pick a map and a getaway vehicle, grab the glowing star shards, shake off up to four police cars and a helicopter and reach the finish before the clock runs out. Or play **The Necklace Job**, a three-act story with three endings.
 
 **Play:** https://alexanderleusch.github.io/shard-heist/ (published automatically from `main` once all tests pass)
 
@@ -100,10 +100,12 @@ docs/             Code Guide (PDF): architecture, all code sections, tuning, lim
 | Arcade physics (speed along the heading, collision circles) | Predictable, fun handling at 60 fps on modest hardware | No real tyre grip or weight transfer |
 | Engine sound from a small physical model: a pressure pulse per firing, a reflecting exhaust pipe, fixed muffler resonances, separate loops for load and overrun | Follows every rpm and gear change, each vehicle has its real engine layout, and the model can be tested in Node | Approximates real engines, it is not a recording; we checked it by measurement, and the group should judge it by ear |
 | Story as data (`STORY` acts and radio timeline) plus rules in `core.js` | Texts and timing can change without touching the logic; the ending logic is tested | Branching is simple (one decision, three endings) |
+| Hills by bending finished flat worlds over one height field | The layouts, collisions and radar stay simple 2D; every layer is cut on one grid, so layers cannot pass through each other | Building fronts follow the slope instead of stepping |
+| Radio composed and synthesised at run time | No music files, so no licences; each bar is a tested list of notes | Stylised, without vocals |
 
 ## Testing
 
-`npm test` runs 64 tests in Node (15 of them for the escape room), and `npm run test:browser` runs 14 more in headless Chrome (4 of them in the escape room). CI runs all of them, plus the SRI check and the 36 pytest checks of `plot-twist/`, on every push to `main` and on every pull request. They cover:
+`npm test` runs 109 tests in Node (16 of them for the escape room), and `npm run test:browser` runs 15 more in headless Chrome (4 of them in the escape room). CI runs all of them, plus the SRI check and the 36 pytest checks of `plot-twist/`, on every push to `main` and on every pull request. They cover:
 
 - **Escape room:** both endings and the jammed-door grace minute; refused actions (walking where there is no exit, taking an item twice, the tile without the spoon, the door without the mop, lock wheels that do not exist, anything before the briefing or after an ending) return the unchanged state; wrong codes cost 30 s but never take the clock below zero; warnings sound once; tampered saved games are rejected; in the browser: briefing, refused action, save and continue after a reload, a wrong code and then Ending A.
 - **Accepted actions:** each menu action in the states whose cards show it; valid map and vehicle picks; restoring a valid saved selection; finishing every story act; both story endings.
@@ -118,20 +120,20 @@ Writing the tests found two real bugs. Both are fixed:
 
 ## Security
 
-- **No accounts, no server, no personal data.** The only data the game stores is your last map and vehicle, best times and the graphics setting, all in your browser's `localStorage`. There are no credentials anywhere in the repository; a test scans every file for keys and tokens.
-- **Input validation.** Everything read back from `localStorage` is checked (`parsePick`, `parseBest`) and replaced by defaults when it is invalid. Menu picks and actions are checked against fixed lists using own properties only. Error messages are inserted as text, never as HTML.
+- **No accounts, no server, no personal data.** The only data the game stores is your last map and vehicle, best times, the radio station, the graphics setting and the saved escape-room game, all in your browser's `localStorage`. The game has no server of its own, but your browser asks Google Fonts, cdnjs and jsDelivr for the fonts and libraries, so those services see your IP address. There are no credentials anywhere in the repository; a test scans every file for keys and tokens.
+- **Input validation.** Everything read back from `localStorage` is checked (`parsePick`, `parseBest`, `parseRadio`, and `restore` in room 1) and replaced by defaults when it is invalid. Menu picks and actions are checked against fixed lists using own properties only. Error messages are inserted as text, never as HTML.
 - **Access control.** Nothing on the site needs a login. Cards accept only the actions allowed in the current state, and the dev server only serves known file types from the project folder (no `.git`, no path traversal, GET and HEAD only).
 - **Dependencies.** No npm packages at all. The Python project pins every package in `uv.lock`, and CI audits them with `pip-audit` (0 known vulnerabilities on 3 November 2026). The only runtime library is three.js 0.128.0 (9 files), pinned by exact URL, checked by SRI hashes (`npm run test:sri`) and loaded with `crossorigin="anonymous"`. `npm audit` reports 0 known vulnerabilities for `three@0.128.0` (checked 3 November 2026). GitHub Actions are pinned to commit hashes.
 - **Content Security Policy.** Scripts may only come from this site and the two pinned CDNs; there are no inline scripts, plugins, forms or foreign base URLs.
 
 ## Limits
 
-- **Lisbon:** the map is a simplified Baixa: square blocks, 7 streets each way, flat, and some real streets left out. The houses follow the Pombaline pattern and the landmarks are modelled freely from descriptions, not from plans. It is recognisable, not surveyed. The other two maps are not Lisbon yet.
-- **Look and sound:** procedural geometry and synthesised engines are stylised; they do not look or sound like photos or recordings.
-- **Performance:** Ultra graphics (bloom, large shadow maps) needs a decent GPU; phones start in Balanced.
-- **AI:** traffic never changes lanes; police ignore traffic lights and can take detours in the city.
+- **Lisbon:** the map is a simplified Baixa: square blocks, 7 streets each way, and some real streets left out. It has hills, which the real Baixa does not: a game decision. The houses follow the Pombaline pattern and the landmarks are modelled freely from descriptions, not from plans. It is recognisable, not surveyed. The other two maps are not Lisbon yet.
+- **Look and sound:** procedural geometry, synthesised engines and the radio are stylised; they do not look or sound like photos or recordings. Sound was checked by measurement (frequency, level, spectrum), so it should also be judged by ear.
+- **Performance:** Ultra graphics (bloom, large shadow maps) needs a decent GPU; phones start in Balanced. Frame rates were only measured in software rendering, not on a real phone.
+- **AI:** traffic never changes lanes and keeps its speed on hills; police ignore traffic lights and can take detours in the city.
 - **Physics:** arcade model with collision circles; no tyre grip or mass transfer.
-- **Structure:** `game.js` is one large closure (about 3,700 lines) whose sections share variables, so it is harder to work on in parallel than separate modules would be.
+- **Structure:** `game.js` is one large closure (about 4,900 lines) whose sections share variables, so it is harder to work on in parallel than separate modules would be.
 - **Testing:** the browser test checks the main workflows, but not long play sessions, every map end to end, or sound quality, and the CI browser renders in software.
 - **Persistence:** best times live in one browser only and can be edited by the player.
 

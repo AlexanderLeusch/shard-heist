@@ -68,7 +68,7 @@ a{color:var(--accent)}
 <tr><td>Warnings from Hale</td><td>at 5:00, 2:00, 1:00 and 0:30, each only once</td></tr>
 <tr><td>Wrong code</td><td>costs <b>30 seconds</b> (<code>WRONG_CODE_PENALTY</code>), never below 0:00</td></tr>
 <tr><td>Jammed door</td><td>when the clock hits 0:00 the first time, you get <b>one extra minute</b> (<code>WEDGE_GRACE</code>), once only</td></tr>
-<tr><td>The clock stops</td><td>in the briefing, in the pause menu, when the browser tab is hidden, and after an ending</td></tr>
+<tr><td>The clock stops</td><td>in the briefing, in the pause menu (which also opens when the browser tab is hidden or the window loses focus), and after an ending</td></tr>
 <tr><td>The clock keeps running</td><td>while reading a clue and while turning the lock</td></tr>
 </table>
 <h2>Scenes and how to move</h2>
@@ -148,7 +148,7 @@ a{color:var(--accent)}
 <tr><td><b>Highway</b></td><td>Reach the finish <b>4 km</b> ahead. Shards are optional: <b>+4 s</b> each</td><td>1:50</td><td>200 km/h</td><td>187 km/h</td><td>12</td><td>2</td></tr>
 <tr><td><b>Countryside</b></td><td>Reach the village at the end of the road. Shards: <b>+4 s</b> each</td><td>2:30</td><td>158 km/h</td><td>148 km/h</td><td>10</td><td>3</td></tr>
 </table>
-<ul><li>A shard is picked up within 3.8 m; a repair kit within 3.6 m, and only when you have damage.</li><li>Lisbon has traffic lights, other cars and three yellow trams. The trams only run on their tracks, a stone track bed with two rails set into the road: a clockwise loop through Rua da Conceição, Rua da Prata, the north side of the Praça do Comércio and Rua Áurea. As on real Lisbon streets, cars and the player can drive over the tracks. The trams stop at red lights and behind other vehicles. On the highway traffic drives both ways. On country roads there is oncoming traffic, and driving off the road cuts your top speed to 55 %.</li><li>Each map has an edge you cannot cross. Near it the screen turns red and a "turn back" arrow appears.</li></ul>
+<ul><li>A shard is picked up within 3.8 m; a repair kit within 3.6 m, and only when you have damage.</li><li>Lisbon has traffic lights, other cars and three yellow trams. The trams only run on their tracks, a stone track bed with two rails set into the road: a clockwise loop through Rua da Conceição, Rua da Prata, the north side of the Praça do Comércio and Rua Áurea. As on real Lisbon streets, cars and the player can drive over the tracks. The trams stop at red lights and behind other vehicles. On the highway traffic drives both ways. On country roads there is oncoming traffic, and driving off the road cuts your top speed to 55 %.</li><li>Each map has an edge you cannot cross. When you near it the screen turns red and a "turn back" arrow appears. In Lisbon the outer streets are part of the map, so there this only happens when you head for the edge.</li></ul>
 <h2>The city map: Lisbon's Baixa</h2>
 <p>The Baixa is the centre of Lisbon, rebuilt as a street grid after the 1755 earthquake. The map is a simplified version of it: the blocks are square, and the grid has 7 streets each way. The real Baixa has a few more, so some are left out. The real Baixa is also flat; the hills on this map are a game decision.</p>
 <table><tr><th>Direction</th><th>Streets, in their real order</th></tr>
@@ -178,10 +178,12 @@ a{color:var(--accent)}
 </table>
 <h2>Police</h2>
 <table><tr><th>Rule</th><th>Value</th></tr>
-<tr><td>First police car</td><td>after 4 seconds</td></tr>
+<tr><td>First police car</td><td>after 4 seconds; in the countryside once you are about 170 m along the road</td></tr>
 <tr><td><b>Wanted stars</b></td><td>1 to 5, shown under the clock. A new star every fifth of the time limit or of the way to the end (shards in the city, distance on the open roads), whichever is further along. Each wrecked police car counts as 4 % more. Stars never fall.</td></tr>
 <tr><td>New police car</td><td>until the number for your stars is reached, see the table below</td></tr>
-<tr><td>Ramming</td><td>every hard hit lowers a police car's health by impact × your ramming power; a police car is wrecked after its health points are gone and comes back after the time in the table below</td></tr>
+<tr><td>Ramming</td><td>every hard hit lowers a police car's health by impact × your ramming power × 0.09; a police car is wrecked when its health is gone and comes back after the time in the table below</td></tr>
+<tr><td>Far behind</td><td>a police car more than 140 m away drives 20 % faster; one more than 230 m away in the city, or 320 m on the open roads, is sent back near you with full health</td></tr>
+<tr><td>Hills</td><td>police slow down uphill and speed up downhill as you do; other traffic keeps its speed</td></tr>
 <tr><td><b>Bust meter</b></td><td>fills while a police car is <b>within 9 m</b> and you are <b>slower than 4.5 m/s</b> (about 16 km/h): full in 2.2 s. Otherwise it drains (empty from full in 3 s).</td></tr>
 <tr><td><b>Busted</b></td><td>bust meter at 100 %: game over</td></tr>
 </table>
@@ -192,9 +194,9 @@ a{color:var(--accent)}
 <tr><td>★★★★</td><td>3</td><td>106 %</td><td>2.5 s</td><td>6 s</td><td>3.5</td></tr>
 <tr><td>★★★★★</td><td>4</td><td>110 %</td><td>2 s</td><td>4.5 s</td><td>4</td></tr>
 </table>
-<p><b>Helicopter.</b> After 60 seconds on the run (or sooner with the fifth star), a police helicopter joins the chase for the rest of the run and hunts you with its searchlight. Its searchlight follows you at 94 % of the police speed. While you are in the light (within 9 m of its centre), the police drive 6 % faster, and in the city they see you from 170 m instead of 110 m. It cannot bust you or damage you. At full speed on a clear road you can stay ahead of the light.</p>
+<p><b>Helicopter.</b> After 60 seconds on the run (or sooner with the fifth star), a police helicopter joins the chase for the rest of the run and hunts you with its searchlight. Its searchlight follows you at 94 % of the police speed. While you are in the light (within 9 m of its centre), the police drive 6 % faster, and in the city they see you from 170 m instead of 110 m. It cannot bust you or damage you. An undamaged car or motorcycle at full speed on a clear, level road stays ahead of the light; the truck, and a badly damaged car, cannot.</p>
 <h2>Radio</h2>
-<p>Seven stations, or off: Reggae, Techno, Hardstyle, Schlager, Sing-Along Pop, Classical and Heavy Metal. Choose in the menu, or with <code>R</code> or the radio button while driving. The music plays while you drive, and is silent in the menu and in pause.</p>
+<p>Seven stations, or off: Reggae, Techno, Hardstyle, Schlager, Sing-Along Pop, Classical and Heavy Metal. Choose in the menu, or at any time with <code>R</code> or the radio button. The music plays while you drive, and is silent in the menu and in pause.</p>
 <p>All of it is composed and synthesised by the game, with no music files. The tunes are generated by the game. The classical station plays Bach and Beethoven, whose works are in the public domain.</p>
 <h2>Ending a run</h2>
 <table><tr><th>Result</th><th>When</th></tr>
@@ -210,11 +212,11 @@ a{color:var(--accent)}
 <tr><td>Highway</td><td>under 88 s</td><td>under 105 s</td><td>otherwise</td></tr>
 <tr><td>Countryside</td><td>under 115 s</td><td>under 135 s</td><td>otherwise</td></tr>
 </table>
-<ul><li>More than 50 % damage costs one star, but never the last one.</li><li>The best drive time per map is saved in the browser. Implausible saved values are ignored.</li></ul>
+<ul><li>These limits are for the car. For the other vehicles the drive time counts multiplied by their speed factor (motorcycle 1.12, truck 0.78), so each can earn three stars.</li><li>More than 50 % damage costs one star, but never the last one.</li><li>The best drive time per map is saved in the browser. Saved values under 10 s or over 15 minutes are ignored, because no run can take that long or that little.</li></ul>
 <h2>Story mode: The Necklace Job</h2>
 <table><tr><th>Act</th><th>Map</th><th>Goal</th><th>Special rule</th></tr>
 <tr><td><b>1 · The Scatter</b></td><td>Lisbon</td><td>Recover the 8 shards, then the gate</td><td>An optional <b>sealed letter</b> is hidden in a park. It is <b>not shown on the radar</b>.</td></tr>
-<tr><td><b>2 · The Courier</b></td><td>Highway</td><td>Catch the gold-marked courier lorry (get within 9 m) to take the <b>clasp</b>, then the finish</td><td>The <b>toll at the finish only opens with the clasp</b></td></tr>
+<tr><td><b>2 · The Courier</b></td><td>Highway</td><td>Catch the gold-marked courier lorry (get within 9 m) to take the <b>clasp</b>, then the finish</td><td>The <b>toll at the finish only opens with the clasp</b>: without it you stop there</td></tr>
 <tr><td><b>3 · Homecoming</b></td><td>Countryside</td><td>Drive back to the Ashford mansion</td><td>The confrontation decides the ending</td></tr>
 </table>
 <table><tr><th>Ending</th><th>When</th></tr>
@@ -228,6 +230,7 @@ a{color:var(--accent)}
 <table><tr><th>Button</th><th>Allowed when</th></tr>
 <tr><td>Start the getaway</td><td>in the main menu</td></tr>
 <tr><td>Story mode</td><td>in the main menu, or after the final ending</td></tr>
+<tr><td>Start act 1</td><td>on the story's opening card</td></tr>
 <tr><td>Drive again / Restart</td><td>after a run, or in the pause menu</td></tr>
 <tr><td>Resume</td><td>in the pause menu</td></tr>
 <tr><td>Main menu</td><td>anywhere except while driving</td></tr>
@@ -244,7 +247,8 @@ a{color:var(--accent)}
 <tr><td><code>P</code> / <code>Esc</code></td><td>Pause</td></tr>
 <tr><td><code>M</code></td><td>Sound on or off</td></tr>
 <tr><td><code>R</code></td><td>Next radio station (<code>Shift</code> + <code>R</code> for the one before)</td></tr>
-<tr><td><code>Enter</code></td><td>Confirm the main button on a card</td></tr>
+<tr><td><code>Enter</code> / <code>Space</code></td><td>Press the button in focus. With no button in focus, <code>Enter</code> presses the card's main button. While driving, <code>Space</code> is the handbrake</td></tr>
+<tr><td><code>Tab</code></td><td>Move between the buttons of a card</td></tr>
 <tr><td>Touch pads</td><td>Steer on the left; brake and gas on the right</td></tr>
 </table>
 </section>

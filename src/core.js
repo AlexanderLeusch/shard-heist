@@ -14,9 +14,9 @@
   // ### acceleration and handling multipliers, damage taken (dmg), ramming power (ram) and the collision circles (samples, r).
   // ### Change a number here and the whole game, including the stat bars in the menu, follows it.
   const MODES = {
-    city: { key: 'city', title: 'Lisbon · Baixa', eyebrow: 'Baixa · Lisbon', mission: 'Star Shards', max: 34, police: 33, time: 180, gaugeMax: 160, redline: 140, radar: 70, shards: 8, kits: 3, store: 'shard-heist-city-best' },
-    highway: { key: 'highway', title: 'Highway', eyebrow: 'Highway', mission: 'Bonus Shards', max: 55.6, police: 52, time: 110, gaugeMax: 260, redline: 230, radar: 110, shards: 12, kits: 2, bonus: 4, store: 'shard-heist-highway-best', linear: true },
-    country: { key: 'country', title: 'Countryside', eyebrow: 'Country roads', mission: 'Bonus Shards', max: 44, police: 41, time: 150, gaugeMax: 220, redline: 190, radar: 90, shards: 10, kits: 3, bonus: 4, store: 'shard-heist-country-best', linear: true }
+    city: { key: 'city', title: 'Lisbon · Baixa', eyebrow: 'Baixa · Lisbon', mission: 'Star Shards', max: 34, police: 33, time: 180, gaugeMax: 180, redline: 140, radar: 70, shards: 8, kits: 3, store: 'shard-heist-city-best' },
+    highway: { key: 'highway', title: 'Highway', eyebrow: 'Highway', mission: 'Bonus Shards', max: 55.6, police: 52, time: 110, gaugeMax: 290, redline: 230, radar: 110, shards: 12, kits: 2, bonus: 4, store: 'shard-heist-highway-best', linear: true },
+    country: { key: 'country', title: 'Countryside', eyebrow: 'Country roads', mission: 'Bonus Shards', max: 44, police: 41, time: 150, gaugeMax: 240, redline: 190, radar: 90, shards: 10, kits: 3, bonus: 4, store: 'shard-heist-country-best', linear: true }
   };
   const VEH = {
     car: { key: 'car', name: 'Car', cls: 'Muscle coupe', blurb: 'A fastback V8 coupe. Balanced speed and grip, average toughness.', speed: 1.0, accel: 1.0, handling: 1.0, dmg: 1.0, ram: 1.0, samples: [-1.1, 1.1], r: 1.2, cam: [10, 4.4], show: [7.5, 2.0, 0.7], light: 2.45, lightY: 0.7 },
@@ -69,7 +69,7 @@
   function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function shuffle(arr, rnd){ for (let i = arr.length - 1; i > 0; i--){ const j = Math.floor(rnd() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; }
   function fmtTime(s){ s = Number.isFinite(s) ? Math.max(0, Math.ceil(s)) : 0; return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
-  function fmtTimeExact(s){ s = Number.isFinite(s) ? Math.max(0, s) : 0; const m = Math.floor(s / 60); return m + ':' + (s - m * 60).toFixed(1).padStart(4, '0'); }
+  function fmtTimeExact(s){ s = Number.isFinite(s) ? Math.round(Math.max(0, s) * 10) / 10 : 0; const m = Math.floor(s / 60); return m + ':' + (s - m * 60).toFixed(1).padStart(4, '0'); }
   // Frame time in seconds, never negative (the first rAF stamp can be older than performance.now) and capped at 50 ms
   const frameDt = ms => Number.isFinite(ms) ? clamp(ms / 1000, 0, MAX_DT) : 0;
 
@@ -85,11 +85,11 @@
     if (isVeh(s.veh)) sel.veh = s.veh;
     return sel;
   }
-  // A best time is a finite number of seconds within the longest possible run
+  // A best time must be possible: no run takes under 10 s, and none can last over 15 minutes
   function parseBest(raw){
     if (typeof raw !== 'string' || !/^\d+(\.\d+)?$/.test(raw.trim())) return null;
     const v = parseFloat(raw);
-    return v > 0 && v < 3600 ? v : null;
+    return v >= 10 && v <= 900 ? v : null;
   }
   // Applies a menu pick only when both the field and the value are known
   function applyPick(sel, field, val){
@@ -106,7 +106,7 @@
     if (state === 'play') return false;
     switch (action){
       case 'go': return state === 'menu';
-      case 'story': return state === 'menu' || state === 'done';
+      case 'story': return state === 'menu' || (state === 'done' && !!story && story.act + 1 >= STORY_ACTS);
       case 'again': return state === 'done' || state === 'over' || state === 'pause';
       case 'resume': return state === 'pause';
       case 'menu': return state === 'menu' || state === 'pause' || state === 'done' || state === 'over';
@@ -134,7 +134,7 @@
   // ---------- Driving ----------
   // ### Top speed falls by up to 40 % with damage and by 45 % off-road. stepSpeed applies throttle, brake/reverse, coasting
   // ### drag and the handbrake for one frame; gas and brake held together both apply, which is how a real pedal pair works.
-  // ### The throttle can never push past the top speed, so the km/h on the menu card is the real maximum.
+  // ### On level ground the throttle can never push past the top speed, so the km/h on the menu card is the real maximum there.
   const topSpeed = (m, v, damage, offRoad) => m.max * v.speed * (1 - 0.4 * clamp(damage, 0, 100) / 100) * (offRoad ? 0.55 : 1);
   // ### One physics step of speed: gravity on the slope, throttle, brakes, rolling drag and the top speed. dt is capped, so a slow frame cannot launch a vehicle.
   function stepSpeed(speed, keys, dt, maxNow, v, grade){
@@ -147,7 +147,12 @@
       else speed = Math.max(speed, Math.min(maxNow, speed + 24 * v.accel * (1 - Math.pow(speed / maxNow, 1.6) * 0.8) * dt));
     }
     if (keys.down) speed -= (speed > 0.5 ? 46 * (v.key === 'truck' ? 0.75 : 1) : 16) * dt;
-    if (!keys.up && !keys.down){ const d = Math.min(Math.abs(speed), (6 + Math.abs(speed) * 0.08) * dt); speed -= Math.sign(speed) * d; }
+    if (!keys.up && !keys.down){
+      const moving = Math.abs(speed), d = Math.min(moving, (6 + moving * 0.08) * dt);
+      speed -= Math.sign(speed) * d;
+      // friction holds a vehicle that has come to rest, even on the steepest hill
+      if (Math.abs(speed) < HOLD_SPEED) speed = 0;
+    }
     if (keys.brake) speed *= Math.max(0, 1 - 3 * dt);
     if (speed > maxNow) speed += (maxNow - speed) * Math.min(1, 3 * dt);
     if (speed < REV_SPEED) speed = REV_SPEED;
@@ -198,9 +203,10 @@
   // ### field, so the roads, buildings and all vehicles share one shape. In Lisbon it fades out towards the river, so the Arco
   // ### and the Praça stay level, and on the highway towards the start and the finish. grade is the rise per metre along the
   // ### direction of travel: uphill the top speed falls and gravity pulls back, downhill both help. A heavy truck feels it most.
-  const GRAVITY_PULL = 42;
+  const GRAVITY_PULL = 42, HOLD_SPEED = 0.6;
   const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
-  const HILL_BOX = Object.freeze({ city: [-180, 180, -180, 70], highway: [-Infinity, Infinity, 60, 3950], country: [-Infinity, Infinity, -Infinity, Infinity] });
+  const HILL_BOX = Object.freeze({ city: [-184, 184, -184, 72], highway: [-Infinity, Infinity, 48, 3960], country: [-Infinity, Infinity, -Infinity, Infinity] });
+  const HILL_GRID = Object.freeze({ city: 8, highway: 24, country: 30 });
   // ### The height of the land at a point on a map. It is a sum of sine waves, faded out where the map must stay level.
   function hillHeight(modeKey, x, z){
     if (modeKey === 'city'){
@@ -213,6 +219,21 @@
     }
     if (modeKey === 'country') return 13 * Math.sin(x * 0.0061 + 0.7) * Math.cos(z * 0.0053) + 4.5 * Math.sin(x * 0.015 + z * 0.011);
     return 0;
+  }
+  // ### The ground as it is really drawn: flat triangles between the grid points of hillHeight. Every layer of the world is cut
+  // ### along the same grid lines and uses this height, so layers can never pass through each other, and a vehicle placed with
+  // ### it stands exactly on the road. On the highway the hills only depend on z, so the grid is a set of cross lines.
+  function hillMesh(modeKey, x, z){
+    const L = Object.hasOwn(HILL_GRID, modeKey) ? HILL_GRID[modeKey] : 0;
+    if (!L) return 0;
+    const [x0, x1, z0, z1] = HILL_BOX[modeKey];
+    if (x < x0 || x > x1 || z < z0 || z > z1) return 0;
+    const j = Math.floor(z / L), fz = z / L - j;
+    if (modeKey === 'highway'){ const a = hillHeight(modeKey, 0, j * L); return a + (hillHeight(modeKey, 0, (j + 1) * L) - a) * fz; }
+    const i = Math.floor(x / L), fx = x / L - i, h10 = hillHeight(modeKey, (i + 1) * L, j * L), h01 = hillHeight(modeKey, i * L, (j + 1) * L);
+    if (fx + fz <= 1){ const h00 = hillHeight(modeKey, i * L, j * L); return h00 + fx * (h10 - h00) + fz * (h01 - h00); }
+    const h11 = hillHeight(modeKey, (i + 1) * L, (j + 1) * L);
+    return h11 + (1 - fx) * (h01 - h11) + (1 - fz) * (h10 - h11);
   }
   // The rise per metre at a point, looking along a heading
   function gradeAt(modeKey, x, z, heading){
@@ -241,8 +262,9 @@
   }
   const pursuit = stars => PURSUIT[clamp(Math.round(stars) || 1, 1, MAX_STARS) - 1];
   const helicopterDue = (runTime, stars) => runTime >= HELI_AFTER || stars >= MAX_STARS;
-  // A police car's top speed: its map's speed, faster with more stars, when far behind, and when the helicopter has you in its light
-  const copTopSpeed = (base, stars, dist, spotted) => base * pursuit(stars).speed * (dist > 140 ? 1.2 : 1) * (spotted ? 1.06 : 1);
+  // A police car's top speed: its map's speed, faster with more stars, when far behind and when the helicopter has you in its
+  // light, and slower uphill, like every other vehicle
+  const copTopSpeed = (base, stars, dist, spotted, grade) => base * pursuit(stars).speed * (dist > 140 ? 1.2 : 1) * (spotted ? 1.06 : 1) * (1 - clamp((grade || 0) * 2.6, -0.22, 0.32));
   // Moves a point towards a target at no more than maxSpeed, and never past it: the helicopter and its searchlight
   function trackStep(x, z, tx, tz, maxSpeed, dt){
     const dx = tx - x, dz = tz - z, d = Math.hypot(dx, dz), step = maxSpeed * clamp(dt, 0, MAX_DT);
@@ -272,11 +294,13 @@
     return modeKey === 'city' ? m.time - timeLeft : m.time + collected * (m.bonus || 0) - timeLeft;
   }
   // ### The one to three stars for a finished run, from the time left and the damage.
-  function runStars(modeKey, m, timeLeft, used, damage){
+  function runStars(modeKey, m, timeLeft, used, damage, v){
+    // the limits are for the car; a slower vehicle gets more time and a faster one less, so each can earn three stars
+    const t = used * (v ? v.speed : 1);
     let stars;
-    if (modeKey === 'city'){ const frac = timeLeft / m.time; stars = frac > 0.4 ? 3 : frac > 0.2 ? 2 : 1; }
-    else if (modeKey === 'country') stars = used < 115 ? 3 : used < 135 ? 2 : 1;
-    else stars = used < 88 ? 3 : used < 105 ? 2 : 1;
+    if (modeKey === 'city'){ const frac = 1 - t / m.time; stars = frac > 0.4 ? 3 : frac > 0.2 ? 2 : 1; }
+    else if (modeKey === 'country') stars = t < 115 ? 3 : t < 135 ? 2 : 1;
+    else stars = t < 88 ? 3 : t < 105 ? 2 : 1;
     if (damage > 50) stars = Math.max(1, stars - 1);
     return stars;
   }
@@ -311,33 +335,34 @@
   // ### firing frequency = rpm / 60 x cylinders / 2. The pulses travel through a pipe with a reflection at its open end and a
   // ### muffler, whose resonances stay at the same frequencies whatever the rpm. Under load the pulses are strong; on overrun
   // ### they are weak and irregular. The V8's two banks fire unevenly (L R R L R L L R) into pipes of different length: its burble.
-  // ### Idling is its own sound, not a quiet overrun: the engine still fires at part load, each cycle a little different, with
-  // ### short sharp pulses and the valve train, clutch or diesel knock clearly audible (idling). Gears are the speeds in m/s at
+  // ### Idling is its own sound, not a quiet overrun: slow, soft pulses through a closed-down muffler, so it is low and round. The
+  // ### cylinders fire unevenly, which makes the V8 lope once per cycle, and valve train or diesel knock sit on top (idling). Gears are the speeds in m/s at
   // ### which each gear reaches max rpm.
   const ENGINES = {
-    car: { layout: 'V8, cross-plane', cyl: 8, idle: 750, max: 6800, launch: 2600, gears: [12, 20, 29, 38, 48, 58], down: 0.62, shift: 0.16, rev: [9, 4, 14],
-      refs: [750, 1500, 2700, 4300, 6300], loop: 1.5, idling: { pulse: 0.0022, lope: 0.18, weak: 0.08, mech: 5, gain: 1.7 }, banks: [0, 1, 1, 0, 1, 0, 0, 1], pipes: [0.0079, 0.0094], lag: 0.0016, reflect: -0.72, damp: 0.55,
+    car: { layout: 'V8, cross-plane', cyl: 8, idle: 750, max: 6800, launch: 2600, gears: [12, 20, 29, 38, 48, 70], down: 0.62, shift: 0.16, rev: [9, 4, 14],
+      refs: [750, 1500, 2700, 4300, 6300], loop: 1.5, idling: { pulse: 0.0052, lope: 0.14, weak: 0.05, mech: 1.4, gain: 1.15, lowpass: 900, spread: 0.36 }, banks: [0, 1, 1, 0, 1, 0, 0, 1], pipes: [0.0079, 0.0094], lag: 0.0016, reflect: -0.72, damp: 0.55,
       pulse: 0.05, pulseMax: 0.0042, rough: 0.2, spread: 0.2, jitter: 0.1, tick: 0.012, knock: 0,
       body: [[95, 1.1, 1.3], [240, 1.3, 0.8], [620, 1.6, 0.3]], direct: 0.1, lowpass: 3600, intake: [420, 1.6, 0.5], off: 0.42, drive: 1.6,
       pops: 620, turbo: 0, air: false, whine: [24, 0.012], road: 1, vol: 1 },
-    bike: { layout: 'Inline four', cyl: 4, idle: 1300, max: 13000, launch: 5200, gears: [20, 30, 39, 48, 57, 66], down: 0.6, shift: 0.07, rev: [16, 7, 30],
-      refs: [1300, 3000, 5500, 8500, 12000], loop: 1.2, idling: { pulse: 0.0014, lope: 0.1, weak: 0.02, mech: 6, gain: 1.3 }, banks: [0, 0, 0, 0], pipes: [0.0041], lag: 0, reflect: -0.62, damp: 0.75,
+    bike: { layout: 'Inline four', cyl: 4, idle: 1300, max: 13000, launch: 5200, gears: [20, 30, 39, 48, 57, 78], down: 0.6, shift: 0.07, rev: [16, 7, 30],
+      refs: [1300, 3000, 5500, 8500, 12000], loop: 1.2, idling: { pulse: 0.0032, lope: 0.08, weak: 0.02, mech: 2.5, gain: 1, lowpass: 1200, spread: 0.12 }, banks: [0, 0, 0, 0], pipes: [0.0041], lag: 0, reflect: -0.62, damp: 0.75,
       pulse: 0.045, pulseMax: 0.0022, rough: 0.28, spread: 0.05, jitter: 0.05, tick: 0.03, knock: 0,
       body: [[310, 1.2, 0.9], [760, 1.5, 0.8], [1700, 1.8, 0.45]], direct: 0.22, lowpass: 7000, intake: [1050, 2.2, 0.9], off: 0.38, drive: 1.3,
       pops: 1300, turbo: 0, air: false, whine: [46, 0.007], road: 0.55, vol: 0.85 },
-    truck: { layout: 'Inline-six diesel', cyl: 6, idle: 600, max: 2300, launch: 1100, gears: [6, 9, 13, 18, 24, 31, 38, 45], down: 0.72, shift: 0.42, rev: [4, 2.5, 7],
-      refs: [600, 1000, 1400, 1800, 2250], loop: 1.8, idling: { pulse: 0.0032, lope: 0.05, weak: 0, mech: 2.4, gain: 1.6 }, banks: [0, 0, 0, 0, 0, 0], pipes: [0.0148], lag: 0, reflect: -0.8, damp: 0.42,
+    truck: { layout: 'Inline-six diesel', cyl: 6, idle: 600, max: 2300, launch: 1100, gears: [6, 9, 13, 18, 24, 31, 38, 55], down: 0.72, shift: 0.42, rev: [4, 2.5, 7],
+      refs: [600, 1000, 1400, 1800, 2250], loop: 1.8, idling: { pulse: 0.0065, lope: 0.05, weak: 0, mech: 2, gain: 1.1, lowpass: 1100, spread: 0.1 }, banks: [0, 0, 0, 0, 0, 0], pipes: [0.0148], lag: 0, reflect: -0.8, damp: 0.42,
       pulse: 0.06, pulseMax: 0.0062, rough: 0.12, spread: 0.08, jitter: 0.05, tick: 0, knock: 0.2,
       body: [[62, 1.0, 1.4], [150, 1.2, 1.0], [370, 1.4, 0.4]], direct: 0.06, lowpass: 2400, intake: [240, 1.2, 0.35], off: 0.5, drive: 1.9,
       pops: 0, turbo: 0.03, air: true, whine: [15, 0.016], road: 1.5, vol: 1.1 }
   };
   const ENGINE_SR = 32000;
 
-  // The gear after this frame: up at the top of a gear under power, down when the lower gear has room again, first in reverse.
+  // The gear after this frame: up at the top of a gear (off the throttle only when a hill overspeeds it), down when the lower
+  // gear has room again, first in reverse.
   function gearFor(E, gear, speed, throttle){
     const sp = Math.abs(speed), G = E.gears;
     if (speed < -0.3) return 1;
-    if (gear < G.length && throttle && sp > G[gear - 1] * 0.97) return gear + 1;
+    if (gear < G.length && sp > G[gear - 1] * (throttle ? 0.97 : 1.02)) return gear + 1;
     if (gear > 1 && sp < G[gear - 2] * E.down) return gear - 1;
     return gear;
   }
@@ -365,7 +390,7 @@
     const rnd = mulberry32(seed), cycle = 120 / rpm, cycles = Math.max(2, Math.ceil(E.loop * (idle ? 2 : 1) / cycle)), n = Math.round(cycle * cycles * sr);
     const flow = E.pipes.map(() => new Float32Array(n)), mech = new Float32Array(n), out = new Float32Array(n);
     const low = clamp(1 - (rpm - E.idle) / (E.max - E.idle) * 2, 0, 1); // engines run less evenly at low rpm
-    const trim = []; for (let i = 0; i < E.cyl; i++) trim.push((rnd() - 0.5) * 2 * E.spread * (0.4 + 0.6 * low));
+    const trim = []; for (let i = 0; i < E.cyl; i++) trim.push((rnd() - 0.5) * 2 * (idle ? I.spread : E.spread * (0.4 + 0.6 * low)));
     const tau = idle ? I.pulse : Math.min(E.pulse * cycle, E.pulseMax), L = Math.round(tau * 9 * sr), step = 1 / (tau * sr);
     let cycleAmp = 1;
     for (let c = 0; c < cycles * E.cyl; c++){
@@ -395,7 +420,7 @@
     const pipes = E.pipes.map(d => ({ ring: new Float32Array(Math.max(1, Math.round(d * sr))), at: 0, lp: 0 }));
     const body = E.body.map(([f, Q, g]) => ({ f: resonance(f, Q, sr), g }));
     const intake = resonance(E.intake[0], E.intake[1], sr), intakeG = onLoad ? E.intake[2] * (0.35 + 0.65 * rpm / E.max) : 0;
-    const smooth = 1 - Math.exp(-2 * Math.PI * E.lowpass / sr);
+    const smooth = 1 - Math.exp(-2 * Math.PI * (idle ? I.lowpass : E.lowpass) / sr);
     let prev = 0, lp = 0, lp2 = 0;
     for (let pass = 0; pass < 2; pass++) for (let i = 0; i < n; i++){
       let x = 0;
@@ -580,7 +605,7 @@
     MODES, VEH, REV_SPEED, REPAIR_AMOUNT, MAX_DT, STORY_ACTS, KEY_MAP, BAIXA, streetAt, TRAM_LOOP, tramNext,
     isMode, isVeh, clamp, wrapAngle, mulberry32, shuffle, fmtTime, fmtTimeExact, frameDt,
     parsePick, parseBest, applyPick, actionAllowed,
-    vehStats, zeroTo80, topSpeed, stepSpeed, collidePoint, HILL_BOX, hillHeight, gradeAt, slopeTop,
+    vehStats, zeroTo80, topSpeed, stepSpeed, collidePoint, HILL_BOX, HILL_GRID, hillHeight, hillMesh, gradeAt, slopeTop,
     crashDamage, addDamage, repairDamage, isWrecked, damageStage, smokeFor,
     PURSUIT, MAX_STARS, SPOT_RADIUS, HELI_AFTER, wantedStars, pursuit, helicopterDue, copTopSpeed, trackStep, inSpotlight, bustStep, edgeDistance,
     driveTime, runStars, isNewBest,

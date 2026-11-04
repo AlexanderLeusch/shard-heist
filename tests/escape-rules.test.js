@@ -197,3 +197,22 @@ test('saved games: a real save is restored, anything else is rejected', () => {
     assert.equal(R.restore(raw), null, String(raw).slice(0, 60));
   }
 });
+
+test('audit: a hand-edited save that no game can produce is refused, and every real save is kept', () => {
+  const good = R.newState();
+  const save = o => JSON.stringify({ ...R.perform(good, 'start').state, ...o });
+  assert.equal(R.restore(save({ scene: 'cell', ending: null })), null, 'the cell without an ending');
+  assert.equal(R.restore(save({ scene: 'tunnel', ending: null })), null, 'the tunnel without an ending');
+  assert.equal(R.restore(save({ scene: 'door', ending: 'A' })), null, 'an ending somewhere else');
+  assert.equal(R.restore(save({ clues: ['mirror', 'mirror'] })), null, 'the same clue twice');
+  assert.equal(R.restore(save({ graceUsed: true, wedged: false })), null, 'grace minute without the jammed door');
+  assert.equal(R.restore(save({ tileOpen: true, inventory: [] })), null, 'the tile open without the spoon');
+  // a full game: after every accepted action the save must load again
+  let s = R.perform(good, 'start').state;
+  const steps = [['go', 'sinks'], ['take', 'spoon'], ['tap', null], ['read', 'mirror'], ['tap', null], ['take', 'mop'], ['go', 'door'], ['wedge', null], ['go', 'stall'], ['read', 'graffiti'], ['pry', null], ['read', 'scrap'], ['go', 'hatch']];
+  for (const [a, b] of steps){
+    const r = R.perform(s, a, b);
+    if (r.ok) s = r.state;
+    assert.notEqual(R.restore(JSON.stringify(s)), null, 'after ' + a + ' ' + b);
+  }
+});
