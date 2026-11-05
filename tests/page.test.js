@@ -10,7 +10,9 @@ const { createServer, resolvePath, ROOT } = require('../scripts/serve.js');
 
 const read = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
 const html = read('index.html');
-const game = read('src/game.js');
+// Tests below read the source text. Comments are removed first: a test must not pass because of a comment.
+const uncommented = t => t.replace(/^\s*\/\/.*$/gm, '').replace(/(\s)\/\/ .*$/gm, '$1');
+const rawGame = read('src/game.js'), game = uncommented(rawGame);
 const scripts = [...html.matchAll(/<script\b([^>]*)><\/script>/g)].map(m => m[1]);
 
 test('every element the game looks up by id exists in index.html', () => {
@@ -67,7 +69,10 @@ test('the Content Security Policy only allows this site and the two CDNs to run 
 test('no credentials or secrets anywhere in the repository', () => {
   const patterns = [/AKIA[0-9A-Z]{16}/, /gh[pousr]_[A-Za-z0-9]{30,}/, /sk-[A-Za-z0-9]{20,}/, /-----BEGIN [A-Z ]*PRIVATE KEY-----/, /(api[_-]?key|secret|password|token)\s*[:=]\s*['"][^'"]{8,}['"]/i];
   // Every file git tracks, so local folders such as plot-twist/.venv (installed packages, ignored by git) do not count
-  const tracked = require('child_process').execFileSync('git', ['ls-files', '-z'], { cwd: ROOT }).toString().split('\0').filter(Boolean);
+  // A downloaded ZIP has no git: then walk the folder and leave out what git would ignore
+  const walk = (dir, out = []) => { for (const e of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })){ if (/^(\.git|\.venv|node_modules|__pycache__)$/.test(e.name)) continue; const p = path.posix.join(dir, e.name); if (e.isDirectory()) walk(p, out); else out.push(p); } return out; };
+  let tracked;
+  try { tracked = require('child_process').execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] }).toString().split('\0').filter(Boolean); } catch (e) { tracked = walk(''); }
   const files = tracked.filter(f => /\.(js|html|css|json|md|yml|yaml|py|toml|txt)$/.test(f)).map(f => path.join(ROOT, f));
   assert.ok(files.length >= 8);
   for (const f of files){
@@ -200,7 +205,7 @@ test('the trams have tracks: bed and rails are built on the same loop the trams 
 });
 
 test('the buildings of the city are authentic: closed blocks of low houses and the real landmarks', () => {
-  const city = game.slice(game.indexOf('function buildCity()'), game.indexOf('// ---------- City traffic'));
+  const city = rawGame.slice(rawGame.indexOf('function buildCity()'), rawGame.indexOf('// ---------- City traffic'));
   assert.ok(!/'glass'|'office'|'brick'/.test(city), 'no towers, offices or brick from the old city');
   assert.match(city, /floors = o\.floors \|\| \(pickFloors < 0\.25 \? 3 : pickFloors < 0\.8 \? 4 : 5\)/, 'ground floor plus 3 to 5 floors, as in OpenStreetMap');
   assert.match(city, /rng\(\) >= 0\.12 \? 'pombal'/, 'tiled fronts stay the exception');
@@ -216,11 +221,9 @@ test('the engines are played from the tested model: loaded and overrun loops per
 });
 
 test('the motorcycle and the truck are modelled like the real thing', () => {
-  const part = (a, b) => game.slice(game.indexOf(a), game.indexOf(b, game.indexOf(a)));
+  const part = (a, b) => rawGame.slice(rawGame.indexOf(a), rawGame.indexOf(b, rawGame.indexOf(a)));
   const bike = part('// Motorcycle: superbike', '// Truck: European'), truck = part('// Truck: European', 'Object.values(MODELS)');
-  for (const piece of ['the engine', 'header pipes', 'frame', 'the rider', 'full-face helmet', 'the fork turns']) assert.match(bike, new RegExp(piece), 'bike: ' + piece);
   assert.match(bike, /rotors: \[0\.058, -0\.058\]/, 'twin front brake discs');
-  for (const piece of ['windscreen', 'grille', 'mirrors', 'fifth wheel', 'fuel tank', 'air and electric lines', 'mudguards']) assert.match(truck, new RegExp(piece), 'truck: ' + piece);
   assert.equal((truck.match(/false, 0\.26\]/g) || []).length, 4, 'twin tyres on each side of the rear axle');
 });
 
@@ -236,7 +239,6 @@ test('the wanted stars and the helicopter are wired up', () => {
   assert.match(game, /Core\.copTopSpeed\(M\.police, stars, dist, heli\.spotted, /);
   assert.doesNotMatch(game, /heatLevel|heat\(\)/, 'stars replaced the old heat level');
   assert.match(game, /Core\.rotorLoop\(/, 'the rotor sound comes from the tested loop');
-  for (const piece of ['bubble canopy', 'engine hump', 'tail boom', 'skids', 'searchlight', 'four tapered', 'tail rotor']) assert.match(game, new RegExp(piece), 'helicopter: ' + piece);
 });
 
 test('damage is visible and the rider is posed', () => {
@@ -244,8 +246,6 @@ test('damage is visible and the rider is posed', () => {
   assert.match(game, /Core\.smokeFor\(damage\)/);
   assert.match(game, /shader\.uniforms\.uDent = dentU/, 'dents and scratches in the paint shader');
   for (const key of ['car', 'bike', 'truck']) assert.match(game, new RegExp('MODELS\\.' + key + ' = \\{.*damageParts'), key + ' has loose parts');
-  for (const piece of ['hood up', 'smashed tail light', 'torn mudguard', 'cracked windscreen']) assert.match(game, new RegExp(piece));
-  for (const piece of ['two-tone leathers', 'fingers round the grips', 'full-face helmet', 'tuck']) assert.match(game, new RegExp(piece));
 });
 
 test('every world is bent over the hills once, and the car feels them', () => {
@@ -300,6 +300,8 @@ test('the ground is one surface: the vehicle, every layer and the shadows follow
 });
 
 test('big ground planes are bent in world space, so none stays flat', () => {
+  assert.ok(game.includes('o.isPoints || o.isLine'), 'wires follow the hills');
+  assert.ok(game.includes('const c = b.getCenter(tmp).applyMatrix4(o.matrixWorld); o.position.y += H(c.x, c.z)'), 'small meshes move by the height under their vertices');
   assert.match(game, /o\.geometry\.clone\(\)\.applyMatrix4\(o\.matrixWorld\)/);
   assert.match(game, /o\.rotation\.set\(0, 0, 0\)/);
 });

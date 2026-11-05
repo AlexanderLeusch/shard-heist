@@ -55,6 +55,10 @@ async function load(){
   await waitFor(menuReady, LOAD_MS, 'main menu');
 }
 
+test('CI really runs the browser tests', { skip: !process.env.CI && 'only on the CI server' }, () => {
+  assert.ok(CHROME, 'no browser on the CI server: the browser tests would be skipped and the deploy would go ahead untested');
+});
+
 test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROME_PATH)', timeout: 600000 }, async t => {
   server = createServer().listen(0, '127.0.0.1');
   await new Promise(r => server.once('listening', r));
@@ -190,6 +194,37 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
     const hs = k => click(`[data-hotspot="${k}"]`);
     const seconds = async () => { const [m, sec] = (await text('#time')).split(':').map(Number); return m * 60 + sec; };
 
+    await t.test('phone: tilt steering is offered, hides the steering buttons sideways, and is refused upright', async () => {
+      const phone = (width, height, type, angle) => send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true, screenOrientation: { type, angle } });
+      await phone(844, 390, 'landscapePrimary', 90);
+      await send('Emulation.setTouchEmulationEnabled', { enabled: true });
+      await send('DeviceOrientation.setDeviceOrientationOverride', { alpha: 0, beta: 15, gamma: -70 });
+      await load();
+      assert.equal(await evaluate("document.querySelector('[data-steer=\"tilt\"]').getAttribute('aria-pressed')"), 'true', 'a phone starts with tilt');
+      await click('[data-action="go"]');
+      await waitFor(playing, 20000, 'run on the phone');
+      await waitFor("document.getElementById('touch').classList.contains('tilt')", 20000, 'tilt to take over');
+      assert.equal(await evaluate("getComputedStyle(document.querySelector('[data-key=\"left\"]')).visibility"), 'hidden');
+      assert.equal(await evaluate("getComputedStyle(document.querySelector('[data-key=\"up\"]')).visibility"), 'visible', 'gas stays');
+      await phone(390, 844, 'portraitPrimary', 0);
+      await waitFor("!document.getElementById('touch').classList.contains('tilt')", 20000, 'buttons to come back upright');
+      assert.equal(await evaluate("getComputedStyle(document.querySelector('[data-key=\"left\"]')).visibility"), 'visible');
+      await phone(844, 390, 'landscapePrimary', 90);
+      await key('keydown', 'KeyP');
+      await waitFor("!!document.querySelector('[data-steer=\"pads\"]')", 20000, 'choice on the pause card');
+      await click('[data-steer="pads"]');
+      await click('[data-action="resume"]');
+      await waitFor("!document.getElementById('touch').classList.contains('tilt')", 20000, 'buttons when chosen');
+      assert.equal(await evaluate("localStorage.getItem('shard-heist-steer')"), 'pads');
+      await evaluate("localStorage.removeItem('shard-heist-steer'), true");
+      assert.deepEqual(errors, []);
+      await send('DeviceOrientation.clearDeviceOrientationOverride');
+      await send('Emulation.setTouchEmulationEnabled', { enabled: false });
+      await send('Emulation.clearDeviceMetricsOverride');
+      await load();
+      assert.equal(await evaluate("document.querySelectorAll('[data-steer]').length"), 0, 'rejected: a desktop is not offered tilt');
+    });
+
     await t.test('escape room: the briefing explains who, where and how, then the clock starts', async () => {
       await send('Page.navigate', { url: base + 'escape-room/' });
       await waitFor("!!document.querySelector('#card h1')", LOAD_MS, 'briefing');
@@ -198,6 +233,7 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       await send('Page.navigate', { url: base + 'escape-room/' });
       await waitFor("!!document.querySelector('#card h1')", LOAD_MS, 'briefing');
       assert.match(await text('#card'), /inmate 4471/);
+      assert.equal(await evaluate("getComputedStyle(document.getElementById('btnNotes')).visibility"), 'hidden', 'rejected: the clue button cannot be reached during the briefing');
       for (let i = 0; i < 3; i++) await click('[data-do="next"]');
       assert.match(await text('#card'), /Drag/);
       await click('[data-do="start"]');
@@ -224,6 +260,27 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       await click('[data-do="resume"]');
       assert.equal(await text('#place'), 'The Sinks');
       assert.equal(await evaluate("document.querySelectorAll('.slot.full').length"), 1);
+    });
+
+    await t.test('escape room rejected: real keys on a lock wheel never try the code', async () => {
+      await hs('go:stall'); await hs('go:hatch'); await hs('lock');
+      await waitFor("!!document.getElementById('lockUi')", 5000, 'lock card');
+      const realKey = async (code, key, vk) => { for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, code, key, windowsVirtualKeyCode: vk, text: type === 'keyDown' && code === 'Enter' ? '\r' : undefined }); };
+      await realKey('Tab', 'Tab', 9);
+      await evaluate("document.querySelector('[data-turn=\"3,1\"]').focus(), true");
+      const wheel = await evaluate("document.activeElement.dataset.turn || ''");
+      assert.equal(wheel, '3,1', 'the wheel has the focus');
+      const before = await evaluate("[...document.querySelectorAll('#lockUi output')].map(o => o.textContent).join('')");
+      const clock = await seconds();
+      await realKey('Enter', 'Enter', 13); await realKey('Enter', 'Enter', 13);
+      assert.equal(await evaluate("document.activeElement.dataset.turn || ''"), wheel, 'the wheel keeps the focus');
+      assert.notEqual(await evaluate("[...document.querySelectorAll('#lockUi output')].map(o => o.textContent).join('')"), before, 'the wheel turned');
+      assert.ok(clock - await seconds() < 10, 'no 30 s penalty');
+      assert.match(await text('#tries'), /Each wrong code/);
+      for (let i = 0; i < 2; i++) await click('[data-turn="3,-1"]');
+      await click('[data-do="close"]');
+      await hs('go:stall');
+      await hs('go:sinks');
     });
 
     await t.test('escape room: a wrong code costs 30 s, the right one (1912) is Ending A', async () => {

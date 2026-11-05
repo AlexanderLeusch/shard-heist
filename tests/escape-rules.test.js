@@ -209,10 +209,23 @@ test('audit: a hand-edited save that no game can produce is refused, and every r
   assert.equal(R.restore(save({ tileOpen: true, inventory: [] })), null, 'the tile open without the spoon');
   // a full game: after every accepted action the save must load again
   let s = R.perform(good, 'start').state;
-  const steps = [['go', 'sinks'], ['take', 'spoon'], ['tap', null], ['read', 'mirror'], ['tap', null], ['take', 'mop'], ['go', 'door'], ['wedge', null], ['go', 'stall'], ['read', 'graffiti'], ['pry', null], ['read', 'scrap'], ['go', 'hatch']];
+  const steps = [['go', 'sinks'], ['take', 'spoon'], ['tap', null], ['read', 'mirror'], ['tap', null], ['go', 'door'], ['take', 'mop'], ['wedge', null], ['go', 'stall'], ['read', 'graffiti'], ['pry', null], ['read', 'scrap'], ['go', 'hatch'], ['try', null]];
   for (const [a, b] of steps){
     const r = R.perform(s, a, b);
-    if (r.ok) s = r.state;
+    assert.ok(r.ok, a + ' ' + b + ' must be accepted: ' + r.message);
+    s = r.state;
     assert.notEqual(R.restore(JSON.stringify(s)), null, 'after ' + a + ' ' + b);
   }
+  assert.equal(s.wedged, true); assert.equal(s.wrongTries, 1);
+  // the clock runs out at the jammed door: the grace minute, then Ending B, and each of them loads
+  while (!s.graceUsed){ s = R.tick(s, 1).state; assert.notEqual(R.restore(JSON.stringify(s)), null, 'at ' + s.time); }
+  assert.equal(s.time, R.WEDGE_GRACE);
+  while (s.ending === null) s = R.tick(s, 1).state;
+  assert.equal(s.ending, 'B');
+  assert.notEqual(R.restore(JSON.stringify(s)), null, 'an ending');
+  // and these never happen in a real game
+  assert.equal(R.restore(save({ wedged: true, graceUsed: true, time: 600 })), null, 'the grace minute with a full clock');
+  assert.equal(R.restore(save({ wrongTries: 3, time: 600 })), null, 'wrong codes that cost nothing');
+  assert.equal(R.restore(save({ wrongTries: 99, time: 0 })), null, 'more wrong codes than the clock allows');
+  assert.equal(R.restore(save({ warned: [60], time: 500 })), null, 'a warning before its time');
 });

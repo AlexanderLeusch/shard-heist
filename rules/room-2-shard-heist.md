@@ -72,7 +72,7 @@ The Baixa is the centre of Lisbon, rebuilt as a street grid after the 1755 earth
 
 | Rule | Value |
 |---|---|
-| Crash | impacts under 3 m/s (about 11 km/h) are free; above that, damage = (impact − 3) × 1.6 × the vehicle's damage factor |
+| Crash | impacts under 3 m/s (about 11 km/h) are free; above that, damage = (impact − 3) × 1.6 × the vehicle's damage factor. One crash counts once: for 0.35 s after contact, only a harder hit costs more |
 | 25 % damage | the paint shows dents and scratches, and thin grey smoke rises from the engine |
 | 50 % damage | warning: "Engine damaged: top speed reduced." Loose parts and a smashed light; the engine misfires; the smoke turns dark |
 | 75 % damage | hood up (car), screen gone (motorcycle), hanging bumper and cracked windscreen (truck); a thick black column of smoke; sparks at speed |
@@ -181,4 +181,5 @@ The last map and vehicle, the best times, the radio station and the graphics set
 | `R` | Next radio station (`Shift` + `R` for the one before) |
 | `Enter` / `Space` | Press the button in focus. With no button in focus, `Enter` presses the card's main button. While driving, `Space` is the handbrake |
 | `Tab` | Move between the buttons of a card |
-| Touch pads | Steer on the left; brake and gas on the right |
+| Touch pads | Steer on the left; brake and gas on the right. Both together are the handbrake |
+| Tilt (phones) | Hold the phone sideways and lower one side, like a steering wheel: from 3° it starts to steer, at 24° it is at full lock. The steering buttons go away while tilt works. Upright, or if the sensor is refused or missing, the buttons stay. Choose `Tilt` or `Buttons` in the menu or on the pause card. The sensor is only read in the browser and nothing is stored or sent |

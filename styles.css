@@ -149,7 +149,9 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-display);overflow
 .pedal.on .pv{color:var(--ink)}
 
 #toast{position:fixed;left:50%;top:calc(20px + env(safe-area-inset-top,0px));transform:translate(-50%,-8px);opacity:0;transition:opacity .3s,transform .3s;pointer-events:none;
-  background:var(--glass-strong);border:1px solid var(--line);border-radius:14px;padding:9px 18px;font-weight:600;font-size:15px;line-height:1.35;text-align:center;width:max-content;max-width:min(680px,calc(100% - 32px));backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+  background:var(--glass-strong);border:1px solid var(--line);border-radius:14px;padding:9px 18px;font-weight:600;font-size:15px;line-height:1.35;text-align:center;box-sizing:border-box;width:max-content;max-width:min(680px,calc(100% - 700px));backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+/* messages sit between the top panels; on a narrow window there is no room, so they go under the mission panel */
+@media (max-width:1120px){#toast{top:calc(158px + env(safe-area-inset-top,0px));max-width:max(260px,calc(100% - 590px))}}
 #toast.show{opacity:1;transform:translate(-50%,0)}
 #toast.gold{color:var(--gold);border-color:rgba(255,200,87,.45)}
 #toast.green{color:var(--go);border-color:rgba(78,240,160,.45)}
@@ -168,6 +170,7 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-display);overflow
 #touch{position:fixed;left:0;right:0;bottom:0;display:none;justify-content:space-between;align-items:flex-end;pointer-events:none;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 calc(16px + env(safe-area-inset-bottom,0px))}
 #touch .grp{display:flex;gap:12px;align-items:flex-end}
+#touch.tilt .grp:first-child{visibility:hidden}
 .pad{--p:0;position:relative;overflow:hidden;pointer-events:auto;width:72px;height:72px;border-radius:18px;border:1px solid var(--line);background:var(--glass);color:var(--ink);display:grid;place-items:center;font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);touch-action:none}
 .pad svg{width:26px;height:26px}
 .pad span{position:relative}
@@ -338,6 +341,7 @@ kbd{font-family:var(--f-mono);font-size:12px;color:var(--ink);background:rgba(25
   .tbtns{gap:4px}
   .icon-btn{width:30px;height:30px}
   .pursuit{grid-column:2;grid-row:1;justify-self:center;width:min(100%,160px);gap:3px}
+  #toast{top:calc(62px + env(safe-area-inset-top,0px));font-size:13px;padding:6px 12px;max-width:min(480px,70%)}
   .pur-title,.pursuit .bust-row,.pursuit .units,.pursuit .pur-label,.pursuit .btrack{display:none}
   .pursuit{padding:6px 9px;border-radius:12px}
   .pur-line{justify-content:center}

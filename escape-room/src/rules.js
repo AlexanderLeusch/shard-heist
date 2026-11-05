@@ -188,6 +188,10 @@
       // only an ending leads to the cell or the tunnel; the grace minute needs the jammed door, and the tile needs the spoon
       && (s.ending === 'A' ? s.scene === 'tunnel' : s.ending === 'B' ? s.scene === 'cell' : s.scene !== 'tunnel' && s.scene !== 'cell')
       && !(s.graceUsed && !s.wedged)
+      // the clock only runs down: every wrong code took 30 s from it, and only the grace minute sets it back, to one minute
+      && s.wrongTries <= (TIME_LIMIT + WEDGE_GRACE) / WRONG_CODE_PENALTY + 1
+      && s.time <= (s.graceUsed ? WEDGE_GRACE : Math.max(0, TIME_LIMIT - s.wrongTries * WRONG_CODE_PENALTY))
+      && (s.graceUsed || s.warned.every(w => s.time <= w))
       && !(s.tileOpen && !s.inventory.includes('spoon'));
     if (!ok) return null;
     return { scene: s.scene, time: s.time, inventory: s.inventory.slice(), clues: s.clues.slice(), tileOpen: s.tileOpen, steam: s.steam,

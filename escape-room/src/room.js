@@ -16,7 +16,8 @@ const $ = id => document.getElementById(id);
 const readStore = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 const writeStore = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
 let S = R.newState(), paused = false, saveTimer = 0;
-const save = () => writeStore(R.SAVE_KEY, JSON.stringify(S));
+// nothing has happened yet on the briefing, and it must not replace a real save
+const save = () => { if (S.scene !== 'intro') writeStore(R.SAVE_KEY, JSON.stringify(S)); };
 const saved = R.restore(readStore(R.SAVE_KEY));
 const COARSE = matchMedia('(pointer: coarse)').matches;
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -606,7 +607,10 @@ function showLock(){
 function renderLock(){
   const ui = card.querySelector('#lockUi');
   if (!ui) return;
+  // redrawing removes the wheel button in use: a keyboard player stays on it, or the next Enter would try the code and cost 30 s
+  const a = document.activeElement, turn = a && a.dataset && a.dataset.turn && a.matches(':focus-visible') ? a.dataset.turn : null;
   ui.innerHTML = S.lock.map((d, i) => `<div class="wheel"><button data-turn="${i},1" aria-label="Wheel ${i + 1} up">▲</button><output aria-label="Wheel ${i + 1}">${d}</output><button data-turn="${i},-1" aria-label="Wheel ${i + 1} down">▼</button></div>`).join('');
+  if (turn) ui.querySelector(`[data-turn="${turn}"]`).focus();
   card.querySelector('#tries').textContent = S.wrongTries ? `Wrong codes so far: ${S.wrongTries} · each costs ${R.WRONG_CODE_PENALTY} s` : 'Each wrong code costs ' + R.WRONG_CODE_PENALTY + ' s';
 }
 // ### Shows one of the two endings.
@@ -637,7 +641,7 @@ card.addEventListener('click', e => {
   else if (d === 'try') act('try');
 });
 $('btnPause').addEventListener('click', e => { e.currentTarget.blur(); if (S.ending || S.scene === 'intro') return; if (paused) resumeRoom(); else showPause(); });
-$('btnNotes').addEventListener('click', e => { e.currentTarget.blur(); if (!paused) showNotes(); });
+$('btnNotes').addEventListener('click', e => { e.currentTarget.blur(); if (!paused && !S.ending && S.scene !== 'intro') showNotes(); });
 let muted = false;
 // ### Back to the room from the pause or continue card: the clock runs again, the HUD shows, and so does the sound.
 function resumeRoom(){ paused = false; hideCard(); hud.classList.remove('off'); if (ac && !muted && !document.hidden) ac.resume(); }

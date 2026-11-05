@@ -26,6 +26,23 @@
   const REV_SPEED = -11, REPAIR_AMOUNT = 40, MAX_DT = 0.05, STORY_ACTS = 3;
   const KEY_MAP = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', Space: 'brake' };
 
+  // ### Tilt steering on a phone held sideways, like a steering wheel. beta is the sensor's angle of the phone's long side against the
+  // ### horizon. Its sine is used because beta itself jumps by 180 degrees when the phone tips past upright. At screen angle 90 the top
+  // ### of the phone points left, so a raised top means the right side is down: steer right. At 270 the phone is the other way round.
+  // ### Returns -1 to 1, with left as positive, like the steering keys, and 0 in portrait or without a reading.
+  const TILT_DEAD = 3, TILT_FULL = 24;
+  function tiltSteer(beta, angle){
+    if (!Number.isFinite(beta) || (angle !== 90 && angle !== 270)) return 0;
+    const deg = Math.asin(clamp(Math.sin(beta * Math.PI / 180), -1, 1)) * 180 / Math.PI, size = Math.abs(deg);
+    if (size <= TILT_DEAD) return 0;
+    const amount = Math.min(1, (size - TILT_DEAD) / (TILT_FULL - TILT_DEAD));
+    return (deg > 0 ? -amount : amount) * (angle === 90 ? 1 : -1);
+  }
+  const parseSteer = raw => raw === 'pads' ? 'pads' : 'tilt';
+
+  // ### Two keys can do the same thing (W and the up arrow): the action stays on until the last of them is released.
+  const actionHeld = (held, action) => [...held].some(code => KEY_MAP[code] === action);
+
   // ---------- The city map: Lisbon's Baixa ----------
   // ### The Baixa was rebuilt as a street grid after the 1755 earthquake, so it fits the game's 7 x 7 grid of roads. The names
   // ### are real and in their real order (ns: west to east, ew: north to south), checked against OpenStreetMap; the Baixa has
@@ -183,12 +200,24 @@
   // ---------- Damage ----------
   // ### Impacts under 3 m/s are free; above that damage grows linearly and is scaled by the vehicle (the truck takes 55 %).
   const crashDamage = (impact, v) => Number.isFinite(impact) ? Math.max(0, (impact - 3) * 1.6 * v.dmg) : 0;
+  // ### One crash is charged once. After a hit the vehicle keeps touching the wall for a few frames, and each of those frames reports
+  // ### an impact. Contact within CRASH_QUIET seconds belongs to the same crash: only a harder hit costs more, and only the difference.
+  const CRASH_QUIET = 0.35;
+  const newCrashGuard = () => ({ until: -Infinity, paid: 0 });
+  function chargeCrash(guard, impact, v, now){
+    const full = crashDamage(impact, v), paid = now >= guard.until ? 0 : guard.paid;
+    guard.until = now + CRASH_QUIET;
+    guard.paid = Math.max(paid, full);
+    return Math.max(0, full - paid);
+  }
   const addDamage = (damage, add) => clamp(damage + Math.max(0, add), 0, 100);
   const repairDamage = damage => Math.max(0, damage - REPAIR_AMOUNT);
   const isWrecked = damage => damage >= 100;
   // ### What damage looks like. Stage 0 is clean, 1 dented, 2 battered (loose parts, a smashed light), 3 critical (hood up and
   // ### worse). Smoke starts at 25 %, thickens and turns from grey to black, and at 88 % the engine burns.
   const damageStage = damage => damage >= 75 ? 3 : damage >= 50 ? 2 : damage >= 25 ? 1 : 0;
+  // ### The word on the dashboard follows the same stages as the looks of the vehicle.
+  const damageLevel = damage => { const stage = damageStage(damage); return stage === 3 ? 'crit' : stage > 0 ? 'warn' : 'ok'; };
   // ### How the engine smokes at a damage level: rate, colour, opacity, how fast it rises, and whether it burns.
   function smokeFor(damage){
     const stage = damageStage(damage), within = (lo, hi) => clamp((damage - lo) / (hi - lo), 0, 1);
@@ -616,7 +645,7 @@
     isMode, isVeh, clamp, wrapAngle, mulberry32, shuffle, fmtTime, fmtTimeExact, frameDt,
     parsePick, parseBest, applyPick, actionAllowed,
     vehStats, zeroTo80, topSpeed, stepSpeed, collidePoint, HILL_BOX, HILL_GRID, hillHeight, hillMesh, gradeAt, slopeTop,
-    crashDamage, addDamage, repairDamage, isWrecked, damageStage, smokeFor,
+    crashDamage, CRASH_QUIET, newCrashGuard, chargeCrash, addDamage, repairDamage, isWrecked, damageStage, damageLevel, smokeFor, actionHeld, TILT_DEAD, TILT_FULL, tiltSteer, parseSteer,
     PURSUIT, MAX_STARS, SPOT_RADIUS, HELI_AFTER, wantedStars, pursuit, helicopterDue, copTopSpeed, trackStep, inSpotlight, bustStep, edgeDistance,
     driveTime, runStars, isNewBest,
     newStory, beginAct, retryAct, finishOpen, storyEnding, dueRadio,

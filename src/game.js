@@ -889,12 +889,13 @@ function laySlopes(group, key){
         m[13] += H(m[12], m[14]); o.setMatrixAt(i, mat4);
       }
       o.instanceMatrix.needsUpdate = true;
-    } else if (o.isPoints){
+    } else if (o.isPoints || o.isLine){
       const g = o.geometry.clone(); displace(g, o.matrixWorld); o.geometry = g;
     } else if (o.isMesh){
       o.geometry.computeBoundingBox();
       const b = o.geometry.boundingBox, big = Math.max(b.max.x - b.min.x, b.max.y - b.min.y, b.max.z - b.min.z) > 24;
-      if (!big) shift(o);
+      // a small mesh moves by the height under its own vertices, which need not be where its origin is
+      if (!big){ const c = b.getCenter(tmp).applyMatrix4(o.matrixWorld); o.position.y += H(c.x, c.z); }
       else {
         // bake the mesh's own turn and position into its vertices first: "up" must be world up. The big ground planes are built
         // lying on their side, and bending them along their own y axis would leave them flat while everything else follows the hills.
@@ -1693,7 +1694,7 @@ function makeSign(dist){
   g.fillStyle = '#0f5c3c'; g.fillRect(0, 0, 512, 160);
   g.strokeStyle = '#f2f2f2'; g.lineWidth = 6; g.strokeRect(9, 9, 494, 142);
   g.fillStyle = '#f2f2f2'; g.textBaseline = 'middle';
-  g.font = '700 54px "Bricolage Grotesque", "Segoe UI", sans-serif'; g.fillText('FINISH', 40, 60);
+  g.font = '700 54px "Segoe UI", sans-serif'; g.fillText('FINISH', 40, 60);
   g.font = '700 40px "JetBrains Mono", Consolas, monospace'; g.fillText(dist, 40, 116);
   g.beginPath(); g.moveTo(440, 34); g.lineTo(478, 80); g.lineTo(452, 80); g.lineTo(452, 128); g.lineTo(428, 128); g.lineTo(428, 80); g.lineTo(402, 80); g.closePath(); g.fill();
   const t = new THREE.CanvasTexture(c); t.anisotropy = ANISO; t.encoding = THREE.sRGBEncoding;
@@ -2083,7 +2084,7 @@ function buildCountry(){
     if (!forest && rng() > 0.05) continue;
     const t = { x, z, y, s: 0.85 + rng() * 0.95, rot: rng() * 6.28, v: rng() };
     (rng() < (forest ? 0.7 : 0.3) ? pines : rounds).push(t);
-    if (d < 120) gridAdd({ t: 'c', x, z, r: 0.5 * t.s });
+    gridAdd({ t: 'c', x, z, r: 0.5 * t.s });
   }
   const placeT = (o, dm) => { dm.position.set(o.x, o.y - 0.15, o.z); dm.rotation.set(0, o.rot, 0); dm.scale.setScalar(o.s); };
   const trunk = new THREE.CylinderGeometry(0.22, 0.32, 2.2, 6); trunk.translate(0, 1.1, 0);
@@ -2133,8 +2134,8 @@ function buildCountry(){
   {
     const pt = roadPoint(L - 250, -26), y = terrainH(pt.x, pt.z) - 0.3;
     plain.box(pt.x - 2.6, pt.x + 2.6, y, y + 20, pt.z - 2.6, pt.z + 2.6, C(0xe6dccb));
-    const spire = new THREE.Mesh(new THREE.ConeGeometry(3.4, 11, 4).rotateY(Math.PI / 4).translate(pt.x, y + 25.5, pt.z), new THREE.MeshStandardMaterial({ color: 0x3b4a44, roughness: 0.6, metalness: 0.3 }));
-    spire.castShadow = true; grp.add(spire);
+    const spire = new THREE.Mesh(new THREE.ConeGeometry(3.4, 11, 4).rotateY(Math.PI / 4), new THREE.MeshStandardMaterial({ color: 0x3b4a44, roughness: 0.6, metalness: 0.3 }));
+    spire.position.set(pt.x, y + 25.5, pt.z); spire.castShadow = true; grp.add(spire);
     house(pt.x + 10, pt.z, 15, 9, 2, false);
     gridAdd({ t: 'b', x0: pt.x - 2.6, x1: pt.x + 2.6, z0: pt.z - 2.6, z1: pt.z + 2.6 });
   }
@@ -2683,7 +2684,7 @@ const policeTex = (() => {
   const c = document.createElement('canvas'); c.width = 256; c.height = 64;
   const g = c.getContext('2d'); g.fillStyle = '#f2f3f6'; g.fillRect(0, 0, 256, 64);
   g.fillStyle = '#1e3fa8'; g.fillRect(0, 44, 256, 10);
-  g.fillStyle = '#10131a'; g.font = '800 34px "Bricolage Grotesque", "Segoe UI", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = '#10131a'; g.font = '800 34px "Segoe UI", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
   g.fillText('POLICE', 128, 24);
   const t = new THREE.CanvasTexture(c); t.anisotropy = ANISO; t.encoding = THREE.sRGBEncoding; return t;
 })();
@@ -2721,8 +2722,9 @@ function updateWanted(){
   else progress = gate && gate.active ? 1 : collected / Math.max(1, M.shards);
   const next = Core.wantedStars(stars, heli.runTime, M.time, progress, copsWrecked);
   if (next === stars) return;
+  const more = Core.pursuit(next).cops > Core.pursuit(stars).cops;
   stars = next;
-  if (stars >= 3) toast('Wanted level up: ' + stars + ' stars. More police, and faster.', 'red', 2400);
+  if (stars >= 3) toast(`Wanted level up: ${stars} stars. ${more ? 'More police, and faster.' : 'The police get faster.'}`, 'red', 2400);
 }
 const snapI = v => clamp(Math.round(v / PITCH) * PITCH, -3 * PITCH, 3 * PITCH);
 // ### True if a building stands between two points: the police line of sight.
@@ -3170,6 +3172,14 @@ for (let i = 0; i < 14; i++){
   flames.push({ s, life: 0, vx: 0, vy: 0, vz: 0 });
 }
 let smokeAcc = 0, smokeIdx = 0, flameAcc = 0, flameIdx = 0;
+// ### Removes all sparks, smoke and flames, so that a new run does not start next to the smoke of the last one.
+function clearEffects(){
+  new Set(particles.map(p => p.mat)).forEach(m => m.dispose());
+  particles.forEach(p => scene.remove(p.mesh));
+  particles.length = 0;
+  smoke.concat(flames).forEach(p => { p.life = 0; p.s.visible = false; });
+  smokeAcc = flameAcc = 0;
+}
 // ### Emits the smoke and flames that Core.smokeFor asks for at the current damage, and lets them rise and fade.
 function updateSmoke(dt){
   const P = Core.smokeFor(damage), md = MODELS[V.key];
@@ -3607,21 +3617,21 @@ function updateBoundary(dt){
 // ---------- Input ----------
 // ### Keyboard (WASD/arrows, space, P, M, Enter) and on-screen touch pads both write into the same keys object.
 const keys = { up: false, down: false, left: false, right: false, brake: false };
-const keyMap = Core.KEY_MAP;
+const keyMap = Core.KEY_MAP, held = new Set(), crashGuard = Core.newCrashGuard();
 addEventListener('keydown', e => {
   if (!$('fatal').hidden || e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.repeat && e.code === 'Enter'){ e.preventDefault(); return; }
   if (e.repeat && !Object.hasOwn(keyMap, e.code)) return;
   const onButton = !overlay.hidden && document.activeElement && document.activeElement.tagName === 'BUTTON' && card.contains(document.activeElement);
   if ((e.code === 'Enter' || e.code === 'Space') && onButton){ e.preventDefault(); if (!e.repeat) document.activeElement.click(); return; }
-  if (Object.hasOwn(keyMap, e.code)){ keys[keyMap[e.code]] = true; e.preventDefault(); }
+  if (Object.hasOwn(keyMap, e.code)){ held.add(e.code); keys[keyMap[e.code]] = true; e.preventDefault(); }
   if (e.code === 'KeyP' || e.code === 'Escape'){ if (state === 'play') pause(); else if (state === 'pause') resume(); }
   if (e.code === 'KeyM') toggleSound();
   if (e.code === 'KeyR'){ initAudio(); setStation(Core.radioNext(radio.key, e.shiftKey ? -1 : 1), true); }
   if (e.code === 'Enter' && !overlay.hidden){ const b = card.querySelector('.btn'); if (b){ e.preventDefault(); b.click(); } }
 });
-addEventListener('keyup', e => { if (Object.hasOwn(keyMap, e.code)) keys[keyMap[e.code]] = false; });
-addEventListener('blur', () => { Object.keys(keys).forEach(k => keys[k] = false); if (state === 'play') pause(); });
+addEventListener('keyup', e => { if (Object.hasOwn(keyMap, e.code)){ held.delete(e.code); keys[keyMap[e.code]] = Core.actionHeld(held, keyMap[e.code]); } });
+addEventListener('blur', () => { held.clear(); Object.keys(keys).forEach(k => keys[k] = false); if (state === 'play') pause(); });
 // The engine must never keep running when the tab is hidden: suspend all audio, resume when visible again
 // The error screen pauses the run and silences the engine
 addEventListener('shardheist:fatal', () => { if (state === 'play') pause(); if (audio) audio.ctx.suspend(); $('fatalReload').focus(); });
@@ -3636,14 +3646,54 @@ document.addEventListener('visibilitychange', () => {
 addEventListener('pagehide', () => { if (audio) audio.ctx.suspend(); });
 document.querySelectorAll('.pad').forEach(btn => {
   const k = btn.dataset.key;
-  const on = e => { e.preventDefault(); keys[k] = true; btn.classList.add('down'); try { btn.setPointerCapture(e.pointerId); } catch (_) {} initAudio(); };
-  const off = () => { keys[k] = false; btn.classList.remove('down'); };
+  const on = e => { e.preventDefault(); keys[k] = true; keys.brake = keys.up && keys.down; btn.classList.add('down'); try { btn.setPointerCapture(e.pointerId); } catch (_) {} initAudio(); };
+  const off = () => { keys[k] = false; keys.brake = keys.up && keys.down; btn.classList.remove('down'); };
   btn.addEventListener('pointerdown', on);
   btn.addEventListener('pointerup', off);
   btn.addEventListener('pointercancel', off);
   btn.addEventListener('lostpointercapture', off);
   btn.addEventListener('contextmenu', e => e.preventDefault());
 });
+
+// ---------- Tilt steering ----------
+// ### A phone is recognised by its touch screen and motion sensor, and then steers by tilting: hold it sideways and lower one side,
+// ### like a steering wheel. Gas and brake stay on the screen, and the steering buttons go away while tilt is working. Upright, or
+// ### without a sensor, the buttons stay. The readings are only used here, in the browser. iOS asks the player first, and only after a tap.
+const TILT = { can: COARSE && typeof DeviceOrientationEvent !== 'undefined', mode: 'pads', beta: NaN, listening: false, asked: false, on: false, value: 0, hintSide: false, hintUp: false };
+if (TILT.can) TILT.mode = Core.parseSteer(readStore('shard-heist-steer'));
+// ### Listens to the sensor once.
+function tiltListen(){
+  if (TILT.listening) return;
+  TILT.listening = true;
+  addEventListener('deviceorientation', e => { if (Number.isFinite(e.beta)) TILT.beta = e.beta; });
+}
+// ### Turns the sensor on if the player wants tilt. Has to run inside a tap, because of iOS.
+function tiltAsk(){
+  if (!TILT.can || TILT.mode !== 'tilt') return;
+  const ask = DeviceOrientationEvent.requestPermission;
+  if (typeof ask !== 'function') return tiltListen();
+  if (TILT.asked) return;
+  TILT.asked = true;
+  const refused = () => { TILT.mode = 'pads'; toast('No access to the motion sensor. Steer with the buttons instead.', 'red', 3600); };
+  ask.call(DeviceOrientationEvent).then(answer => { if (answer === 'granted') tiltListen(); else refused(); }).catch(refused);
+}
+// ### The rotation of the screen in degrees: 0 upright, 90 or 270 sideways.
+function screenAngle(){
+  const o = screen.orientation, a = o && Number.isFinite(o.angle) ? o.angle : window.orientation || 0;
+  return (a % 360 + 360) % 360;
+}
+// ### Reads the tilt each frame, shows or hides the steering buttons, and explains it once in a run.
+function updateTilt(){
+  const seen = Number.isFinite(TILT.beta), angle = screenAngle(), sideways = angle === 90 || angle === 270;
+  const on = TILT.mode === 'tilt' && seen && sideways;
+  if (on !== TILT.on){ TILT.on = on; $('touch').classList.toggle('tilt', on); }
+  TILT.value = on ? Core.tiltSteer(TILT.beta, angle) : 0;
+  if (state !== 'play' || TILT.mode !== 'tilt' || !seen || heli.runTime < 5) return;
+  if (on && !TILT.hintSide){ TILT.hintSide = true; toast('Tilt the phone like a steering wheel. Gas and brake are on the right.', '', 3600); }
+  if (!sideways && !TILT.hintUp){ TILT.hintUp = true; toast('Turn the phone sideways to steer by tilting. Auto-rotate must be on.', '', 3600); }
+}
+// ### The choice between tilt and buttons, for the menu and the pause card. Only a phone shows it.
+const steerRow = () => TILT.can ? `<span class="gfx">Steering <button data-steer="tilt" aria-pressed="${TILT.mode === 'tilt'}">Tilt</button><button data-steer="pads" aria-pressed="${TILT.mode === 'pads'}">Buttons</button></span>` : '';
 
 // ---------- HUD ----------
 // ### Updates the on-screen panels every frame: timer, speedometer (SVG arc with ticks), gear, rpm, pedal bars, damage,
@@ -3751,7 +3801,7 @@ function updateHud(dt){
   if (d !== last.dmg){
     last.dmg = d;
     ui.dmgPct.textContent = d;
-    const lvl = d >= 70 ? 'crit' : d >= 35 ? 'warn' : 'ok';
+    const lvl = Core.damageLevel(d);
     ui.dmg.dataset.level = lvl;
     ui.dmgState.textContent = lvl === 'crit' ? 'Critical' : lvl === 'warn' ? 'Dented' : 'Good';
     ui.dfill.style.width = d + '%';
@@ -3930,6 +3980,8 @@ function setMode(m){
 
 // ### Puts the player back at the start of the map.
 function resetCar(){
+  clearEffects();
+  Object.assign(crashGuard, Core.newCrashGuard());
   let x = mode === 'city' ? -3.5 : HW.our[1], z = mode === 'city' ? -6 : 5, heading = 0;
   if (mode === 'country'){ const pt = roadPoint(40, ROAD.lane); x = pt.x; z = pt.z; heading = pt.h; roadPos.ri = undefined; roadPos.s = 40; roadPos.lat = ROAD.lane; }
   Object.assign(car, { x, z, y: groundH(x, z), heading, speed: 0, steer: 0, pitch: 0, roll: 0, bodyPitch: 0, shake: 0, prevSpeed: 0, lean: 0, lift: 0 });
@@ -3942,6 +3994,7 @@ function resetCar(){
 // ### Starts a free ride or a story act: resets the score, car and police.
 function startRun(m, v){
   initAudio();
+  tiltAsk();
   setVehicle(v || V.key);
   setMode(m || mode);
   placeRun();
@@ -3972,7 +4025,8 @@ function pause(){
       <button class="btn" data-action="resume">Resume</button>
       <button class="btn ghost" data-action="${story ? 'retry-act' : 'again'}">Restart</button>
       <button class="btn ghost" data-action="menu">Main menu</button>
-    </div>`);
+    </div>
+    ${steerRow()}`);
 }
 // ### Goes back to driving after a pause.
 function resume(){ hideOverlay(); state = 'play'; initAudio(); }
@@ -3989,8 +4043,7 @@ function collect(it){
     gate.active = true; gate.group.visible = true; gate.grow = 0;
     sfx.gate();
     toast('All shards found! Escape through the Arco da Rua Augusta: follow the golden beam.', 'gold', 4500);
-  } else if (collected % 3 === 0) toast(`Shard ${collected} / ${items.length}. More police are joining the chase!`, 'red', 2400);
-  else toast(`Star shard ${collected} / ${items.length}`, '', 1800);
+  } else toast(`Star shard ${collected} / ${items.length}`, '', 1800);
 }
 // ### Picks up a repair kit: Core.repairDamage removes the damage.
 function repair(kt){
@@ -3999,14 +4052,13 @@ function repair(kt){
   runGroup.remove(kt.group);
   const before = damage;
   damage = Core.repairDamage(damage);
-  if (damage < 35) warnedDamage = false;
+  if (damage < 50) warnedDamage = false;
   sfx.repair();
   toast(`Repair kit: damage ${Math.round(before)}% → ${Math.round(damage)}%`, 'green', 2400);
 }
 
 // ### Applies a crash: damage from Core.crashDamage, sparks, sound and camera shake.
-function crash(impact){
-  const add = Core.crashDamage(impact, V);
+function crash(impact, add = Core.crashDamage(impact, V)){
   if (add <= 0 && clock < bumpQuiet) return;
   bumpQuiet = clock + 0.4;
   car.shake = Math.min(1, impact / 18);
@@ -4162,6 +4214,7 @@ function showMenu(){
       <span>Best · Lisbon ${bestNote('city')} · Highway ${bestNote('highway')} · Country ${bestNote('country')}</span>
       <span class="gfx">Radio ${Core.RADIO_ORDER.map(k => `<button data-radio="${k}" aria-pressed="${radio.key === k}">${k === 'off' ? 'Off' : Core.RADIO[k].name}</button>`).join('')}</span>
       <span class="gfx">Graphics <button data-gfx="ultra" aria-pressed="${gfx === 'ultra'}">Ultra</button><button data-gfx="balanced" aria-pressed="${gfx === 'balanced'}">Balanced</button></span>
+      ${steerRow()}
     </div>`, 'menu');
   renderVehDetail();
 }
@@ -4196,6 +4249,14 @@ card.addEventListener('click', e => {
   const rb = e.target.closest('[data-radio]');
   if (rb){
     setStation(rb.dataset.radio, false);
+    return;
+  }
+  const sb = e.target.closest('[data-steer]');
+  if (sb){
+    TILT.mode = Core.parseSteer(sb.dataset.steer);
+    card.querySelectorAll('[data-steer]').forEach(b => b.setAttribute('aria-pressed', String(b === sb)));
+    writeStore('shard-heist-steer', TILT.mode);
+    tiltAsk();
     return;
   }
   const gb = e.target.closest('[data-gfx]');
@@ -4256,7 +4317,7 @@ function updateCar(dt){
   if (offRoad && Math.abs(car.speed) > 8) car.shake = Math.max(car.shake, 0.06);
   car.speed = Core.stepSpeed(car.speed, keys, dt, maxNow, V, grade);
 
-  const steerIn = (keys.left ? 1 : 0) - (keys.right ? 1 : 0);
+  const steerIn = (keys.left ? 1 : 0) - (keys.right ? 1 : 0) || TILT.value;
   car.steer += (steerIn - car.steer) * Math.min(1, 8 * dt);
   const sp = Math.abs(car.speed);
   const turn = car.steer * Math.min(1, sp / 6) * (2.5 * V.handling / (1 + sp * 0.035)) * (keys.brake ? 1.5 : 1);
@@ -4309,8 +4370,14 @@ function updateCar(dt){
       }
     }
   }
-  if (worst > 0) crash(worst);
+  if (worst > 0) crash(worst, Core.chargeCrash(crashGuard, worst, V, clock));
   if (state !== 'play') return;
+  settleCar(dt);
+}
+
+// ### Keeps the vehicle inside the map and on the ground, and sets its pitch, roll and wheels.
+function settleCar(dt){
+  const fx = Math.sin(car.heading), fz = Math.cos(car.heading);
 
   if (mode === 'city' && (Math.abs(car.x) > LIMIT || Math.abs(car.z) > LIMIT)){
     const into = (Math.abs(car.x) > LIMIT ? Math.sign(car.x) * fx : 0) + (Math.abs(car.z) > LIMIT ? Math.sign(car.z) * fz : 0);
@@ -4336,6 +4403,22 @@ function updateCar(dt){
   car.prevSpeed = car.speed;
   car.bodyPitch += (clamp(accel * 0.0025, -0.06, 0.05) - car.bodyPitch) * Math.min(1, 6 * dt);
   car.wheelRot += car.speed * dt;
+}
+
+// ### When a run ends the vehicle rolls out instead of stopping dead, and stops at the first thing in its way.
+function coast(dt){
+  car.speed *= Math.exp(-dt * 3);
+  if (Math.abs(car.speed) < 0.05){ car.speed = 0; return; }
+  const fx = Math.sin(car.heading), fz = Math.cos(car.heading), x = car.x + fx * car.speed * dt, z = car.z + fz * car.speed * dt;
+  const blocked = V.samples.some(s => {
+    const px = x + fx * s, pz = z + fz * s;
+    if (collidersNear(x, z).some(c => collidePoint(px, pz, V.r, c))) return true;
+    if (mode === 'highway') return traffic.some(t => t.on && Math.abs(t.x - px) < t.hw + V.r && Math.abs(t.z - pz) < t.len / 2 + V.r);
+    return vehicleObstacles().some(o => Math.hypot(o.x - px, o.z - pz) < o.r + V.r);
+  });
+  if (blocked){ car.speed = 0; return; }
+  car.x = x; car.z = z;
+  settleCar(dt);
 }
 
 // ### Moves the 3D vehicle to its physics position; sets brake lights, damage parts, dents, lean and spinning wheels.
@@ -4519,10 +4602,10 @@ function buildComposer(){
 }
 // ### Applies the Ultra or Balanced graphics setting.
 function applyGfx(){
-  const q = GFX[gfx];
+  const q = GFX[gfx], size = COARSE ? q.shadow / 2 : q.shadow;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.ratio));
-  if (sun.shadow.mapSize.x !== q.shadow){
-    sun.shadow.mapSize.set(q.shadow, q.shadow);
+  if (sun.shadow.mapSize.x !== size){
+    sun.shadow.mapSize.set(size, size);
     if (sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map = null; }
   }
   if (q.post && !composer) composer = buildComposer();
@@ -4779,6 +4862,7 @@ function frame(now){
   lastT = now;
   const paused = state === 'pause';
   frameNo++;
+  if (TILT.can) updateTilt();
   if (!paused) clock += dt;
 
   if (state === 'play'){
@@ -4793,7 +4877,7 @@ function frame(now){
     }
     chaseCam(dt);
   } else if (!paused){
-    car.speed *= Math.exp(-dt * 3);
+    if (state !== 'menu') coast(dt);
     updatePickups(dt, false);
     if (state !== 'menu') updatePolice(dt);
     if (state === 'menu') orbitCam(dt); else chaseCam(dt);

@@ -113,6 +113,35 @@ test('damage: soft bumps are free, the truck takes 55 %, damage stays within 0-1
   assert.equal(Core.crashDamage(13, VEH.car), 16);
   assert.ok(Math.abs(Core.crashDamage(13, VEH.truck) - 16 * 0.55) < 1e-9);
   assert.equal(Core.crashDamage(NaN, VEH.car), 0);
+  // accepted and refused: one crash pays once, however many frames it touches
+  const g = Core.newCrashGuard();
+  assert.equal(Core.chargeCrash(g, 34, VEH.car, 10), Core.crashDamage(34, VEH.car), 'the first frame pays in full');
+  assert.equal(Core.chargeCrash(g, 10.6, VEH.car, 10.016), 0, 'the rebound in the next frame is the same crash');
+  assert.equal(Core.chargeCrash(g, 3.6, VEH.car, 10.033), 0);
+  assert.ok(Math.abs(Core.chargeCrash(g, 44, VEH.car, 10.05) - Core.crashDamage(44, VEH.car) + Core.crashDamage(34, VEH.car)) < 1e-9, 'a harder hit pays the difference');
+  assert.equal(Core.chargeCrash(g, 34, VEH.car, 10.1), 0, 'contact keeps the window open');
+  assert.equal(Core.chargeCrash(g, 34, VEH.car, 10.1 + Core.CRASH_QUIET), Core.crashDamage(34, VEH.car), 'a later crash is a new one');
+  // the dashboard word follows the damage stages
+  assert.deepEqual([0, 24, 25, 74, 75, 100].map(Core.damageLevel), ['ok', 'ok', 'warn', 'warn', 'crit', 'crit']);
+  // tilt steering: sideways only, with a dead zone, full lock at the limit, and mirrored when the phone is turned round
+  assert.equal(Core.tiltSteer(20, 0), 0, 'refused upright');
+  assert.equal(Core.tiltSteer(20, 180), 0, 'refused upside down');
+  for (const bad of [NaN, null, undefined, Infinity, '20']) assert.equal(Core.tiltSteer(bad, 90), 0, 'refused: ' + bad);
+  assert.equal(Core.tiltSteer(0, 90), 0);
+  assert.equal(Core.tiltSteer(Core.TILT_DEAD, 90), 0, 'a steady hand does not steer');
+  assert.equal(Core.tiltSteer(Core.TILT_FULL, 90), -1, 'right side down steers right');
+  assert.equal(Core.tiltSteer(-Core.TILT_FULL, 90), 1, 'left side down steers left');
+  assert.equal(Core.tiltSteer(Core.TILT_FULL, 270), 1, 'the phone turned round is mirrored');
+  assert.equal(Core.tiltSteer(60, 90), -1, 'never more than full lock');
+  assert.ok(Math.abs(Core.tiltSteer(10, 90)) < 1 && Math.abs(Core.tiltSteer(10, 90)) > 0, 'in between it is gradual');
+  assert.ok(Math.abs(Core.tiltSteer(170, 90) - Core.tiltSteer(10, 90)) < 1e-9, 'past upright the sensor jumps, the steering does not');
+  assert.equal(Core.parseSteer('pads'), 'pads');
+  for (const bad of ['tilt', 'constructor', '', null]) assert.equal(Core.parseSteer(bad), 'tilt');
+  // two keys for one action: it stays on until the last one is released
+  assert.equal(Core.actionHeld(new Set(['KeyW', 'ArrowUp']), 'up'), true);
+  assert.equal(Core.actionHeld(new Set(['KeyW']), 'up'), true);
+  assert.equal(Core.actionHeld(new Set(['KeyS']), 'up'), false);
+  assert.equal(Core.actionHeld(new Set(), 'up'), false);
   assert.equal(Core.addDamage(90, 30), 100);
   assert.equal(Core.addDamage(20, -50), 20, 'negative damage is rejected');
   assert.equal(Core.repairDamage(70), 30);
