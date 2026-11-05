@@ -551,3 +551,26 @@ test('idling is low and round: most of its sound is below 400 Hz', () => {
     assert.ok(low > high, key + ' low ' + low + ' high ' + high);
   }
 });
+
+test('skid marks: hard braking, the handbrake and very fast corners slide; normal driving does not', () => {
+  assert.equal(Core.skidAmount(30, true, false, 0), 0.8, 'hard braking');
+  assert.equal(Core.skidAmount(10, false, true, 0), 1, 'handbrake');
+  assert.equal(Core.skidAmount(-10, false, true, 0), 1, 'handbrake in reverse');
+  assert.equal(Core.skidAmount(30, false, false, 1), 0.45, 'very fast corner');
+  assert.equal(Core.skidAmount(30, false, false, -1), 0.45, 'either way');
+  assert.equal(Core.skidAmount(30, false, false, 0), 0, 'straight on');
+  assert.equal(Core.skidAmount(8, true, false, 0), 0, 'gentle braking at low speed');
+  assert.equal(Core.skidAmount(10, true, false, 0), 0.8, 'braking at speed');
+  assert.equal(Core.skidAmount(-10, true, false, 0), 0, 'S while reversing is throttle');
+  assert.equal(Core.skidAmount(3, false, true, 0), 0, 'handbrake when nearly stopped');
+  assert.equal(Core.skidAmount(5, false, true, 0), 1, 'handbrake while rolling');
+  assert.equal(Core.skidAmount(15, false, false, 1), 0, 'a normal corner');
+  assert.equal(Core.skidAmount(0, false, false, 0), 0);
+});
+
+test('reversing lights: on only while rolling backwards', () => {
+  assert.equal(Core.isReversing(-3), true);
+  assert.equal(Core.isReversing(-0.4), false, 'not while stopping');
+  assert.equal(Core.isReversing(0), false);
+  assert.equal(Core.isReversing(20), false);
+});

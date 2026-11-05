@@ -376,6 +376,16 @@
   function isBraking(speed, down, up, handbrake){
     return !!((down && speed > 0.5) || (up && speed < -0.5) || (handbrake && Math.abs(speed) > 0.5));
   }
+  // The white reversing lights: on while actually rolling backwards
+  const isReversing = speed => speed < -0.5;
+  // How hard the rear tyres slide, from 0 to 1. The skid marks and the tyre squeal both follow it.
+  function skidAmount(speed, down, handbrake, steer){
+    const sp = Math.abs(speed);
+    if (handbrake && sp > 4) return 1;
+    if (down && speed > 9) return 0.8;
+    if (Math.abs(steer) > 0.85 && sp > 22) return 0.45;
+    return 0;
+  }
   // A two-pole resonance with its own state, one sample at a time
   function resonance(f, Q, sr){
     const w = 2 * Math.PI * f / sr, alpha = Math.sin(w) / (2 * Q), a0 = 1 + alpha, c = Math.cos(w);
@@ -610,7 +620,7 @@
     PURSUIT, MAX_STARS, SPOT_RADIUS, HELI_AFTER, wantedStars, pursuit, helicopterDue, copTopSpeed, trackStep, inSpotlight, bustStep, edgeDistance,
     driveTime, runStars, isNewBest,
     newStory, beginAct, retryAct, finishOpen, storyEnding, dueRadio,
-    ENGINES, ENGINE_SR, gearFor, engineTarget, isBraking, engineLoop, engineLoops, ROTOR, rotorLoop,
+    ENGINES, ENGINE_SR, gearFor, engineTarget, isBraking, isReversing, skidAmount, engineLoop, engineLoops, ROTOR, rotorLoop,
     RADIO, RADIO_ORDER, BACH, parseRadio, radioNext, radioBar
   });
 });

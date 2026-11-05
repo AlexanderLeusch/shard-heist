@@ -1313,7 +1313,29 @@ function buildCity(){
   // The hills around the valley: Bairro Alto in the west, the castle hill in the east, the Avenida in the north
   const HILLS = [[330, -110, 175, 64, 240], [-345, -60, 150, 60, 320], [0, -470, 340, 45, 190]];
   const hillH = (x, z) => Math.max(0, ...HILLS.map(([cx, cz, rx, ry, rz]) => ry * Math.sqrt(Math.max(0, 1 - ((x - cx) / rx) ** 2 - ((z - cz) / rz) ** 2))));
-  grp.add(new THREE.Mesh(mergeGeos(HILLS.map(([cx, cz, rx, ry, rz]) => new THREE.SphereGeometry(1, 24, 14).scale(rx, ry, rz).translate(cx, 0, cz))), new THREE.MeshStandardMaterial({ color: 0x2a3142, roughness: 1 })));
+  // ### Night and fog would turn a plainly lit hill into the colour of the sky, and the houses on it would seem to hang in the air. So
+  // ### the hills paint their own colours and ignore the fog: dark gardens, built-up terracotta patches and streets along the slope,
+  // ### shaded by the direction each slope faces, with the small lights of the quarter on top.
+  {
+    const geo = mergeGeos(HILLS.map(([cx, cz, rx, ry, rz]) => new THREE.SphereGeometry(1, 96, 40).scale(rx, ry, rz).translate(cx, 0, cz)));
+    const p = geo.attributes.position, n = geo.attributes.normal, col = new Float32Array(p.count * 3), L = Math.hypot(0.35, 0.8, 0.45);
+    for (let i = 0; i < p.count; i++){
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i), lit = Math.max(0, (n.getX(i) * -0.35 + n.getY(i) * 0.8 + n.getZ(i) * 0.45) / L);
+      const patch = Math.sin(x * 0.083 + z * 0.047) * Math.sin(z * 0.071 - x * 0.039) + 0.5 * Math.sin(x * 0.21 + z * 0.17);
+      const street = Math.sin(y * 1.1 + patch * 1.2) > 0.86;
+      const c = street ? [0.085, 0.078, 0.066] : patch > 0.05 ? [0.05, 0.032, 0.026] : [0.02, 0.03, 0.022], s = 0.7 + 0.7 * lit;
+      col[i * 3] = c[0] * s; col[i * 3 + 1] = c[1] * s; col[i * 3 + 2] = c[2] * s;
+    }
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    grp.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false })));
+    const lights = [], hr = mulberry32(77);
+    for (const [hx, hz, rx, , rz] of HILLS) for (let k = 0; k < 170; k++){
+      const a = hr() * Math.PI * 2, q = Math.sqrt(hr()) * 0.95, x = hx + Math.cos(a) * q * rx, z = hz + Math.sin(a) * q * rz;
+      if (Math.max(Math.abs(x), Math.abs(z)) >= 200 && z <= 145) lights.push(x, hillH(x, z) + 3, z);
+    }
+    const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lights, 3));
+    grp.add(new THREE.Points(lg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffcf8c, size: 2.4, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
+  }
   for (let n = 0; n < 240; n++){
     const a = rng() * Math.PI * 2, r = 205 + rng() * 240, x = Math.cos(a) * r, z = Math.sin(a) * r;
     if (Math.max(Math.abs(x), Math.abs(z)) < 200 || z > 145 || (x > 186 && x < 220 && Math.abs(z) < 8)) continue;
@@ -1323,12 +1345,14 @@ function buildCity(){
     hipRoof(x - w / 2, x + w / 2, base + h, z - d / 2, z + d / 2, 3, roofTile());
   }
   // Houses climbing the hills, so the slopes are not empty at night
-  for (const [hx, hz, rx, , rz] of HILLS) for (let n = 0; n < 130; n++){
+  for (const [hx, hz, rx, , rz] of HILLS) for (let n = 0; n < 190; n++){
     const a = rng() * Math.PI * 2, q = Math.sqrt(rng()) * 0.96, x = hx + Math.cos(a) * q * rx, z = hz + Math.sin(a) * q * rz;
     if (Math.max(Math.abs(x), Math.abs(z)) < 200 || z > 145 || (x > 186 && x < 220 && Math.abs(z) < 8)) continue;
-    const base = hillH(x, z), w = 10 + Math.floor(rng() * 3) * 3, d = 10 + Math.floor(rng() * 3) * 3, h = (2 + Math.floor(rng() * 3)) * FLOOR;
+    const w = 10 + Math.floor(rng() * 3) * 3, d = 10 + Math.floor(rng() * 3) * 3, h = (2 + Math.floor(rng() * 3)) * FLOOR;
+    // the foundations reach below the lowest corner of the plot, so no house hangs over a steep slope
+    const corners = [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) => hillH(x + sx * w / 2, z + sz * d / 2)), base = Math.max(...corners), low = Math.min(...corners);
     const style = rng() < 0.88 ? 'pombal' : 'tileG';
-    facade(style, x - w / 2, x + w / 2, base - 5, base + h, z - d / 2, z + d / 2, pick(style).multiplyScalar(0.85));
+    facade(style, x - w / 2, x + w / 2, low - 3, base + h, z - d / 2, z + d / 2, pick(style).multiplyScalar(0.85));
     hipRoof(x - w / 2, x + w / 2, base + h, z - d / 2, z + d / 2, 2.6, roofTile());
   }
   // The Se, Lisbon's cathedral, on the slope at the end of Rua da Conceicao: two crenellated towers and a rose window, facing west
@@ -2257,6 +2281,8 @@ function dentShader(shader){
 const headlights = [], beams = [];
 // the player's tail lights: dim red, and bright with a glow around each lamp while braking
 const brakeLights = { mat: new THREE.MeshBasicMaterial({ color: 0x7a0c14 }), glows: [], on: false };
+// the white reversing lights: unlit glass until the vehicle rolls backwards, then a glow around each lamp and a pool of light behind it
+const reverseLights = { mat: new THREE.MeshBasicMaterial({ color: 0x4a4e55 }), glows: [], on: false };
 (function buildPlayerModels(){
   const mk = (geo, mat, parent) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; parent.add(m); return m; };
   const paintMat = (hex, rough, metal) => { const m = new THREE.MeshPhysicalMaterial({ color: hex, roughness: rough, metalness: metal, clearcoat: 1, clearcoatRoughness: 0.05 }); m.userData.env = 1.15; m.onBeforeCompile = dentShader; return m; };
@@ -2271,6 +2297,14 @@ const brakeLights = { mat: new THREE.MeshBasicMaterial({ color: 0x7a0c14 }), glo
     const sh = shp(pts); (holes || []).forEach(h => { const p = new THREE.Path(); h.forEach((q, i) => i ? p.lineTo(q[0], q[1]) : p.moveTo(q[0], q[1])); p.closePath(); sh.holes.push(p); });
     return extrudeProfile(sh, thick, thick * 0.3).translate(side * x, 0, 0);
   });
+  const reverseLamps = (group, lamps, size, rearZ, pool) => {
+    lamps.forEach(p => {
+      const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color: 0xe8f2ff, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }));
+      s.position.set(p[0], p[1], p[2]); s.scale.setScalar(size); s.visible = false; group.add(s); reverseLights.glows.push(s);
+    });
+    const light = new THREE.Mesh(new THREE.CircleGeometry(pool, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: glowTexture, color: 0xcfdcf2, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
+    light.position.set(0, 0.07, rearZ - pool * 0.8); light.visible = false; group.add(light); reverseLights.glows.push(light);
+  };
   const led = new THREE.MeshBasicMaterial({ color: 0xeef6ff });
   const red = brakeLights.mat;
   const brakeGlow = (group, lamps, size) => lamps.forEach(p => {
@@ -2360,6 +2394,8 @@ const brakeLights = { mat: new THREE.MeshBasicMaterial({ color: 0x7a0c14 }), glo
     [[0.86, 1.45, true], [-0.86, 1.45, true], [0.88, -1.35, false], [-0.88, -1.35, false]].forEach(([x, z, f]) =>
       wheel(g, { x, z, r: 0.38, w: 0.3, rim: gun, spokes: 5, caliper: 0xd0202a, front: f, list: wheels, pivots }));
     brakeGlow(g, [[0.72, 0.82, -2.56], [-0.72, 0.82, -2.56], [0, 0.87, -2.5]], 1.25);
+    mk(mergeGeos([-1, 1].map(sd => boxG(0.14, 0.09, 0.04, sd * 0.42, 0.8, -2.51))), reverseLights.mat, g);
+    reverseLamps(g, [[0.42, 0.8, -2.56], [-0.42, 0.8, -2.56]], 0.95, -2.5, 3);
     // battered: smashed tail light, boot lid sprung open, bumper hanging at one end. Critical: hood up, a dead headlight, door ajar
     const damageParts = [];
     hinged(damageParts, 2, boxG(0.38, 0.19, 0.07, -0.72, 0.8, -2.545), SHARED.trim, g);
@@ -2368,7 +2404,7 @@ const brakeLights = { mat: new THREE.MeshBasicMaterial({ color: 0x7a0c14 }), glo
     hinged(damageParts, 3, boxG(1.62, 0.05, 1.4, 0, 0, 0.7), pm, g, [0, 1.0, 0.66], [-0.5, 0, 0]);
     hinged(damageParts, 3, boxG(0.5, 0.13, 0.06, -0.66, 0.69, 2.51), SHARED.trim, g);
     hinged(damageParts, 3, boxG(0.05, 0.5, 1.15, 0, 0, -0.57), pm, g, [-1.0, 0.66, 0.42], [0, -0.3, 0]);
-    MODELS.car = { g, paint: pm, base: C(base), wheels, pivots, r: 0.38, damageParts, dent: 1, smoke: [1.5, 1.1], stage: 0 };
+    MODELS.car = { skid: { x: [-0.88, 0.88], z: -1.35, w: 0.28 }, g, paint: pm, base: C(base), wheels, pivots, r: 0.38, damageParts, dent: 1, smoke: [1.5, 1.1], stage: 0 };
   }
 
   // Motorcycle: superbike with an inline four, twin-spar frame, upside-down fork and a tucked rider in leathers.
@@ -2500,13 +2536,15 @@ const brakeLights = { mat: new THREE.MeshBasicMaterial({ color: 0x7a0c14 }), glo
     mk(mergeGeos([-1, 1].flatMap(sd => [boxG(0.05, 0.13, 0.05, sd * 0.09, 0.09, -0.135, -0.5), boxG(0.03, 0.05, 0.05, sd * 0.06, 0.12, -0.13)])), gold, fork);
     const fender = new THREE.Mesh(extrudeProfile(shp([[0.25, 0.14], [0.14, 0.3], [-0.06, 0.345], [-0.25, 0.2], [-0.2, 0.2], [-0.06, 0.31], [0.12, 0.27], [0.21, 0.13]]), 0.13, 0.008), carbon); fork.add(fender);
     brakeGlow(root, [[0, 1.1, -1.13]], 0.9);
+    mk(mergeGeos([-1, 1].map(sd => boxG(0.035, 0.024, 0.02, sd * 0.085, 1.215, -1.075, 0.5))), reverseLights.mat, g);
+    reverseLamps(root, [[0.085, 1.07, -1.1], [-0.085, 1.07, -1.1]], 0.55, -1.1, 2);
     // battered: a side panel hanging loose and a smashed tail light. Critical: the screen is gone and the tail unit cracked open
     const damageParts = [];
     hinged(damageParts, 2, extrudeProfile(shp([[0.3, 0], [0.02, -0.02], [-0.02, -0.3], [0.24, -0.26]]), 0.02, 0.005), pm, g, [0.262, 0.82, 0.14], [0.62, 0, 0.32]);
     hinged(damageParts, 2, boxG(0.13, 0.05, 0.05, 0, 1.235, -1.09, 0.5), SHARED.trim, g);
     hinged(damageParts, 3, extrudeProfile(shp([[0, 0], [-0.38, 0.03], [-0.44, -0.06], [-0.04, -0.09]]), 0.02, 0.004), pm, g, [-0.15, 1.04, -0.68], [-0.3, 0.12, -0.5]);
     gone(damageParts, 3, screen);
-    MODELS.bike = { g: root, paint: pm, base: C(base), wheels, pivots, r: 0.31, damageParts, dent: 0.35, smoke: [0.15, 0.72], stage: 0, rider };
+    MODELS.bike = { skid: { x: [0], z: -0.74, w: 0.17 }, g: root, paint: pm, base: C(base), wheels, pivots, r: 0.31, damageParts, dent: 0.35, smoke: [0.15, 0.72], stage: 0, rider };
   }
 
   // Truck: European cab-over tractor unit in sage green. A tall sleeper cab sits over the front axle; behind it the
@@ -2594,12 +2632,13 @@ const brakeLights = { mat: new THREE.MeshBasicMaterial({ color: 0x7a0c14 }), glo
     mk(mergeGeos([boxG(2.3, 0.1, 0.1, 0, 0.7, -3.22), ...[-1, 1].map(sd => boxG(0.5, 0.18, 0.07, sd * 0.86, 0.86, -3.22))]), SHARED.trim, g);
     mk(mergeGeos([-1, 1].map(sd => boxG(0.22, 0.12, 0.04, sd * 0.98, 0.86, -3.26))), red, g);
     mk(mergeGeos([-1, 1].flatMap(sd => [boxG(0.11, 0.12, 0.04, sd * 0.8, 0.86, -3.26)])), amber, g);
-    mk(mergeGeos([-1, 1].map(sd => boxG(0.08, 0.12, 0.04, sd * 0.69, 0.86, -3.26))), led, g);
+    mk(mergeGeos([-1, 1].map(sd => boxG(0.08, 0.12, 0.04, sd * 0.69, 0.86, -3.26))), reverseLights.mat, g);
     mk(boxG(0.52, 0.12, 0.02, 0, 0.7, -3.285), plateMat, g);
     const wheels = [], pivots = [];
     [[1.1, 2.0, true, 0.32], [-1.1, 2.0, true, 0.32], [0.76, -1.7, false, 0.26], [1.06, -1.7, false, 0.26], [-0.76, -1.7, false, 0.26], [-1.06, -1.7, false, 0.26]].forEach(([x, z, f, w]) =>
       wheel(g, { x, z, r: 0.52, w, tyre: 0.22, rim: alu, solid: true, front: f, list: wheels, pivots }));
     brakeGlow(g, [[0.98, 0.86, -3.32], [-0.98, 0.86, -3.32]], 1.6);
+    reverseLamps(g, [[0.69, 0.86, -3.32], [-0.69, 0.86, -3.32]], 1.1, -3.3, 4);
     // battered: a torn mudguard, a smashed tail light and a mirror hanging down. Critical: bumper hanging, cracked windscreen
     const damageParts = [];
     hinged(damageParts, 2, boxG(0.74, 0.03, 0.84, 0, 0, -0.42), plastic, g, [-0.93, 1.21, -1.3], [-0.5, 0, 0.1]);
@@ -2607,7 +2646,7 @@ const brakeLights = { mat: new THREE.MeshBasicMaterial({ color: 0x7a0c14 }), glo
     hinged(damageParts, 2, mergeGeos([boxG(0.25, 0.56, 0.1, 0, -0.28, 0), boxG(0.21, 0.5, 0.012, 0, -0.28, -0.058)]), plastic, g, [-1.5, 3.16, 2.86], [0.1, 0, -0.45]);
     hinged(damageParts, 3, boxG(1.3, 0.3, 0.1, -0.65, 0, 0), plastic, g, [0.12, 0.72, 3.3], [0, 0, 0.2]);
     hinged(damageParts, 3, mergeGeos([[-0.5, 2.72, 0.5, 2.84], [-0.5, 2.72, -0.2, 2.42], [-0.5, 2.72, -1.0, 2.98], [-0.5, 2.72, -0.72, 2.46], [-0.5, 2.72, 0.05, 3.06]].map(([x0, y0, x1, y1]) => limb([x0, y0, 3.09 - (y0 - 2.42) * 0.17], [x1, y1, 3.09 - (y1 - 2.42) * 0.17], 0.006, 0.006, 4))), new THREE.MeshBasicMaterial({ color: 0xc8d0da }), g);
-    MODELS.truck = { g, paint: pm, base: C(base), wheels, pivots, r: 0.52, damageParts, dent: 1.4, smoke: [0.7, 3.95], stage: 0 };
+    MODELS.truck = { skid: { x: [-0.91, 0.91], z: -1.7, w: 0.56 }, g, paint: pm, base: C(base), wheels, pivots, r: 0.52, damageParts, dent: 1.4, smoke: [0.7, 3.95], stage: 0 };
   }
 
   Object.values(MODELS).forEach(m => { m.g.visible = false; carTilt.add(m.g); });
@@ -3123,7 +3162,7 @@ const smoke = [], flames = [];
 for (let i = 0; i < 70; i++){
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color: 0x4a4a50, transparent: true, depthWrite: false, opacity: 0 }));
   s.visible = false; scene.add(s);
-  smoke.push({ s, life: 0, vx: 0, vy: 0, vz: 0, peak: 0.5 });
+  smoke.push({ s, life: 0, vx: 0, vy: 0, vz: 0, peak: 0.5, grow: 5 });
 }
 for (let i = 0; i < 14; i++){
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color: 0xff7a1e, transparent: true, depthWrite: false, opacity: 0, blending: THREE.AdditiveBlending }));
@@ -3140,7 +3179,7 @@ function updateSmoke(dt){
     while (smokeAcc >= 1){
       smokeAcc -= 1;
       const p = smoke[smokeIdx++ % smoke.length];
-      p.life = 1; p.s.visible = true; p.peak = P.opacity;
+      p.life = 1; p.s.visible = true; p.peak = P.opacity; p.grow = 5;
       p.s.position.set(ox + (Math.random() - 0.5) * 0.6, oy, oz + (Math.random() - 0.5) * 0.6);
       p.vx = (Math.random() - 0.5) * 1.1 - fx * car.speed * 0.2; p.vy = P.rise + Math.random() * 1.2; p.vz = (Math.random() - 0.5) * 1.1 - fz * car.speed * 0.2;
       p.s.material.color.set(P.color);
@@ -3161,7 +3200,7 @@ function updateSmoke(dt){
     p.life -= dt * 0.42;
     p.s.position.x += p.vx * dt; p.s.position.y += p.vy * dt; p.s.position.z += p.vz * dt;
     p.vx *= 1 - dt * 0.6; p.vz *= 1 - dt * 0.6;
-    p.s.scale.setScalar(1.0 + (1 - p.life) * 5);
+    p.s.scale.setScalar(1.0 + (1 - p.life) * p.grow);
     p.s.material.opacity = Math.min(1, (1 - p.life) * 8) * Math.max(0, p.life) * p.peak;
     if (p.life <= 0) p.s.visible = false;
   }
@@ -3172,6 +3211,60 @@ function updateSmoke(dt){
     p.s.scale.setScalar(0.5 + p.life * 1.3);
     p.s.material.opacity = Math.max(0, p.life) * 0.95;
     if (p.life <= 0) p.s.visible = false;
+  }
+}
+
+// ### Skid marks: dark strips behind the rear wheels while the tyres slide (Core.skidAmount). They use a fixed ring of quads, so
+// ### a long drive never allocates more; the oldest fade out before they are overwritten. Each corner is placed with groundH, so the
+// ### marks lie on the hills, 5 cm above the road and its painted lines, and they darken what is under them instead of covering it.
+const SKID_QUADS = 900, SKID_FADE = 60, SKID_STEP = 0.7, SKID_LIFT = 0.05;
+const skids = (() => {
+  const g = new THREE.BufferGeometry(), pos = new Float32Array(SKID_QUADS * 18), col = new Float32Array(SKID_QUADS * 18).fill(1);
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3).setUsage(THREE.DynamicDrawUsage));
+  g.setDrawRange(0, 0);
+  const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.MultiplyBlending, fog: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: THREE.DoubleSide }));
+  mesh.frustumCulled = false; mesh.renderOrder = 1; scene.add(mesh);
+  return { mesh, g, pos, col, head: 0, used: 0, dark: new Float32Array(SKID_QUADS), last: [] };
+})();
+function resetSkids(){ skids.head = 0; skids.used = 0; skids.last = []; skids.g.setDrawRange(0, 0); }
+function shadeSkid(q, v){ for (let i = q * 18; i < (q + 1) * 18; i++) skids.col[i] = v; }
+function addSkidQuad(a, b, shade){
+  const q = skids.head, c = [a.lx, a.ly, a.lz, a.rx, a.ry, a.rz, b.rx, b.ry, b.rz, a.lx, a.ly, a.lz, b.rx, b.ry, b.rz, b.lx, b.ly, b.lz];
+  skids.pos.set(c, q * 18); skids.dark[q] = shade; shadeSkid(q, shade);
+  skids.head = (q + 1) % SKID_QUADS; skids.used = Math.min(SKID_QUADS, skids.used + 1);
+  // the oldest quads are next in line: they fade towards nothing, so marks never vanish with a hard edge
+  if (skids.used === SKID_QUADS) for (let k = 0; k < SKID_FADE; k++){
+    const old = (skids.head + k) % SKID_QUADS, f = k / SKID_FADE;
+    shadeSkid(old, 1 - (1 - skids.dark[old]) * f);
+  }
+}
+function updateSkids(){
+  const md = MODELS[V.key], S = md.skid, amount = Core.skidAmount(car.speed, keys.down, keys.brake, car.steer);
+  // rubber only marks a road: not the fields in the countryside or the verges of the highway
+  const onRoad = mode === 'country' ? Math.abs(roadPos.lat) <= 5.4 : mode !== 'highway' || Math.abs(car.x) <= 13;
+  if (!amount || !onRoad){ skids.last = []; return; }
+  const fx = Math.sin(car.heading), fz = Math.cos(car.heading), rx = -fz, rz = fx;
+  let wrote = false;
+  S.x.forEach((off, i) => {
+    const cx = car.x + fx * S.z + rx * off, cz = car.z + fz * S.z + rz * off, prev = skids.last[i];
+    if (prev && Math.hypot(cx - prev.x, cz - prev.z) < SKID_STEP) return;
+    const hw = S.w / 2, lx = cx - rx * hw, lz = cz - rz * hw, x2 = cx + rx * hw, z2 = cz + rz * hw;
+    const now = { x: cx, z: cz, lx, ly: groundH(lx, lz) + SKID_LIFT, lz, rx: x2, ry: groundH(x2, z2) + SKID_LIFT, rz: z2 };
+    if (prev){
+      addSkidQuad(prev, now, Math.pow(1 - 0.8 * amount, 2.2)); wrote = true;
+      // burning rubber: a thin, low puff of pale smoke behind the tyre
+      if (amount > 0.6 && Math.random() < 0.5){
+        const p = smoke[smokeIdx++ % smoke.length];
+        p.life = 1; p.s.visible = true; p.peak = 0.2; p.grow = 2.6; p.s.material.color.set(0x9a9aa2);
+        p.s.position.set(cx, now.ly + 0.25, cz); p.vx = -fx * car.speed * 0.12; p.vy = 0.55; p.vz = -fz * car.speed * 0.12;
+      }
+    }
+    skids.last[i] = now;
+  });
+  if (wrote){
+    skids.g.attributes.position.needsUpdate = true; skids.g.attributes.color.needsUpdate = true;
+    skids.g.setDrawRange(0, skids.used * 6);
   }
 }
 
@@ -3423,7 +3516,7 @@ function updateEngine(dt){
   a.rotorF.frequency.setTargetAtTime(500 + 3500 * rotorNear * rotorNear, t, 0.3);
   a.rotorSrc.playbackRate.setTargetAtTime(1 + clamp(heli.closing / 340, -0.08, 0.08), t, 0.3);
   a.wind.gain.setTargetAtTime(on ? Math.pow(sp / 55, 2) * 0.06 * under : 0, t, 0.2);
-  const squeal = (keys.brake && sp > 8 ? 0.07 : 0) + (Math.abs(car.steer) > 0.8 && sp > 24 ? 0.035 : 0);
+  const squeal = Core.skidAmount(car.speed, keys.down, keys.brake, car.steer) * 0.075;
   a.tire.gain.setTargetAtTime(on ? squeal : 0, t, 0.06);
   const sirenVol = !muted && (state === 'play' || state === 'over') && nearestCop < Infinity ? 0.075 * clamp(1 - nearestCop / 220, 0, 1) : 0;
   a.sirenGain.gain.setTargetAtTime(sirenVol, t, 0.15);
@@ -3840,6 +3933,7 @@ function resetCar(){
   let x = mode === 'city' ? -3.5 : HW.our[1], z = mode === 'city' ? -6 : 5, heading = 0;
   if (mode === 'country'){ const pt = roadPoint(40, ROAD.lane); x = pt.x; z = pt.z; heading = pt.h; roadPos.ri = undefined; roadPos.s = 40; roadPos.lat = ROAD.lane; }
   Object.assign(car, { x, z, y: groundH(x, z), heading, speed: 0, steer: 0, pitch: 0, roll: 0, bodyPitch: 0, shake: 0, prevSpeed: 0, lean: 0, lift: 0 });
+  resetSkids();
   eng.gear = 1; eng.rpm = ENGINES[V.key].idle; eng.shift = 0; eng.boost = 0; eng.miss = 0;
   camera.position.set(x - Math.sin(heading) * V.cam[0], car.y + V.cam[1], z - Math.cos(heading) * V.cam[0]);
   camera.lookAt(x + Math.sin(heading) * 4, car.y + 1.6, z + Math.cos(heading) * 4);
@@ -4254,6 +4348,12 @@ function applyCarMesh(dt){
     brakeLights.on = braking;
     brakeLights.mat.color.setHex(braking ? 0xff2a38 : 0x7a0c14);
     brakeLights.glows.forEach(s => { s.visible = braking; });
+  }
+  const reversing = state === 'play' && Core.isReversing(car.speed);
+  if (reversing !== reverseLights.on){
+    reverseLights.on = reversing;
+    reverseLights.mat.color.setHex(reversing ? 0xf4f8ff : 0x4a4e55);
+    reverseLights.glows.forEach(s => { s.visible = reversing; });
   }
   const stage = Core.damageStage(damage);
   if (stage !== md.stage){
@@ -4683,6 +4783,7 @@ function frame(now){
 
   if (state === 'play'){
     updateCar(dt);
+    if (state === 'play') updateSkids();
     if (state === 'play') updatePolice(dt);
     if (state === 'play'){
       timeLeft -= dt;

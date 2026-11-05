@@ -62,24 +62,28 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-display);overflow
 .icon-btn svg{width:18px;height:18px}
 
 /* Pursuit */
-.pursuit{grid-column:2;grid-row:2;justify-self:end;align-self:start;display:grid;gap:9px;width:236px}
+.pursuit{grid-column:2;grid-row:2;justify-self:end;align-self:start;display:grid;gap:10px;width:236px;padding:13px 14px;border-radius:18px;background:linear-gradient(155deg,rgba(255,255,255,.085),rgba(255,255,255,.015) 55%),var(--glass);box-shadow:0 10px 30px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.07);transition:border-color .3s,box-shadow .3s}
+.pursuit.close{border-color:rgba(255,93,108,.5);box-shadow:0 10px 34px rgba(255,51,68,.24),inset 0 1px 0 rgba(255,255,255,.07)}
 .pur-row{display:flex;align-items:center;gap:8px}
 .siren{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.18);flex:none}
 .pursuit.active .siren{animation:siren .5s steps(1) infinite}
 @keyframes siren{0%{background:var(--cop-red);box-shadow:0 0 10px var(--cop-red)}50%{background:var(--cop-blue);box-shadow:0 0 10px var(--cop-blue)}}
-.pur-title{font-size:14px;font-weight:700}
-.pur-state{margin-left:auto;font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.pursuit.close .pur-state{color:var(--stop)}
-.stars{display:flex;gap:3px}
-.stars i{width:17px;height:17px;background:rgba(255,255,255,.16);clip-path:polygon(50% 0,62% 35%,98% 35%,69% 57%,80% 92%,50% 71%,20% 92%,31% 57%,2% 35%,38% 35%);transition:background .25s}
+.pur-title{font-size:13px;font-weight:750;letter-spacing:.05em;text-transform:uppercase}
+.pur-state{margin-left:auto;padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.07);font-family:var(--f-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;color:var(--muted);transition:background .3s,color .3s}
+.pursuit.active .pur-state{color:var(--ink)}
+.pur-line{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.pur-label{font-family:var(--f-mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.pursuit.close .pur-state{color:#fff;background:rgba(255,93,108,.32)}
+.stars{display:flex;gap:2px;filter:drop-shadow(0 0 5px rgba(255,200,87,.35))}
+.stars i{width:16px;height:16px;background:rgba(255,255,255,.13);clip-path:polygon(50% 0,62% 35%,98% 35%,69% 57%,80% 92%,50% 71%,20% 92%,31% 57%,2% 35%,38% 35%);transition:background .25s}
 .stars i.on{background:var(--gold)}
 .stars.max i.on{animation:starflash .5s steps(1) infinite}
 @keyframes starflash{50%{background:var(--stop)}}
-.cops{display:flex;gap:5px}
-.cops i{width:22px;height:8px;border-radius:3px;background:rgba(255,255,255,.1)}
+.cops{display:flex;gap:4px}
+.cops i{width:18px;height:6px;border-radius:999px;background:rgba(255,255,255,.1);transition:background .25s}
 .cops i.on{background:linear-gradient(90deg,var(--cop-red) 50%,var(--cop-blue) 50%);box-shadow:0 0 8px rgba(47,107,255,.5)}
 .cops i.down{background:rgba(255,255,255,.25);background-image:repeating-linear-gradient(45deg,transparent 0 3px,rgba(0,0,0,.4) 3px 6px)}
-.bust-row{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--f-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.bust-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:-4px;font-family:var(--f-mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .bust-row b{color:var(--ink);font-size:12px;font-variant-numeric:tabular-nums}
 .btrack{height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden}
 .btrack i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cop-blue),var(--cop-red));box-shadow:0 0 10px var(--cop-red)}
@@ -301,7 +305,7 @@ kbd{font-family:var(--f-mono);font-size:12px;color:var(--ink);background:rgba(25
   #toast{top:calc(112px + env(safe-area-inset-top,0px));font-size:14px}
   .card{padding:20px}
   .vehicles{grid-template-columns:1fr}
-  .pursuit{width:190px}
+  .pursuit{width:190px;padding:10px 11px}
   #hud{grid-template-columns:minmax(0,1fr) auto}
   .mission{justify-self:stretch;max-width:100%}
   .timer{gap:8px;padding-inline:9px}
@@ -334,7 +338,9 @@ kbd{font-family:var(--f-mono);font-size:12px;color:var(--ink);background:rgba(25
   .tbtns{gap:4px}
   .icon-btn{width:30px;height:30px}
   .pursuit{grid-column:2;grid-row:1;justify-self:center;width:min(100%,160px);gap:3px}
-  .pur-title,.pursuit .bust-row,.pursuit .cops{display:none}
+  .pur-title,.pursuit .bust-row,.pursuit .units,.pursuit .pur-label,.pursuit .btrack{display:none}
+  .pursuit{padding:6px 9px;border-radius:12px}
+  .pur-line{justify-content:center}
   .stars i{width:13px;height:13px}
   .radar-wrap{position:fixed;left:calc(max(16px,env(safe-area-inset-left,0px)) + 150px);bottom:calc(6px + env(safe-area-inset-bottom,0px))}
   .radar-wrap .signal{display:none}

@@ -63,6 +63,8 @@ The Baixa is the centre of Lisbon, rebuilt as a street grid after the 1755 earth
 | No pedal | the car rolls to a stop |
 | Handbrake (`Space`) | slows you quickly and turns sharper |
 | Brake lights | on while you brake, in either direction, and with the handbrake while moving |
+| Reversing lights | white, on while you roll backwards |
+| Skid marks and tyre squeal | with the handbrake above about 15 km/h, when braking above about 30 km/h, and in very fast corners (above about 80 km/h, steering hard). They only mark the road, and they are cleared when a new run starts |
 
 **Hills.** All three maps have hills, up to about 20 % steep. The Arco, the river front and the two ends of the highway are level. Uphill your top speed falls by up to 32 % and gravity pulls you back. Downhill your top speed rises by up to 22 % and you coast on. The truck feels slopes most, the motorcycle least. Brakes and rolling friction hold a stopped vehicle in place.
 

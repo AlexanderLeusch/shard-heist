@@ -243,7 +243,7 @@ test('damage is visible and the rider is posed', () => {
   assert.match(game, /Core\.damageStage\(damage\)/);
   assert.match(game, /Core\.smokeFor\(damage\)/);
   assert.match(game, /shader\.uniforms\.uDent = dentU/, 'dents and scratches in the paint shader');
-  for (const key of ['car', 'bike', 'truck']) assert.match(game, new RegExp('MODELS\\.' + key + ' = \\{[^}]*damageParts'), key + ' has loose parts');
+  for (const key of ['car', 'bike', 'truck']) assert.match(game, new RegExp('MODELS\\.' + key + ' = \\{.*damageParts'), key + ' has loose parts');
   for (const piece of ['hood up', 'smashed tail light', 'torn mudguard', 'cracked windscreen']) assert.match(game, new RegExp(piece));
   for (const piece of ['two-tone leathers', 'fingers round the grips', 'full-face helmet', 'tuck']) assert.match(game, new RegExp(piece));
 });
@@ -302,4 +302,19 @@ test('the ground is one surface: the vehicle, every layer and the shadows follow
 test('big ground planes are bent in world space, so none stays flat', () => {
   assert.match(game, /o\.geometry\.clone\(\)\.applyMatrix4\(o\.matrixWorld\)/);
   assert.match(game, /o\.rotation\.set\(0, 0, 0\)/);
+});
+
+test('skid marks are drawn on the shared ground, cost no new memory, and start clean each run', () => {
+  assert.match(game, /groundH\(lx, lz\) \+ SKID_LIFT/, 'on the hills');
+  assert.match(game, /new Float32Array\(SKID_QUADS \* 18\)/, 'a fixed ring');
+  assert.match(game, /if \(state === 'play'\) updateSkids\(\);/);
+  assert.match(game, /resetSkids\(\);\n\s*eng\.gear = 1;/, 'cleared when the car is reset');
+  for (const key of ['car', 'bike', 'truck']) assert.match(game, new RegExp('MODELS\\.' + key + ' = \\{ skid: '));
+});
+
+test('all three vehicles have reversing lights, and the hills are visible at night', () => {
+  assert.match(game, /Core\.isReversing\(car\.speed\)/);
+  assert.equal((game.match(/reverseLamps\((g|root), /g) || []).length, 3, 'one call per vehicle');
+  assert.match(game, /new THREE\.MeshBasicMaterial\(\{ vertexColors: true, fog: false \}\)/, 'the hills paint their own colours');
+  assert.match(game, /facade\(style, x - w \/ 2, x \+ w \/ 2, low - 3, base \+ h,/, 'houses reach below their lowest corner');
 });

@@ -105,7 +105,7 @@ docs/             Code Guide (PDF): architecture, all code sections, tuning, lim
 
 ## Testing
 
-`npm test` runs 109 tests in Node (16 of them for the escape room), and `npm run test:browser` runs 15 more in headless Chrome (4 of them in the escape room). CI runs all of them, plus the SRI check and the 36 pytest checks of `plot-twist/`, on every push to `main` and on every pull request. They cover:
+`npm test` runs 113 tests in Node (16 of them for the escape room), and `npm run test:browser` runs 15 more in headless Chrome (4 of them in the escape room). CI runs all of them, plus the SRI check and the 36 pytest checks of `plot-twist/`, on every push to `main` and on every pull request. They cover:
 
 - **Escape room:** both endings and the jammed-door grace minute; refused actions (walking where there is no exit, taking an item twice, the tile without the spoon, the door without the mop, lock wheels that do not exist, anything before the briefing or after an ending) return the unchanged state; wrong codes cost 30 s but never take the clock below zero; warnings sound once; tampered saved games are rejected; in the browser: briefing, refused action, save and continue after a reload, a wrong code and then Ending A.
 - **Accepted actions:** each menu action in the states whose cards show it; valid map and vehicle picks; restoring a valid saved selection; finishing every story act; both story endings.
