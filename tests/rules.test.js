@@ -137,6 +137,45 @@ test('damage: soft bumps are free, the truck takes 55 %, damage stays within 0-1
   assert.ok(Math.abs(Core.tiltSteer(170, 90) - Core.tiltSteer(10, 90)) < 1e-9, 'past upright the sensor jumps, the steering does not');
   assert.equal(Core.parseSteer('pads'), 'pads');
   for (const bad of ['tilt', 'constructor', '', null]) assert.equal(Core.parseSteer(bad), 'tilt');
+  // the shadow box moves in whole shadow pixels, along the two axes of the shadow map
+  const off = [-90, 60, -40], cell = 120 / 4096, len = Math.hypot(...off), d = off.map(v => v / len);
+  const flat = Math.hypot(d[0], d[2]), R = [-d[2] / flat, 0, d[0] / flat], U = [-R[2] * d[1], R[2] * d[0] - R[0] * d[2], R[0] * d[1]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  assert.ok(Math.abs(dot(R, U)) < 1e-9 && Math.abs(dot(R, d)) < 1e-9 && Math.abs(dot(U, d)) < 1e-9, 'the axes are at right angles');
+  for (const [x, y, z] of [[0, 0, 0], [-3.5, 3.01, -40], [12.345, 1.5, 3999.9], [-180, 5, 70.123]]){
+    const s = Core.snapShadow(x, y, z, off, cell), t = Core.snapShadow(x, y, z + 0.4, off, cell);
+    assert.ok(Math.hypot(s[0] - x, s[1] - y, s[2] - z) <= cell, 'it stays within one shadow pixel of the player');
+    const step = [t[0] - s[0], t[1] - s[1], t[2] - s[2]];
+    for (const axis of [R, U]){ const n = dot(step, axis) / cell; assert.ok(Math.abs(n - Math.round(n)) < 1e-6, 'moves in whole pixels: ' + n); }
+    assert.deepEqual(Core.snapShadow(s[0], s[1], s[2], off, cell).map(v => +v.toFixed(6)), s.map(v => +v.toFixed(6)), 'a snapped point stays');
+  }
+  // the resolution follows the frame rate
+  const play = (q, fps, secs) => { for (let i = 0; i < fps * secs; i++) Core.stepQuality(q, 1000 / fps); return q; };
+  assert.equal(play(Core.newQuality(), 60, 30).level, 0, 'a smooth game keeps full resolution');
+  assert.equal(play(Core.newQuality(), 50, 30).level, 0, 'a 50 Hz screen is left alone');
+  let q = play(Core.newQuality(), 30, 2.1);
+  assert.equal(q.level, 1, 'slow: one step down');
+  play(q, 40, 2);
+  assert.equal(q.level, 2, 'it helped but is still slow: the next step');
+  q = play(Core.newQuality(), 30, 2.1);
+  play(q, 30, 2);
+  assert.deepEqual([q.level, q.locked], [0, true], 'refused: a 30 Hz screen gains nothing, so the step is taken back');
+  play(q, 30, 60);
+  assert.equal(q.level, 0, 'and it stays there');
+  q = play(Core.newQuality(), 20, 2.1);
+  for (const fps of [25, 32, 40, 45]) play(q, fps, 2);
+  assert.equal(q.level, Core.QUALITY_SCALES.length - 1, 'never below the last step');
+  q = play(Core.newQuality(), 30, 2.1);
+  play(q, 60, 2);
+  assert.equal(q.level, 1);
+  play(q, 60, 16);
+  assert.equal(q.level, 1, 'not up before 20 good seconds');
+  play(q, 60, 4);
+  assert.equal(q.level, 0, 'up again after them');
+  for (const bad of [NaN, Infinity, -5, 0, 400, undefined]){
+    const fresh = Core.newQuality();
+    assert.deepEqual(Core.stepQuality(fresh, bad), Core.newQuality(), 'refused frame time: ' + bad);
+  }
   // two keys for one action: it stays on until the last one is released
   assert.equal(Core.actionHeld(new Set(['KeyW', 'ArrowUp']), 'up'), true);
   assert.equal(Core.actionHeld(new Set(['KeyW']), 'up'), true);

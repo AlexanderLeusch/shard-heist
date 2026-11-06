@@ -296,7 +296,14 @@ test('the ground is one surface: the vehicle, every layer and the shadows follow
   assert.match(game, /const hill = \(x, z\) => Core\.hillMesh\(mode, x, z\)/);
   assert.match(game, /const onGrid = tri =>/, 'ground triangles are cut on the grid');
   assert.match(game, /car\.y = land \+ car\.lift/, 'no lag on a climb');
-  assert.match(game, /sun\.target\.position\.set\(car\.x, car\.y, car\.z\)/, 'the shadow box follows the height');
+  assert.ok(game.includes('sun.target.position.set(sx, sy, sz)') && game.includes('Core.snapShadow(car.x, car.y, car.z,'), 'the shadow box follows the height');
+});
+
+test('the picture is steady: snapped shadows, 24 bits of depth, and the resolution follows the frame rate', () => {
+  assert.ok(game.includes('Core.snapShadow(car.x, car.y, car.z, SUN_OFF,'));
+  assert.ok(game.includes('new THREE.DepthTexture(size.x, size.y, THREE.UnsignedIntType)'));
+  assert.ok(game.includes('Core.stepQuality(quality, now - lastT)'));
+  assert.ok(game.includes('Core.QUALITY_SCALES[quality.level]'));
 });
 
 test('big ground planes are bent in world space, so none stays flat', () => {

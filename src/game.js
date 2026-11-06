@@ -4262,6 +4262,7 @@ card.addEventListener('click', e => {
   const gb = e.target.closest('[data-gfx]');
   if (gb){
     gfx = gb.dataset.gfx;
+    quality = Core.newQuality();
     card.querySelectorAll('[data-gfx]').forEach(b => b.setAttribute('aria-pressed', String(b === gb)));
     writeStore('shard-heist-gfx', gfx);
     applyGfx();
@@ -4593,6 +4594,8 @@ function buildComposer(){
     if (renderer.capabilities.isWebGL2 && THREE.WebGLMultisampleRenderTarget){ rt = new THREE.WebGLMultisampleRenderTarget(size.x, size.y, opts); rt.samples = 4; }
     else rt = new THREE.WebGLRenderTarget(size.x, size.y, opts);
     const c = new THREE.EffectComposer(renderer, rt);
+    // without a depth texture three.js gives a multisampled target only 16 bits of depth, too few for details on far facades
+    if (rt.isWebGLMultisampleRenderTarget) for (const t of [c.renderTarget1, c.renderTarget2]) t.depthTexture = new THREE.DepthTexture(size.x, size.y, THREE.UnsignedIntType);
     c.addPass(new THREE.RenderPass(scene, camera));
     c.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(size.x / 2, size.y / 2), 0.7, 0.45, 0.82));
     c.addPass(new THREE.ShaderPass(THREE.GammaCorrectionShader));
@@ -4600,10 +4603,11 @@ function buildComposer(){
     return c;
   } catch (e) { return null; }
 }
-// ### Applies the Ultra or Balanced graphics setting.
+let quality = Core.newQuality();
+// ### Applies the Ultra or Balanced graphics setting, at the resolution that keeps the picture smooth.
 function applyGfx(){
   const q = GFX[gfx], size = COARSE ? q.shadow / 2 : q.shadow;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.ratio));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, q.ratio) * Core.QUALITY_SCALES[quality.level]);
   if (sun.shadow.mapSize.x !== size){
     sun.shadow.mapSize.set(size, size);
     if (sun.shadow.map){ sun.shadow.map.dispose(); sun.shadow.map = null; }
@@ -4859,6 +4863,11 @@ let lastT = performance.now();
 function frame(now){
   requestAnimationFrame(frame);
   const dt = Core.frameDt(now - lastT);
+  if (state === 'play' && !document.hidden){
+    const level = quality.level;
+    Core.stepQuality(quality, now - lastT);
+    if (quality.level !== level) applyGfx();
+  }
   lastT = now;
   const paused = state === 'pause';
   frameNo++;
@@ -4896,8 +4905,9 @@ function frame(now){
 
   sky.position.copy(camera.position);
   // the shadow box travels with the player, in height too, or high ground would fall out of it and lose its shadows
-  sun.position.set(car.x + SUN_OFF[0], car.y + SUN_OFF[1], car.z + SUN_OFF[2]);
-  sun.target.position.set(car.x, car.y, car.z);
+  const [sx, sy, sz] = Core.snapShadow(car.x, car.y, car.z, SUN_OFF, (sun.shadow.camera.right - sun.shadow.camera.left) / sun.shadow.mapSize.x);
+  sun.position.set(sx + SUN_OFF[0], sy + SUN_OFF[1], sz + SUN_OFF[2]);
+  sun.target.position.set(sx, sy, sz);
 
   updateEngine(dt);
   updateRadio();

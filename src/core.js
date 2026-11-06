@@ -40,6 +40,42 @@
   }
   const parseSteer = raw => raw === 'pads' ? 'pads' : 'tilt';
 
+  // ### The shadow box follows the player, but in whole shadow pixels. If it moved freely, every shadow edge would land on other shadow
+  // ### pixels in each frame, and the edges would crawl over the walls. off points from the player to the sun; cell is one shadow pixel in metres.
+  function snapShadow(x, y, z, off, cell){
+    const len = Math.hypot(off[0], off[1], off[2]), dx = off[0] / len, dy = off[1] / len, dz = off[2] / len, flat = Math.hypot(dx, dz);
+    const rx = -dz / flat, rz = dx / flat, ux = -rz * dy, uy = rz * dx - rx * dz, uz = rx * dy;
+    const a = x * rx + z * rz, b = x * ux + y * uy + z * uz;
+    const da = Math.round(a / cell) * cell - a, db = Math.round(b / cell) * cell - b;
+    return [x + rx * da + ux * db, y + uy * db, z + rz * da + uz * db];
+  }
+  // ### Keeps the picture smooth on a weak graphics card, by lowering the resolution when the frame rate stays low. Each 2 s are judged
+  // ### together. Under 48 frames per second is one step down. If that does not help by at least 5 %, for example on a 30 Hz screen, the
+  // ### step is taken back and the setting stays. After 20 s at 57 or more it goes one step up again, at most twice, so it cannot swing.
+  const QUALITY_SCALES = Object.freeze([1, 0.85, 0.7, 0.6]);
+  const newQuality = () => ({ level: 0, t: 0, n: 0, good: 0, raises: 0, tried: null, locked: false });
+  function stepQuality(q, ms){
+    if (!Number.isFinite(ms) || ms <= 0 || ms > 250) return q;
+    q.t += ms; q.n++;
+    if (q.t < 2000) return q;
+    const fps = 1000 * q.n / q.t;
+    q.t = 0; q.n = 0;
+    if (q.tried !== null){
+      const helped = fps >= q.tried * 1.05;
+      q.tried = null;
+      if (!helped){ q.level--; q.locked = true; return q; }
+    }
+    if (q.locked) return q;
+    if (fps < 48){
+      q.good = 0;
+      if (q.level < QUALITY_SCALES.length - 1){ q.tried = fps; q.level++; }
+    } else if (fps >= 57){
+      q.good += 2;
+      if (q.good >= 20 && q.level > 0 && q.raises < 2){ q.good = 0; q.raises++; q.level--; }
+    } else q.good = 0;
+    return q;
+  }
+
   // ### Two keys can do the same thing (W and the up arrow): the action stays on until the last of them is released.
   const actionHeld = (held, action) => [...held].some(code => KEY_MAP[code] === action);
 
@@ -645,7 +681,7 @@
     isMode, isVeh, clamp, wrapAngle, mulberry32, shuffle, fmtTime, fmtTimeExact, frameDt,
     parsePick, parseBest, applyPick, actionAllowed,
     vehStats, zeroTo80, topSpeed, stepSpeed, collidePoint, HILL_BOX, HILL_GRID, hillHeight, hillMesh, gradeAt, slopeTop,
-    crashDamage, CRASH_QUIET, newCrashGuard, chargeCrash, addDamage, repairDamage, isWrecked, damageStage, damageLevel, smokeFor, actionHeld, TILT_DEAD, TILT_FULL, tiltSteer, parseSteer,
+    crashDamage, CRASH_QUIET, newCrashGuard, chargeCrash, addDamage, repairDamage, isWrecked, damageStage, damageLevel, smokeFor, actionHeld, TILT_DEAD, TILT_FULL, tiltSteer, parseSteer, snapShadow, QUALITY_SCALES, newQuality, stepQuality,
     PURSUIT, MAX_STARS, SPOT_RADIUS, HELI_AFTER, wantedStars, pursuit, helicopterDue, copTopSpeed, trackStep, inSpotlight, bustStep, edgeDistance,
     driveTime, runStars, isNewBest,
     newStory, beginAct, retryAct, finishOpen, storyEnding, dueRadio,
