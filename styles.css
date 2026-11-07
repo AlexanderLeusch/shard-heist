@@ -169,6 +169,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-display);overflow
 
 #touch{position:fixed;left:0;right:0;bottom:0;display:none;justify-content:space-between;align-items:flex-end;pointer-events:none;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 calc(16px + env(safe-area-inset-bottom,0px))}
+.vol{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;font-family:var(--f-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.vol label{display:flex;align-items:center;gap:8px}
+.vol input{width:112px;accent-color:var(--spark);cursor:pointer}
+.vol output{min-width:34px;color:var(--ink)}
 #touch .grp{display:flex;gap:12px;align-items:flex-end}
 #touch.tilt .grp:first-child{visibility:hidden}
 .pad{--p:0;position:relative;overflow:hidden;pointer-events:auto;width:72px;height:72px;border-radius:18px;border:1px solid var(--line);background:var(--glass);color:var(--ink);display:grid;place-items:center;font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);touch-action:none}

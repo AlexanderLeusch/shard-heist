@@ -33,6 +33,9 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-display)
 /* HUD */
 #hud{position:fixed;inset:0;pointer-events:none;transition:opacity .4s}
 #hud.off{opacity:0;visibility:hidden}
+.vol{display:flex;align-items:center;gap:10px;font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.vol input{width:160px;accent-color:var(--orange);cursor:pointer}
+.vol output{min-width:36px;color:var(--ink)}
 #hud > *{pointer-events:auto}
 .where{position:absolute;left:max(16px,env(safe-area-inset-left,0px));top:calc(16px + env(safe-area-inset-top,0px))}
 .place{font-size:26px;font-weight:800;letter-spacing:.01em;text-transform:uppercase;line-height:1.05;margin-top:2px}

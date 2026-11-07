@@ -37,6 +37,7 @@ a{color:var(--accent)}
 <table><tr><th>Room</th><th>Document</th><th>Code with the rules</th><th>Tests</th></tr>
 <tr><td>1 · Plot Twist: Cell Block D (escape room)</td><td><a href="#room-1-escape-room">room-1-escape-room.md</a></td><td><code>escape-room/src/rules.js</code></td><td><code>tests/escape-rules.test.js</code></td></tr>
 <tr><td>2 · Shard Heist (police chase)</td><td><a href="#room-2-shard-heist">room-2-shard-heist.md</a></td><td><code>src/core.js</code> (rules), <code>src/game.js</code> (pickups, police AI)</td><td><code>tests/rules.test.js</code>, <code>tests/story.test.js</code>, <code>tests/input.test.js</code></td></tr>
+<tr><td>Both rooms: every setting and option</td><td>settings.md</td><td><code>src/core.js</code>, <code>escape-room/src/rules.js</code> (checks of stored values)</td><td><code>tests/rules.test.js</code>, <code>tests/escape-rules.test.js</code>, <code>tests/browser.test.js</code></td></tr>
 </table>
 <h2>The whole game in one paragraph</h2>
 <p>You were the detective on the Ashford necklace case. Now you are inmate 4471, convicted of stealing it. <b>Room 1:</b> you have ten minutes in a prison washroom to find the code for a hatch in the floor. If you get out (Ending A), a note shows that the guard wanted you out, and a car is waiting at the end of the tunnel. <b>Room 2:</b> the police chase begins. You drive a getaway vehicle through Lisbon's Baixa, on the highway and across the countryside, collecting star shards while up to four police cars and a helicopter hunt you.</p>
@@ -124,6 +125,7 @@ a{color:var(--accent)}
 <tr><td>"Clues" button (bottom left)</td><td>Read your clue notes</td></tr>
 <tr><td><code>P</code> / <code>Esc</code></td><td>Pause (Esc also closes a card)</td></tr>
 <tr><td><code>M</code></td><td>Sound on or off</td></tr>
+<tr><td>Volume slider</td><td>On the pause card, 0 to 100 %. It is kept for the next visit</td></tr>
 <tr><td><code>Enter</code></td><td>Confirm the main button on a card</td></tr>
 </table>
 </section>
@@ -167,7 +169,7 @@ a{color:var(--accent)}
 <tr><td>Reversing lights</td><td>white, on while you roll backwards</td></tr>
 <tr><td>Skid marks and tyre squeal</td><td>with the handbrake above about 15 km/h, when braking above about 30 km/h, and in very fast corners (above about 80 km/h, steering hard). They only mark the road, and they are cleared when a new run starts</td></tr>
 </table>
-<p><b>Hills.</b> All three maps have hills, up to about 20 % steep. The Arco, the river front and the two ends of the highway are level. Uphill your top speed falls by up to 32 % and gravity pulls you back. Downhill your top speed rises by up to 22 % and you coast on. The truck feels slopes most, the motorcycle least. Brakes and rolling friction hold a stopped vehicle in place.</p>
+<p><b>Hills.</b> All three maps have hills, up to about 20 % steep. The Arco, the river front and the two ends of the highway are level. Uphill your top speed falls by up to 16 % and gravity pulls you back, half as strongly as it pushes you downhill. Downhill your top speed rises by up to 22 % and you coast on. The truck feels slopes most, the motorcycle least. Brakes and rolling friction hold a stopped vehicle in place.</p>
 <p><b>Smooth picture.</b> If the game runs below 48 frames per second for 2 seconds, it lowers the resolution one step (85, 70, then 60 %). If that does not help, the step is taken back. After 20 seconds at 57 or more it goes back up, at most twice. The choice of Ultra or Balanced stays yours.</p>
 <h2>Damage</h2>
 <table><tr><th>Rule</th><th>Value</th></tr>
@@ -242,19 +244,70 @@ a{color:var(--accent)}
 </table>
 <p>Any other button or action is refused, and no card button works while you are driving.</p>
 <h2>Saved settings</h2>
-<p>The last map and vehicle, the best times, the radio station and the graphics setting are saved in the browser. Every saved value is checked when loaded; invalid values fall back to Lisbon, Car, radio off and the defaults.</p>
+<p>The last map and vehicle, the best times, the radio station, the graphics, the steering and both volumes are saved in the browser. Every saved value is checked when loaded; invalid values fall back to Lisbon, Car, radio off and the defaults. All settings are explained in Settings and options.</p>
 <h2>Controls</h2>
 <table><tr><th>Input</th><th>Action</th></tr>
 <tr><td><code>W A S D</code> or arrow keys</td><td>Drive</td></tr>
 <tr><td><code>Space</code></td><td>Handbrake</td></tr>
 <tr><td><code>P</code> / <code>Esc</code></td><td>Pause</td></tr>
 <tr><td><code>M</code></td><td>Sound on or off</td></tr>
+<tr><td>Volume sliders</td><td>In the menu and on the pause card: <code>Game</code> (engine, effects, sirens) and <code>Music</code> (the radio), 0 to 100 %. They are kept for the next visit</td></tr>
 <tr><td><code>R</code></td><td>Next radio station (<code>Shift</code> + <code>R</code> for the one before)</td></tr>
 <tr><td><code>Enter</code> / <code>Space</code></td><td>Press the button in focus. With no button in focus, <code>Enter</code> presses the card's main button. While driving, <code>Space</code> is the handbrake</td></tr>
 <tr><td><code>Tab</code></td><td>Move between the buttons of a card</td></tr>
 <tr><td>Touch pads</td><td>Steer on the left; brake and gas on the right. Both together are the handbrake</td></tr>
 <tr><td>Tilt (phones)</td><td>Hold the phone sideways and lower one side, like a steering wheel: from 3° it starts to steer, at 24° it is at full lock. The steering buttons go away while tilt works. Upright, or if the sensor is refused or missing, the buttons stay. Choose <code>Tilt</code> or <code>Buttons</code> in the menu or on the pause card. The sensor is only read in the browser and nothing is stored or sent</td></tr>
 </table>
+</section>
+<section id="settings">
+<h1>Settings and options</h1>
+<blockquote>Every setting the player can change, in both rooms: where it is, what each choice does, and what the game remembers. All of it is stored only in this browser (<code>localStorage</code>). Nothing is sent anywhere, and there are no accounts.</blockquote>
+<h2>Room 2 · Shard Heist: the main menu</h2>
+<table><tr><th>Setting</th><th>Choices</th><th>What it does</th></tr>
+<tr><td><b>Map</b></td><td>Lisbon (Baixa), Highway, Country Roads</td><td>Where the run takes place. Each map has its own goal, time limit and top speed (see <i>Maps</i> in the room 2 rules)</td></tr>
+<tr><td><b>Vehicle</b></td><td>Car, Motorcycle, Truck</td><td>Speed, acceleration, handling, how much damage a crash does and how the police can push you. The card under the choice shows the numbers</td></tr>
+<tr><td><b>Mode</b></td><td>Start the getaway (free ride), or the story card <i>The Necklace Job</i></td><td>Free ride is one run on the chosen map. The story plays all three maps in order, with Hale on the radio and three endings</td></tr>
+<tr><td><b>Radio</b></td><td>Off, Reggae, Techno, Hardstyle, Schlager, Sing-Along Pop, Classical, Heavy Metal</td><td>The station that plays while you drive. <code>R</code> changes it at any time, <code>Shift</code> + <code>R</code> goes back one</td></tr>
+<tr><td><b>Graphics</b></td><td>Ultra, Balanced</td><td><b>Ultra:</b> sharper picture (up to twice the screen resolution), smoothed edges, glowing lights and the finest shadows (4096 × 4096). <b>Balanced:</b> a lighter picture without the glow and with smaller shadows (2048 × 2048). Computers start in Ultra, phones in Balanced</td></tr>
+<tr><td><b>Steering</b> (phones only)</td><td>Tilt, Buttons</td><td><b>Tilt:</b> hold the phone sideways and lower one side like a steering wheel. <b>Buttons:</b> steer with the arrow pads. Tilt is the default on a phone with a motion sensor</td></tr>
+<tr><td><b>Volume</b></td><td><code>Game</code> 0–100 %, <code>Music</code> 0–100 %</td><td><code>Game</code> is the engine, tyres, sirens, the helicopter and all effects. <code>Music</code> is the radio. The music plays for a moment while its slider moves, so it can be heard; letting go of the game slider plays a short tone</td></tr>
+</table>
+<h2>Room 2: during a run</h2>
+<table><tr><th>Setting</th><th>How</th><th>What it does</th></tr>
+<tr><td><b>Pause</b></td><td><code>P</code>, <code>Esc</code> or the pause button</td><td>Stops everything: the clock, the police, the traffic and the music. The pause card shows the shards, time, damage and bust meter</td></tr>
+<tr><td><b>Pause card</b></td><td>Resume, Restart (or Retry act in the story), Main menu</td><td>It also has the steering choice (phones) and both volume sliders</td></tr>
+<tr><td><b>Sound</b></td><td><code>M</code> or the speaker button</td><td>Turns all sound off or on, without changing the volume sliders</td></tr>
+<tr><td><b>Radio</b></td><td><code>R</code> or the radio button</td><td>Next station; the name is shown under the clock</td></tr>
+</table>
+<h2>Room 2: what the game sets by itself</h2>
+<table><tr><th>Setting</th><th>Rule</th></tr>
+<tr><td><b>Resolution</b></td><td>If the game runs below 48 frames per second for 2 seconds, the resolution drops one step: 85 %, then 70 %, then 60 %. A step that does not make the game faster by at least 5 % is taken back and the setting stays. After 20 seconds at 57 frames per second or more it goes one step back up, at most twice. Choosing Ultra or Balanced starts again at full resolution</td></tr>
+<tr><td><b>Shadows</b></td><td>The area that gets shadows (120 m wide) follows the player in whole shadow pixels, so shadow edges do not crawl over the walls</td></tr>
+<tr><td><b>Phones</b></td><td>Phones start in Balanced and use shadows of half the size</td></tr>
+<tr><td><b>Less motion</b></td><td>If the system asks for reduced motion, the camera does not shake after crashes, the radar sweep stops and the menu turns more slowly</td></tr>
+<tr><td><b>Hidden tab</b></td><td>When the tab is hidden or the window loses focus, the run pauses and the sound stops</td></tr>
+</table>
+<h2>Room 1 · Plot Twist: Cell Block D</h2>
+<table><tr><th>Setting</th><th>How</th><th>What it does</th></tr>
+<tr><td><b>Continue or New game</b></td><td>Shown after a reload, if there is a saved game</td><td>Continue goes on where you were, with the time that was left. New game asks first, then deletes the save</td></tr>
+<tr><td><b>Pause</b></td><td><code>P</code>, <code>Esc</code> or the pause button</td><td>Stops the clock. The pause card has Resume, Restart and the volume slider</td></tr>
+<tr><td><b>Volume</b></td><td>Slider on the pause card, 0–100 %</td><td>All sounds of the washroom: the light's hum, dripping water, the tap and the effects. A short tone plays when it is let go</td></tr>
+<tr><td><b>Sound</b></td><td><code>M</code> or the speaker button</td><td>All sound off or on</td></tr>
+<tr><td><b>Look around</b></td><td>Drag, or the arrow keys</td><td>Turns the view in the current scene</td></tr>
+</table>
+<h2>What is remembered, and what happens to bad values</h2>
+<p>Every stored value comes from outside the program, so each one is checked when it is loaded. A value that is missing or wrong is ignored and the default is used; the game never breaks because of it.</p>
+<table><tr><th>Stored</th><th>Room</th><th>Default if missing or invalid</th></tr>
+<tr><td>Map and vehicle</td><td>2</td><td>Lisbon and the car</td></tr>
+<tr><td>Best time per map</td><td>2</td><td>No best time (only 10 s to 900 s counts)</td></tr>
+<tr><td>Radio station</td><td>2</td><td>Off</td></tr>
+<tr><td>Graphics</td><td>2</td><td>Ultra on a computer, Balanced on a phone</td></tr>
+<tr><td>Steering</td><td>2</td><td>Tilt</td></tr>
+<tr><td>Game and music volume</td><td>2</td><td>100 % each; a value outside 0–100 % is cut to the range</td></tr>
+<tr><td>Saved game</td><td>1</td><td>No saved game; any save that no real game could produce is refused</td></tr>
+<tr><td>Volume</td><td>1</td><td>100 %</td></tr>
+</table>
+<p>To reset everything, clear this site's data in the browser settings.</p>
 </section>
 </body>
 </html>

@@ -143,6 +143,78 @@ class Batch {
   }
 }
 // ### Merges many geometries into one, so a whole street can be drawn in a single draw call.
+// ---------- Tree shapes ----------
+// ### Trees for all maps. A broadleaf crown is a cluster of lumps around a main one, each lump a sphere with a bumpy outline, so the
+// ### outline is irregular like foliage. Normals point away from each lump's centre, which shades the crown softly instead of in facets.
+// ### The colours of the vertices are an ambient shading: dark at the bottom and inside, light at the top. The instance colour of each
+// ### tree multiplies them, so trees differ in hue. Pines are layers of drooping cones. The bark has a few branches into the crown.
+// a repeatable pseudo-random number for a point, so lumps sharing a vertex move it the same way and stay closed
+const hash3 = (x, y, z) => { const s = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453; return s - Math.floor(s); };
+function mergeColored(list){
+  const pos = [], nor = [], col = [];
+  for (const g0 of list){
+    const g = g0.index ? g0.toNonIndexed() : g0, p = g.attributes.position.array, n = g.attributes.normal.array, c = g.attributes.color ? g.attributes.color.array : null;
+    for (let i = 0; i < p.length; i++){ pos.push(p[i]); nor.push(n[i]); col.push(c ? c[i] : 1); }
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  out.computeBoundingSphere();
+  return out;
+}
+// ### A broadleaf crown: lumps around the centre (cx 0, y), r the size of the main lump, detail 0 or 1.
+function treeCrown(lumps, detail, r, y, seed){
+  const rnd = mulberry32(seed), parts = [], bottom = y - r * 1.05, span = r * 2.3;
+  for (let k = 0; k < lumps; k++){
+    const a = k * 2.399 + rnd(), d = k ? r * (0.55 + 0.35 * rnd()) : 0, lr = k ? r * (0.55 + 0.3 * rnd()) : r;
+    const cx = Math.cos(a) * d, cz = Math.sin(a) * d, cy = y + (k ? (rnd() - 0.4) * r * 0.9 : 0);
+    const g = new THREE.IcosahedronGeometry(1, detail), p = g.attributes.position, n = g.attributes.normal, col = new Float32Array(p.count * 3);
+    for (let i = 0; i < p.count; i++){
+      const nx = p.getX(i), ny = p.getY(i), nz = p.getZ(i), bump = 1 + 0.26 * (hash3(nx + k, ny, nz) - 0.5);
+      const x = cx + nx * lr * bump, yy = cy + ny * lr * bump * 0.92, z = cz + nz * lr * bump;
+      p.setXYZ(i, x, yy, z); n.setXYZ(i, nx, ny, nz);
+      const up = clamp((yy - bottom) / span, 0, 1), out = Math.min(1, Math.hypot(x, z) / (r * 1.4));
+      const c = (0.42 + 0.5 * up) * (0.8 + 0.2 * out) * (0.9 + 0.2 * hash3(x, yy, z));
+      col[i * 3] = c; col[i * 3 + 1] = c; col[i * 3 + 2] = c;
+    }
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    parts.push(g);
+  }
+  return mergeColored(parts);
+}
+// ### A pine: drooping, slightly ragged cone layers from the bottom (y0) to the top (y1), widest at the bottom.
+function treePine(layers, r, y0, y1, seed){
+  const rnd = mulberry32(seed), parts = [], step = (y1 - y0) / (layers + 0.6);
+  for (let k = 0; k < layers; k++){
+    const lr = r * (1 - k / (layers + 0.4)), h = step * 1.9, base = y0 + k * step;
+    const g = new THREE.ConeGeometry(lr, h, 9, 1, true).toNonIndexed(), p = g.attributes.position, col = new Float32Array(p.count * 3);
+    for (let i = 0; i < p.count; i++){
+      const x = p.getX(i), yv = p.getY(i), z = p.getZ(i), rim = yv < 0 ? 1 : 0, rag = 1 + 0.18 * (hash3(x + k, yv, z) - 0.5) * rim;
+      p.setXYZ(i, x * rag, base + h / 2 + yv - rim * lr * 0.12 * (0.6 + rnd() * 0.4), z * rag);
+      const c = rim ? 0.45 + 0.1 * hash3(x, k, z) : 0.95;
+      col[i * 3] = c; col[i * 3 + 1] = c; col[i * 3 + 2] = c;
+    }
+    g.computeVertexNormals();
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    parts.push(g);
+  }
+  return mergeColored(parts);
+}
+// ### A tapered trunk of height h, with branches that reach up into the crown.
+function treeTrunk(h, r0, branches, seed){
+  const rnd = mulberry32(seed), parts = [];
+  const t = new THREE.CylinderGeometry(r0 * 0.6, r0, h, 7); t.translate(0, h / 2, 0); parts.push(t);
+  for (let k = 0; k < branches; k++){
+    const len = h * (0.45 + 0.2 * rnd()), b = new THREE.CylinderGeometry(r0 * 0.22, r0 * 0.4, len, 5);
+    b.translate(0, len / 2, 0); b.rotateZ(0.6 + rnd() * 0.35); b.rotateY(k * 2.1 + rnd()); b.translate(0, h * (0.62 + 0.12 * rnd()), 0);
+    parts.push(b);
+  }
+  return mergeGeos(parts);
+}
+const leafMat = () => new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.92 });
+const barkMat = () => new THREE.MeshStandardMaterial({ color: 0x4f3a2b, roughness: 0.95 });
+
 function mergeGeos(list){
   const pos = [], nor = [], uvs = [];
   list.forEach(g => {
@@ -1313,18 +1385,35 @@ function buildCity(){
 
   // The hills around the valley: Bairro Alto in the west, the castle hill in the east, the Avenida in the north
   const HILLS = [[330, -110, 175, 64, 240], [-345, -60, 150, 60, 320], [0, -470, 340, 45, 190]];
-  const hillH = (x, z) => Math.max(0, ...HILLS.map(([cx, cz, rx, ry, rz]) => ry * Math.sqrt(Math.max(0, 1 - ((x - cx) / rx) ** 2 - ((z - cz) / rz) ** 2))));
+  // ### A hill is a bell, flat at its foot and round on top, so it never stands up like a wall. It only starts outside the street grid
+  // ### of the Baixa, and the flat city meets it at the edge.
+  const hillH = (x, z) => sstep(186, 216, Math.max(Math.abs(x), Math.abs(z))) * Math.max(0, ...HILLS.map(([cx, cz, rx, ry, rz]) => ry * Math.pow(Math.max(0, 1 - ((x - cx) / rx) ** 2 - ((z - cz) / rz) ** 2), 1.4)));
+  // ### The real surface of the hills: the dome plus small banks and terraces of up to about 2 m, and what each spot is.
+  // ### Streets wind along the slope at fixed heights, gardens sit in patches, everything else is built up.
+  const hillBump = (x, z) => 1.3 * Math.sin(x * 0.13 + z * 0.07) * Math.sin(z * 0.11 - x * 0.05) + 0.7 * Math.sin(x * 0.37 + z * 0.29) * Math.sin(z * 0.23 + 1.7);
+  const hillSurf = (x, z) => { const h = hillH(x, z); return h + hillBump(x, z) * clamp((h - 1) / 6, 0, 1); };
+  const hillPatch = (x, z) => Math.sin(x * 0.083 + z * 0.047) * Math.sin(z * 0.071 - x * 0.039) + 0.5 * Math.sin(x * 0.21 + z * 0.17);
+  const hillKind = (x, y, z) => Math.sin(y * 0.55 + hillPatch(x, z) * 1.6) > 0.9 ? 'street' : hillPatch(x, z) < -0.45 ? 'garden' : 'built';
+  const hillLots = [];
   // ### Night and fog would turn a plainly lit hill into the colour of the sky, and the houses on it would seem to hang in the air. So
   // ### the hills paint their own colours and ignore the fog: dark gardens, built-up terracotta patches and streets along the slope,
   // ### shaded by the direction each slope faces, with the small lights of the quarter on top.
   {
-    const geo = mergeGeos(HILLS.map(([cx, cz, rx, ry, rz]) => new THREE.SphereGeometry(1, 96, 40).scale(rx, ry, rz).translate(cx, 0, cz)));
-    const p = geo.attributes.position, n = geo.attributes.normal, col = new Float32Array(p.count * 3), L = Math.hypot(0.35, 0.8, 0.45);
+    // the ground of the hills is rough, not a smooth dome: small terraces and banks follow hillBump
+    // one grid of about 6 m per hill, lifted to the real surface; where the hill is flat it stays just under the street
+    const geo = mergeGeos(HILLS.map(([cx, cz, rx, , rz]) => {
+      const g = new THREE.PlaneGeometry(rx * 2, rz * 2, Math.round(rx / 3), Math.round(rz / 3)).rotateX(-Math.PI / 2).translate(cx, 0, cz), q = g.attributes.position;
+      for (let i = 0; i < q.count; i++){ const h = hillSurf(q.getX(i), q.getZ(i)); q.setY(i, h > 0.2 ? h : -0.6); }
+      g.computeVertexNormals();
+      return g;
+    }));
+    const p = geo.attributes.position, col = new Float32Array(p.count * 3), L = Math.hypot(0.35, 0.8, 0.45);
+    const n = geo.attributes.normal;
     for (let i = 0; i < p.count; i++){
       const x = p.getX(i), y = p.getY(i), z = p.getZ(i), lit = Math.max(0, (n.getX(i) * -0.35 + n.getY(i) * 0.8 + n.getZ(i) * 0.45) / L);
-      const patch = Math.sin(x * 0.083 + z * 0.047) * Math.sin(z * 0.071 - x * 0.039) + 0.5 * Math.sin(x * 0.21 + z * 0.17);
-      const street = Math.sin(y * 1.1 + patch * 1.2) > 0.86;
-      const c = street ? [0.085, 0.078, 0.066] : patch > 0.05 ? [0.05, 0.032, 0.026] : [0.02, 0.03, 0.022], s = 0.7 + 0.7 * lit;
+      const kind = hillKind(x, y, z), grain = 0.82 + 0.36 * hash3(Math.round(x), Math.round(y), Math.round(z));
+      // night colours: lit streets, built-up ground between the houses, and gardens with trees
+      const c = kind === 'street' ? [0.11, 0.095, 0.075] : kind === 'garden' ? [0.018, 0.032, 0.02] : [0.05, 0.04, 0.034], s = (0.6 + 0.8 * lit) * grain;
       col[i * 3] = c[0] * s; col[i * 3 + 1] = c[1] * s; col[i * 3 + 2] = c[2] * s;
     }
     geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
@@ -1332,7 +1421,13 @@ function buildCity(){
     const lights = [], hr = mulberry32(77);
     for (const [hx, hz, rx, , rz] of HILLS) for (let k = 0; k < 170; k++){
       const a = hr() * Math.PI * 2, q = Math.sqrt(hr()) * 0.95, x = hx + Math.cos(a) * q * rx, z = hz + Math.sin(a) * q * rz;
-      if (Math.max(Math.abs(x), Math.abs(z)) >= 200 && z <= 145) lights.push(x, hillH(x, z) + 3, z);
+      if (Math.max(Math.abs(x), Math.abs(z)) >= 200 && z <= 145) lights.push(x, hillSurf(x, z) + 3, z);
+    }
+    // street lamps along the winding streets of the slopes
+    const lr = mulberry32(78);
+    for (const [hx, hz, rx, , rz] of HILLS) for (let k = 0; k < 2400; k++){
+      const a = lr() * Math.PI * 2, q = Math.sqrt(lr()) * 0.95, x = hx + Math.cos(a) * q * rx, z = hz + Math.sin(a) * q * rz, y = hillSurf(x, z);
+      if (Math.max(Math.abs(x), Math.abs(z)) >= 200 && z <= 145 && hillKind(x, y, z) === 'street' && lr() < 0.3) lights.push(x, y + 4.5, z);
     }
     const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lights, 3));
     grp.add(new THREE.Points(lg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffcf8c, size: 2.4, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
@@ -1355,6 +1450,37 @@ function buildCity(){
     const style = rng() < 0.88 ? 'pombal' : 'tileG';
     facade(style, x - w / 2, x + w / 2, low - 3, base + h, z - d / 2, z + d / 2, pick(style).multiplyScalar(0.85));
     hipRoof(x - w / 2, x + w / 2, base + h, z - d / 2, z + d / 2, 2.6, roofTile());
+    hillLots.push([x - w / 2, x + w / 2, z - d / 2, z + d / 2]);
+  }
+  // ### Lisbon's hills are built up almost to the top: rows of houses step up the slopes that face the city, with gardens and
+  // ### trees in between and streets winding along. They use their own random numbers, so the rest of the city stays as it was.
+  {
+    const hr = mulberry32(4471), gardenTrees = [], free = (x0, x1, z0, z1) => hillLots.every(([a, b, c, d]) => x1 + 2 < a || x0 - 2 > b || z1 + 2 < c || z0 - 2 > d);
+    for (const [hx, hz, rx, ry, rz] of HILLS){
+      const toCity = Math.hypot(hx, hz);
+      for (let gx = hx - rx; gx < hx + rx; gx += 15) for (let gz = hz - rz; gz < hz + rz; gz += 15){
+        const x = gx + (hr() - 0.5) * 6, z = gz + (hr() - 0.5) * 6, q = Math.hypot((x - hx) / rx, (z - hz) / rz);
+        if (q > 0.97 || Math.max(Math.abs(x), Math.abs(z)) < 198 || z > 140) continue;
+        if ((x > 186 && x < 280 && Math.abs(z) < 32) || Math.hypot(x - 300, z + 115) < 60) continue;
+        // only the sides the city can see
+        if (((x - hx) * -hx + (z - hz) * -hz) / (Math.hypot(x - hx, z - hz) * toCity + 1e-6) < -0.35) continue;
+        const y = hillSurf(x, z), kind = hillKind(x, y, z);
+        if (kind === 'garden'){ if (hr() < 0.8) gardenTrees.push({ x, z, y, s: 1.1 + hr() * 0.8, rot: hr() * 6.28, v: hr() }); continue; }
+        if (kind === 'street'){ if (hr() < 0.35) gardenTrees.push({ x, z, y, s: 0.9 + hr() * 0.5, rot: hr() * 6.28, v: hr() }); continue; }
+        const w = 9 + Math.floor(hr() * 3) * 2, d = 9 + Math.floor(hr() * 3) * 2, h = (2 + Math.floor(hr() * 3)) * FLOOR;
+        if (!free(x - w / 2, x + w / 2, z - d / 2, z + d / 2)) continue;
+        const corners = [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) => hillSurf(x + sx * w / 2, z + sz * d / 2)), top = Math.max(...corners), low = Math.min(...corners);
+        const style = hr() < 0.85 ? 'pombal' : hr() < 0.5 ? 'tileG' : 'tileB', pal = PAL[style];
+        FB[style].sides(x - w / 2, x + w / 2, low - 3, top + h, z - d / 2, z + d / 2, C(pal[Math.floor(hr() * pal.length)]).multiplyScalar(0.8), TU, TV, Math.floor(hr() * 8) / 8, Math.floor(hr() * 8) / 8);
+        hipRoof(x - w / 2, x + w / 2, top + h, z - d / 2, z + d / 2, 2.4, C(TILE_ROOFS[Math.floor(hr() * TILE_ROOFS.length)]));
+        hillLots.push([x - w / 2, x + w / 2, z - d / 2, z + d / 2]);
+      }
+    }
+    const crown = treeCrown(4, 0, 1.9, 4.4, 41), trunk = treeTrunk(2.8, 0.3, 2, 42);
+    const placeG = (o, dm) => { dm.position.set(o.x, o.y - 0.3, o.z); dm.rotation.set(0, o.rot, 0); dm.scale.setScalar(o.s); };
+    const gt = instanced(grp, trunk, barkMat(), gardenTrees, placeG), gc = instanced(grp, crown, leafMat(), gardenTrees, placeG, (o, t) => t.set(0x3f6e45).offsetHSL((o.v - 0.5) * 0.08, 0, (o.v - 0.5) * 0.12));
+    // far away: no shadows needed, which keeps them cheap
+    for (const m of [gt, gc]) if (m){ m.castShadow = false; m.receiveShadow = false; }
   }
   // The Se, Lisbon's cathedral, on the slope at the end of Rua da Conceicao: two crenellated towers and a rose window, facing west
   {
@@ -1529,12 +1655,11 @@ function buildCity(){
   const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(glowPts, 3));
   grp.add(new THREE.Points(pg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffd79a, size: 2.8, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
 
-  const tTrunk = new THREE.CylinderGeometry(0.18, 0.26, 2.6, 6); tTrunk.translate(0, 1.3, 0);
-  const tCrown = new THREE.IcosahedronGeometry(1.7, 0); tCrown.translate(0, 3.6, 0);
+  const tTrunk = treeTrunk(3.0, 0.24, 3, 11), tCrown = treeCrown(7, 1, 1.45, 3.9, 12);
   // ### Places one tree, unless it would stand on a road or in a building.
   const placeTree = (o, d) => { d.position.set(o.x, 0.3, o.z); d.rotation.set(0, o.rot, 0); d.scale.setScalar(o.s); };
-  instanced(grp, tTrunk, flatMat({ color: 0x5e4433 }), trees, placeTree);
-  instanced(grp, tCrown, flatMat(), trees, placeTree, (o, t) => t.set(0x3d7a4c).offsetHSL((o.v - 0.5) * 0.06, 0, (o.v - 0.5) * 0.1));
+  instanced(grp, tTrunk, barkMat(), trees, placeTree);
+  instanced(grp, tCrown, leafMat(), trees, placeTree, (o, t) => t.set(0x427a48).offsetHSL((o.v - 0.5) * 0.08, (o.v - 0.5) * 0.1, (o.v - 0.5) * 0.12));
   initCityTraffic();
   CITY.built = true;
 }
@@ -1772,15 +1897,11 @@ function buildHighway(){
   }
   const pines = trees.filter(t => t.pine), rounds = trees.filter(t => !t.pine);
   const place = (o, d) => { d.position.set(o.x, 0, o.z); d.rotation.set(0, o.rot, 0); d.scale.setScalar(o.s); };
-  const trunk = new THREE.CylinderGeometry(0.22, 0.32, 2.2, 6); trunk.translate(0, 1.1, 0);
-  const cone1 = new THREE.ConeGeometry(2.0, 4.2, 7); cone1.translate(0, 3.6, 0);
-  const cone2 = new THREE.ConeGeometry(1.4, 3.2, 7); cone2.translate(0, 5.8, 0);
-  const crown = new THREE.IcosahedronGeometry(2.2, 0); crown.translate(0, 3.8, 0);
-  const leafTint = base => (o, t) => t.set(base).offsetHSL((o.v - 0.5) * 0.05, 0, (o.v - 0.5) * 0.1);
-  instanced(grp, trunk, flatMat({ color: 0x5e4433 }), trees, place);
-  instanced(grp, cone1, flatMat(), pines, place, leafTint(0x2c5a40));
-  instanced(grp, cone2, flatMat(), pines, place, leafTint(0x2c5a40));
-  instanced(grp, crown, flatMat(), rounds, place, leafTint(0x3d6e44));
+  const leafTint = base => (o, t) => t.set(base).offsetHSL((o.v - 0.5) * 0.06, (o.v - 0.5) * 0.08, (o.v - 0.5) * 0.12);
+  instanced(grp, treeTrunk(2.4, 0.27, 0, 21), barkMat(), pines, place);
+  instanced(grp, treeTrunk(2.6, 0.28, 3, 22), barkMat(), rounds, place);
+  instanced(grp, treePine(4, 2.2, 1.6, 8.2, 23), leafMat(), pines, place, leafTint(0x376b4c));
+  instanced(grp, treeCrown(5, 0, 1.75, 4.1, 24), leafMat(), rounds, place, leafTint(0x4f8250));
   const hillGeo = new THREE.IcosahedronGeometry(1, 1);
   for (let i = 0; i < 46; i++){
     const side = rng() < 0.5 ? -1 : 1;
@@ -2087,15 +2208,11 @@ function buildCountry(){
     gridAdd({ t: 'c', x, z, r: 0.5 * t.s });
   }
   const placeT = (o, dm) => { dm.position.set(o.x, o.y - 0.15, o.z); dm.rotation.set(0, o.rot, 0); dm.scale.setScalar(o.s); };
-  const trunk = new THREE.CylinderGeometry(0.22, 0.32, 2.2, 6); trunk.translate(0, 1.1, 0);
-  const cone1 = new THREE.ConeGeometry(2.0, 4.2, 8); cone1.translate(0, 3.6, 0);
-  const cone2 = new THREE.ConeGeometry(1.4, 3.2, 8); cone2.translate(0, 5.8, 0);
-  const crown = new THREE.IcosahedronGeometry(2.3, 1); crown.translate(0, 3.9, 0);
-  const leafTint = base => (o, t) => t.set(base).offsetHSL((o.v - 0.5) * 0.05, 0, (o.v - 0.5) * 0.1);
-  instanced(grp, trunk, flatMat({ color: 0x5e4433 }), pines.concat(rounds), placeT);
-  instanced(grp, cone1, flatMat(), pines, placeT, leafTint(0x2a5038));
-  instanced(grp, cone2, flatMat(), pines, placeT, leafTint(0x2a5038));
-  instanced(grp, crown, flatMat(), rounds, placeT, leafTint(0x3d6a3e));
+  const leafTint = base => (o, t) => t.set(base).offsetHSL((o.v - 0.5) * 0.06, (o.v - 0.5) * 0.08, (o.v - 0.5) * 0.12);
+  instanced(grp, treeTrunk(2.4, 0.28, 0, 31), barkMat(), pines, placeT);
+  instanced(grp, treeTrunk(2.6, 0.3, 3, 32), barkMat(), rounds, placeT);
+  instanced(grp, treePine(4, 2.2, 1.6, 8.4, 33), leafMat(), pines, placeT, leafTint(0x34654a));
+  instanced(grp, treeCrown(5, 0, 1.85, 4.2, 34), leafMat(), rounds, placeT, leafTint(0x4b7c4a));
 
   // Farmhouses, barns, a village with a church near the finish
   const FBh = new Batch(), plain = new Batch(), roofsB = new Batch();
@@ -3285,6 +3402,18 @@ function updateSkids(){
 // ### the revs audibly fall into the next gear. Road rumble, gearbox whine, wind and tyres follow the speed; the truck adds a
 // ### lagging turbo and air brakes; a second oscillator with a slow LFO is the police siren.
 let audio = null, muted = false;
+// ### The two volume sliders. The music can be heard for a moment while its slider moves, even in the menu or the pause.
+const volume = Core.parseVolume(readStore('shard-heist-volume'));
+let musicPreview = 0;
+function setVolume(kind, value){
+  volume[kind] = clamp(value, 0, 1);
+  writeStore('shard-heist-volume', JSON.stringify(volume));
+  card.querySelectorAll(`[data-vol="${kind}"]`).forEach(r => { r.value = Math.round(volume[kind] * 100); const o = r.parentNode.querySelector('output'); if (o) o.textContent = r.value + '%'; });
+  if (!audio) return;
+  const g = kind === 'game' ? audio.gameVol : audio.musicVol;
+  g.gain.setTargetAtTime(Core.volumeGain(volume[kind]), audio.ctx.currentTime, 0.03);
+}
+const volumeRow = () => `<div class="vol">${['game', 'music'].map(k => `<label>${k === 'game' ? 'Game' : 'Music'} <input type="range" min="0" max="100" step="5" data-vol="${k}" value="${Math.round(volume[k] * 100)}" aria-label="${k === 'game' ? 'Game volume: engine, effects and sirens' : 'Music volume: the radio'}"><output>${Math.round(volume[k] * 100)}%</output></label>`).join('')}</div>`;
 const ENGINES = Core.ENGINES;
 const eng = { rpm: 750, gear: 1, shift: 0, load: 0, boost: 0, miss: 0, prevPedal: 0, prevBrake: false, popTime: 0 };
 // ### Creates the audio graph on the first click or key. Browsers do not allow sound before the player has done something.
@@ -3294,7 +3423,10 @@ function initAudio(){
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const master = ctx.createGain(); master.gain.value = 0.9;
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 4;
-    comp.connect(master); master.connect(ctx.destination);
+    // the player's two volumes: everything of the game goes through gameVol, the radio through musicVol
+    const gameVol = ctx.createGain(), musicVol = ctx.createGain();
+    gameVol.gain.value = Core.volumeGain(volume.game); musicVol.gain.value = Core.volumeGain(volume.music);
+    comp.connect(gameVol).connect(master); musicVol.connect(master); master.connect(ctx.destination);
     const gain = v => { const g = ctx.createGain(); g.gain.value = v; return g; };
     const bus = gain(0); bus.connect(comp);
     const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
@@ -3314,7 +3446,7 @@ function initAudio(){
     const rotorSrc = ctx.createBufferSource(); rotorSrc.buffer = rotorBuf; rotorSrc.loop = true; rotorSrc.start();
     const rotorF = ctx.createBiquadFilter(); rotorF.type = 'lowpass'; rotorF.frequency.value = 900;
     const rotor = gain(0); rotorSrc.connect(rotorF).connect(rotor).connect(comp);
-    const radioBus = gain(0), radioComp = ctx.createDynamicsCompressor(); radioComp.threshold.value = -14; radioComp.ratio.value = 6; radioBus.connect(radioComp).connect(master);
+    const radioBus = gain(0), radioComp = ctx.createDynamicsCompressor(); radioComp.threshold.value = -14; radioComp.ratio.value = 6; radioBus.connect(radioComp).connect(musicVol);
     const whine = ctx.createOscillator(); whine.type = 'triangle';
     const whineG = gain(0); whine.connect(whineG).connect(comp);
     const turbo = ctx.createOscillator(); turbo.type = 'sine'; turbo.frequency.value = 1800;
@@ -3324,7 +3456,7 @@ function initAudio(){
     const sirenDepth = gain(330); sirenLfo.connect(sirenDepth).connect(siren.frequency);
     const sirenGain = gain(0); siren.connect(sirenGain).connect(comp);
     [turbo, whine, siren, sirenLfo].forEach(o => o.start());
-    audio = { ctx, master, comp, bus, layers: [], voice: null, bufs: {}, noiseBuf, radioBus, road, rotor, rotorF, rotorSrc, wind, tire, popF, airF, turbo, turboG, whine, whineG, sirenGain, sirenLfo };
+    audio = { ctx, master, gameVol, musicVol, comp, bus, layers: [], voice: null, bufs: {}, noiseBuf, radioBus, road, rotor, rotorF, rotorSrc, wind, tire, popF, airF, turbo, turboG, whine, whineG, sirenGain, sirenLfo };
     setEngineVoice();
   } catch (e) { audio = null; }
 }
@@ -3417,7 +3549,7 @@ function radioNote(e, at, beat){
 // ### Schedules the next bar ahead on the audio clock, and silences the radio outside of driving.
 function updateRadio(){
   if (!audio) return;
-  const t = audio.ctx.currentTime, playing = radio.key !== 'off' && state === 'play' && !muted;
+  const t = audio.ctx.currentTime, playing = radio.key !== 'off' && (state === 'play' || performance.now() < musicPreview) && !muted;
   audio.radioBus.gain.setTargetAtTime(playing ? 0.9 * (Core.RADIO[radio.key].level || 1) : 0, t, 0.08);
   if (!playing) return;
   if (!radio.out) radioBuses();
@@ -3457,7 +3589,7 @@ function tone(freqs, dur, type, vol){
     g.gain.setValueAtTime(0.0001, st);
     g.gain.exponentialRampToValueAtTime(vol || 0.12, st + 0.015);
     g.gain.exponentialRampToValueAtTime(0.0001, st + dur);
-    o.connect(g).connect(audio.master);
+    o.connect(g).connect(audio.gameVol);
     o.start(st); o.stop(st + dur + 0.05);
   });
 }
@@ -3620,6 +3752,8 @@ const keys = { up: false, down: false, left: false, right: false, brake: false }
 const keyMap = Core.KEY_MAP, held = new Set(), crashGuard = Core.newCrashGuard();
 addEventListener('keydown', e => {
   if (!$('fatal').hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+  // on a volume slider the arrow keys move the slider, not the car
+  if (e.target && e.target.type === 'range' && /^(Arrow|Home|End|Page)/.test(e.code)) return;
   if (e.repeat && e.code === 'Enter'){ e.preventDefault(); return; }
   if (e.repeat && !Object.hasOwn(keyMap, e.code)) return;
   const onButton = !overlay.hidden && document.activeElement && document.activeElement.tagName === 'BUTTON' && card.contains(document.activeElement);
@@ -4026,7 +4160,8 @@ function pause(){
       <button class="btn ghost" data-action="${story ? 'retry-act' : 'again'}">Restart</button>
       <button class="btn ghost" data-action="menu">Main menu</button>
     </div>
-    ${steerRow()}`);
+    ${steerRow()}
+    ${volumeRow()}`);
 }
 // ### Goes back to driving after a pause.
 function resume(){ hideOverlay(); state = 'play'; initAudio(); }
@@ -4215,6 +4350,7 @@ function showMenu(){
       <span class="gfx">Radio ${Core.RADIO_ORDER.map(k => `<button data-radio="${k}" aria-pressed="${radio.key === k}">${k === 'off' ? 'Off' : Core.RADIO[k].name}</button>`).join('')}</span>
       <span class="gfx">Graphics <button data-gfx="ultra" aria-pressed="${gfx === 'ultra'}">Ultra</button><button data-gfx="balanced" aria-pressed="${gfx === 'balanced'}">Balanced</button></span>
       ${steerRow()}
+      ${volumeRow()}
     </div>`, 'menu');
   renderVehDetail();
 }
@@ -4245,6 +4381,15 @@ function backToMenu(){
   showMenu();
 }
 
+// moving a volume slider: the music plays for a moment so it can be heard, the game sounds give a short tone when let go
+card.addEventListener('input', e => {
+  const r = e.target.closest('[data-vol]');
+  if (!r) return;
+  initAudio();
+  if (r.dataset.vol === 'music') musicPreview = performance.now() + 1500;
+  setVolume(r.dataset.vol, Number(r.value) / 100);
+});
+card.addEventListener('change', e => { const r = e.target.closest('[data-vol="game"]'); if (r) sfx.collect(); });
 card.addEventListener('click', e => {
   const rb = e.target.closest('[data-radio]');
   if (rb){

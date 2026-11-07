@@ -66,7 +66,7 @@ The Baixa is the centre of Lisbon, rebuilt as a street grid after the 1755 earth
 | Reversing lights | white, on while you roll backwards |
 | Skid marks and tyre squeal | with the handbrake above about 15 km/h, when braking above about 30 km/h, and in very fast corners (above about 80 km/h, steering hard). They only mark the road, and they are cleared when a new run starts |
 
-**Hills.** All three maps have hills, up to about 20 % steep. The Arco, the river front and the two ends of the highway are level. Uphill your top speed falls by up to 32 % and gravity pulls you back. Downhill your top speed rises by up to 22 % and you coast on. The truck feels slopes most, the motorcycle least. Brakes and rolling friction hold a stopped vehicle in place.
+**Hills.** All three maps have hills, up to about 20 % steep. The Arco, the river front and the two ends of the highway are level. Uphill your top speed falls by up to 16 % and gravity pulls you back, half as strongly as it pushes you downhill. Downhill your top speed rises by up to 22 % and you coast on. The truck feels slopes most, the motorcycle least. Brakes and rolling friction hold a stopped vehicle in place.
 
 **Smooth picture.** If the game runs below 48 frames per second for 2 seconds, it lowers the resolution one step (85, 70, then 60 %). If that does not help, the step is taken back. After 20 seconds at 57 or more it goes back up, at most twice. The choice of Ultra or Balanced stays yours.
 
@@ -170,7 +170,7 @@ Any other button or action is refused, and no card button works while you are dr
 
 ## Saved settings
 
-The last map and vehicle, the best times, the radio station and the graphics setting are saved in the browser. Every saved value is checked when loaded; invalid values fall back to Lisbon, Car, radio off and the defaults.
+The last map and vehicle, the best times, the radio station, the graphics, the steering and both volumes are saved in the browser. Every saved value is checked when loaded; invalid values fall back to Lisbon, Car, radio off and the defaults. All settings are explained in [Settings and options](settings.md).
 
 ## Controls
 
@@ -180,6 +180,7 @@ The last map and vehicle, the best times, the radio station and the graphics set
 | `Space` | Handbrake |
 | `P` / `Esc` | Pause |
 | `M` | Sound on or off |
+| Volume sliders | In the menu and on the pause card: `Game` (engine, effects, sirens) and `Music` (the radio), 0 to 100 %. They are kept for the next visit |
 | `R` | Next radio station (`Shift` + `R` for the one before) |
 | `Enter` / `Space` | Press the button in focus. With no button in focus, `Enter` presses the card's main button. While driving, `Space` is the handbrake |
 | `Tab` | Move between the buttons of a card |

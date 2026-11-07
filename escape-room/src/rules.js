@@ -198,9 +198,15 @@
       wedged: s.wedged, graceUsed: s.graceUsed, lock: s.lock.slice(), wrongTries: s.wrongTries, ending: s.ending, warned: s.warned.slice() };
   }
   const canContinue = s => !!s && s.scene !== 'intro' && !ended(s);
+  // ### The player's volume, 0 to 1, stored as text. Anything else is refused and the volume stays at full.
+  const VOLUME_KEY = 'escape-room-volume';
+  function parseVolume(raw){
+    if (typeof raw !== 'string' || !/^(0(\.\d+)?|1(\.0+)?)$/.test(raw)) return 1;
+    return Number(raw);
+  }
 
   return Object.freeze({
     TIME_LIMIT, WRONG_CODE_PENALTY, WEDGE_GRACE, CODE, SAVE_KEY, ITEMS, CLUES, SCENES, ENDINGS, WARNINGS,
-    newState, visibleHotspots, perform, tick, restore, canContinue
+    newState, visibleHotspots, perform, tick, restore, canContinue, VOLUME_KEY, parseVolume
   });
 });

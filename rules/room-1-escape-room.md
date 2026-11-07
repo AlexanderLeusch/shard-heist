@@ -105,4 +105,5 @@ After an ending, every action is refused except **Play again / Try again**, whic
 | "Clues" button (bottom left) | Read your clue notes |
 | `P` / `Esc` | Pause (Esc also closes a card) |
 | `M` | Sound on or off |
+| Volume slider | On the pause card, 0 to 100 %. It is kept for the next visit |
 | `Enter` | Confirm the main button on a card |

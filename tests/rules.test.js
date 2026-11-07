@@ -176,6 +176,16 @@ test('damage: soft bumps are free, the truck takes 55 %, damage stays within 0-1
     const fresh = Core.newQuality();
     assert.deepEqual(Core.stepQuality(fresh, bad), Core.newQuality(), 'refused frame time: ' + bad);
   }
+  // the volume: stored as text, each part refused on its own, squared for the ear
+  assert.deepEqual(Core.parseVolume(null), { game: 1, music: 1 }, 'nothing stored: full volume');
+  assert.deepEqual(Core.parseVolume('{"game":0.5,"music":0}'), { game: 0.5, music: 0 });
+  assert.deepEqual(Core.parseVolume('{"game":7,"music":-2}'), { game: 1, music: 0 }, 'kept within 0 and 1');
+  for (const bad of ['', 'loud', '[0.2,0.3]', '{"game":"0.2"}', '{"game":null}', 'null', '{"music":1e999}', 'x'.repeat(200)]){
+    const v = Core.parseVolume(bad); assert.ok(v.game === 1 && v.music === 1, 'refused: ' + bad.slice(0, 20));
+  }
+  assert.deepEqual(Core.parseVolume('{"game":0.3}'), { game: 0.3, music: 1 }, 'a missing part stays full');
+  assert.deepEqual([0, 0.5, 1].map(Core.volumeGain), [0, 0.25, 1]);
+  assert.equal(Core.volumeGain(NaN), 1); assert.equal(Core.volumeGain(3), 1);
   // two keys for one action: it stays on until the last one is released
   assert.equal(Core.actionHeld(new Set(['KeyW', 'ArrowUp']), 'up'), true);
   assert.equal(Core.actionHeld(new Set(['KeyW']), 'up'), true);
@@ -479,13 +489,13 @@ test('slopes: uphill is slower, downhill faster, a heavy truck feels it most, an
   const pull = (grade, v) => { let s = 0; for (let t = 0; t < 12; t += 1 / 60) s = Core.stepSpeed(s, { ...idle, up: true }, 1 / 60, Core.slopeTop(34 * v.speed, grade, v), v, grade); return s; };
   for (const key of ['car', 'bike', 'truck']){
     const v = VEH[key];
-    assert.ok(pull(0.08, v) < pull(0, v) * 0.9, key + ' slower uphill');
+    assert.ok(pull(0.08, v) < pull(0, v) * 0.95 && pull(0.08, v) > pull(0, v) * 0.85, key + ' a little slower uphill');
     assert.ok(pull(-0.08, v) > pull(0, v) * 1.05, key + ' faster downhill');
   }
   assert.ok(Core.slopeTop(30, 0.08, VEH.truck) < Core.slopeTop(30, 0.08, VEH.bike), 'the truck loses more uphill');
   assert.equal(Core.slopeTop(30, 0, VEH.car), 30);
   assert.equal(Core.slopeTop(30, undefined, VEH.car), 30);
-  assert.ok(Core.slopeTop(30, 9, VEH.car) >= 20.39, 'never below 68 %');
+  assert.ok(Core.slopeTop(30, 9, VEH.car) >= 25.19, 'never below 84 %');
   assert.ok(Core.slopeTop(30, -9, VEH.car) <= 36.61, 'never above 122 %');
   // rolling and holding on a hill
   assert.equal(Core.stepSpeed(0, idle, 1 / 60, 30, VEH.car, 0.1), 0, 'a stopped vehicle does not creep');

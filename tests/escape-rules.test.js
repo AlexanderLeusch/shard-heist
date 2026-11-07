@@ -223,6 +223,9 @@ test('audit: a hand-edited save that no game can produce is refused, and every r
   while (s.ending === null) s = R.tick(s, 1).state;
   assert.equal(s.ending, 'B');
   assert.notEqual(R.restore(JSON.stringify(s)), null, 'an ending');
+  // the volume is stored as text: only a number from 0 to 1 is taken
+  assert.equal(R.parseVolume('0.35'), 0.35); assert.equal(R.parseVolume('0'), 0); assert.equal(R.parseVolume('1'), 1);
+  for (const bad of [null, '', '2', '-0.5', '0.5x', 'NaN', ' 0.5', '1.5', '1e-3']) assert.equal(R.parseVolume(bad), 1, 'refused: ' + bad);
   // and these never happen in a real game
   assert.equal(R.restore(save({ wedged: true, graceUsed: true, time: 600 })), null, 'the grace minute with a full clock');
   assert.equal(R.restore(save({ wrongTries: 3, time: 600 })), null, 'wrong codes that cost nothing');

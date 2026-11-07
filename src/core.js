@@ -76,6 +76,18 @@
     return q;
   }
 
+  // ### The player's volume for the game sounds and for the music, each 0 to 1 and 1 when nothing is stored. The stored text comes from
+  // ### outside, so anything that is not a plain object with numbers is refused. The ear hears loudness roughly as the square of the
+  // ### slider, so the gain is the slider squared: halfway sounds about half as loud.
+  function parseVolume(raw){
+    let v = null;
+    if (typeof raw === 'string' && raw.length < 100){ try { v = JSON.parse(raw); } catch (e) { v = null; } }
+    const one = x => typeof x === 'number' && Number.isFinite(x) ? clamp(x, 0, 1) : 1;
+    const ok = v && typeof v === 'object' && !Array.isArray(v);
+    return { game: one(ok ? v.game : 1), music: one(ok ? v.music : 1) };
+  }
+  const volumeGain = v => { const x = typeof v === 'number' && Number.isFinite(v) ? clamp(v, 0, 1) : 1; return x * x; };
+
   // ### Two keys can do the same thing (W and the up arrow): the action stays on until the last of them is released.
   const actionHeld = (held, action) => [...held].some(code => KEY_MAP[code] === action);
 
@@ -193,7 +205,7 @@
   function stepSpeed(speed, keys, dt, maxNow, v, grade){
     dt = clamp(dt, 0, MAX_DT);
     // Gravity along the road comes first, so that the brakes and rolling friction can still hold a stopped vehicle on a hill
-    speed -= GRAVITY_PULL * (grade || 0) * dt;
+    speed -= GRAVITY_PULL * (grade || 0) * (grade > 0 ? UPHILL : 1) * dt;
     // Throttle stops at the top speed; above it (just after taking damage) the pull-down below takes over
     if (keys.up){
       if (speed < 0) speed += 40 * dt;
@@ -268,7 +280,8 @@
   // ### field, so the roads, buildings and all vehicles share one shape. In Lisbon it fades out towards the river, so the Arco
   // ### and the Praça stay level, and on the highway towards the start and the finish. grade is the rise per metre along the
   // ### direction of travel: uphill the top speed falls and gravity pulls back, downhill both help. A heavy truck feels it most.
-  const GRAVITY_PULL = 42, HOLD_SPEED = 0.6;
+  // uphill is felt half as much as downhill: climbing should slow you a little, not stop the chase
+  const GRAVITY_PULL = 42, UPHILL = 0.5, HOLD_SPEED = 0.6;
   const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
   const HILL_BOX = Object.freeze({ city: [-184, 184, -184, 72], highway: [-Infinity, Infinity, 48, 3960], country: [-Infinity, Infinity, -Infinity, Infinity] });
   const HILL_GRID = Object.freeze({ city: 8, highway: 24, country: 30 });
@@ -305,7 +318,7 @@
     const fx = Math.sin(heading), fz = Math.cos(heading);
     return (hillHeight(modeKey, x + fx * 2, z + fz * 2) - hillHeight(modeKey, x - fx * 2, z - fz * 2)) / 4;
   }
-  const slopeTop = (maxNow, grade, v) => maxNow * (1 - clamp((grade || 0) * 2.6 / Math.sqrt(v.accel), -0.22, 0.32));
+  const slopeTop = (maxNow, grade, v) => maxNow * (1 - clamp((grade || 0) * 2.6 * (grade > 0 ? UPHILL : 1) / Math.sqrt(v.accel), -0.22, 0.16));
 
   // ---------- Police pressure ----------
   // ### Wanted stars (1-5) rise with the time on the run and with the progress towards the end, whichever is further along.
@@ -681,7 +694,7 @@
     isMode, isVeh, clamp, wrapAngle, mulberry32, shuffle, fmtTime, fmtTimeExact, frameDt,
     parsePick, parseBest, applyPick, actionAllowed,
     vehStats, zeroTo80, topSpeed, stepSpeed, collidePoint, HILL_BOX, HILL_GRID, hillHeight, hillMesh, gradeAt, slopeTop,
-    crashDamage, CRASH_QUIET, newCrashGuard, chargeCrash, addDamage, repairDamage, isWrecked, damageStage, damageLevel, smokeFor, actionHeld, TILT_DEAD, TILT_FULL, tiltSteer, parseSteer, snapShadow, QUALITY_SCALES, newQuality, stepQuality,
+    crashDamage, CRASH_QUIET, newCrashGuard, chargeCrash, addDamage, repairDamage, isWrecked, damageStage, damageLevel, smokeFor, actionHeld, TILT_DEAD, TILT_FULL, tiltSteer, parseSteer, snapShadow, QUALITY_SCALES, newQuality, stepQuality, parseVolume, volumeGain,
     PURSUIT, MAX_STARS, SPOT_RADIUS, HELI_AFTER, wantedStars, pursuit, helicopterDue, copTopSpeed, trackStep, inSpotlight, bustStep, edgeDistance,
     driveTime, runStars, isNewBest,
     newStory, beginAct, retryAct, finishOpen, storyEnding, dueRadio,

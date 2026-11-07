@@ -585,7 +585,8 @@ function showPause(){
   paused = true;
   showCard(`<div class="eyebrow">${esc(R.SCENES[S.scene] ? R.SCENES[S.scene].title : '')} · ${fmt(S.time)} left</div><h2>Paused</h2>
     <p>Items: <b>${S.inventory.length ? S.inventory.map(i => R.ITEMS[i]).join(', ') : 'none'}</b> · Clues: <b>${S.clues.length} of 3</b> · Wrong codes: <b>${S.wrongTries}</b></p>
-    <div class="actions"><button class="btn" data-do="resume">Resume <small>Enter</small></button><button class="btn ghost" data-do="ask-new">Restart</button></div>`);
+    <div class="actions"><button class="btn" data-do="resume">Resume <small>Enter</small></button><button class="btn ghost" data-do="ask-new">Restart</button></div>
+    <label class="vol">Volume <input type="range" min="0" max="100" step="5" data-vol value="${Math.round(volume * 100)}" aria-label="Volume"><output>${Math.round(volume * 100)}%</output></label>`);
 }
 function showClue(k){
   const c = R.CLUES[k];
@@ -622,6 +623,16 @@ function showEnding(){
     ${A ? '<div class="next">Room 2 · The chase starts at the end of this tunnel</div>' : '<p>Tip: the jammed door buys you a minute, and the steam shows more than your face.</p>'}
     <div class="actions"><button class="btn" data-do="new">${A ? 'Play again' : 'Try again'} <small>Enter</small></button></div>`, A ? 'ending-a' : 'ending-b');
 }
+// the volume slider on the pause card; a short tick when it is let go
+card.addEventListener('input', e => {
+  const r = e.target.closest('[data-vol]');
+  if (!r) return;
+  volume = Math.min(1, Math.max(0, Number(r.value) / 100));
+  writeStore(R.VOLUME_KEY, String(volume));
+  r.parentNode.querySelector('output').textContent = r.value + '%';
+  if (master) master.gain.value = loud();
+});
+card.addEventListener('change', e => { if (e.target.closest('[data-vol]')) cue('take'); });
 card.addEventListener('click', e => {
   const t = e.target.closest('[data-turn]');
   if (t){ const [i, d] = t.dataset.turn.split(',').map(Number); act('turn', [i, d]); renderLock(); return; }
@@ -647,7 +658,10 @@ let muted = false;
 function resumeRoom(){ paused = false; hideCard(); hud.classList.remove('off'); if (ac && !muted && !document.hidden) ac.resume(); }
 $('btnSound').addEventListener('click', e => { e.currentTarget.blur(); toggleSound(); });
 // ### Turns the sound on or off.
-function toggleSound(){ muted = !muted; $('soundWaves').style.display = muted ? 'none' : ''; $('btnSound').setAttribute('aria-label', muted ? 'Turn sound on' : 'Mute sound'); if (master) master.gain.value = muted ? 0 : .8; }
+function toggleSound(){ muted = !muted; $('soundWaves').style.display = muted ? 'none' : ''; $('btnSound').setAttribute('aria-label', muted ? 'Turn sound on' : 'Mute sound'); if (master) master.gain.value = loud(); }
+// ### The player's volume: the slider squared, because the ear hears loudness roughly that way.
+let volume = R.parseVolume(readStore(R.VOLUME_KEY));
+const loud = () => muted ? 0 : .8 * volume * volume;
 addEventListener('keydown', e => {
   if (!$('fatal').hidden || e.ctrlKey || e.metaKey || e.altKey) return;
   // a held Enter must not repeat an action: each wrong code costs 30 seconds
@@ -682,7 +696,7 @@ let ac = null, master = null, waterGain = null, noiseBuf = null, dripIn = 3;
 function initAudio(){
   if (ac){ if (ac.state === 'suspended' && !document.hidden) ac.resume(); return; }
   try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e){ ac = null; return; }
-  master = ac.createGain(); master.gain.value = muted ? 0 : .8; master.connect(ac.destination);
+  master = ac.createGain(); master.gain.value = loud(); master.connect(ac.destination);
   noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
   const nd = noiseBuf.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
   const hum = ac.createOscillator(), hum2 = ac.createOscillator(), hf = ac.createBiquadFilter(), hg = ac.createGain();

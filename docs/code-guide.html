@@ -103,16 +103,16 @@ pre .c{ color:#7fd4e2; }
   <h2>The game at a glance</h2>
   <p><b>Shard Heist</b> is a 3D police-chase game that runs entirely in the browser as a static website: one page, one stylesheet and three scripts. The player picks a map (Lisbon's Baixa, Highway or Countryside) and a getaway vehicle (Car, Motorcycle or Truck), collects glowing star shards, escapes up to four police cars and a helicopter, and reaches a finish gate before the clock runs out. Five wanted stars make the chase harder over time. All three maps have hills that slow the player down or speed them up. Crashes cause visible damage; repair kits remove it; police can bust the player when they box the vehicle in. Seven radio stations play while driving, all synthesised by the game. The story mode <b>The Necklace Job</b> is an option in the same main menu (section 10).</p>
   <div class="kpis">
-    <div class="kpi"><b>6,202</b><span>lines of game code</span></div>
-    <div class="kpi"><b>5,638</b><span>lines of JavaScript</span></div>
-    <div class="kpi"><b>218</b><span>named functions</span></div>
+    <div class="kpi"><b>6,364</b><span>lines of game code</span></div>
+    <div class="kpi"><b>5,796</b><span>lines of JavaScript</span></div>
+    <div class="kpi"><b>224</b><span>named functions</span></div>
     <div class="kpi"><b>25</b><span>code sections</span></div>
-    <div class="kpi"><b>131</b><span>automated tests</span></div>
+    <div class="kpi"><b>132</b><span>automated tests</span></div>
     <div class="kpi"><b>0</b><span>npm dependencies</span></div>
     <div class="kpi"><b>0</b><span>image / sound files</span></div>
-    <div class="kpi"><b>420 KB</b><span>game code size</span></div>
+    <div class="kpi"><b>432 KB</b><span>game code size</span></div>
   </div>
-  <p class="mono" style="color:var(--muted)">Figures for room 2 (index.html, styles.css, src/). Room 1 is described in section 14. The test count covers both rooms: 114 unit and page tests and 17 browser tests. Tests add 1,690 lines.</p>
+  <p class="mono" style="color:var(--muted)">Figures for room 2 (index.html, styles.css, src/). Room 1 is described in section 14. The test count covers both rooms: 114 unit and page tests and 18 browser tests. Tests add 1,724 lines.</p>
   <h3>The three maps</h3>
   <table>
     <tr><th>Map</th><th>Layout</th><th>Goal</th><th class="num">Car top speed</th><th class="num">Police</th><th class="num">Time</th></tr>
@@ -140,23 +140,23 @@ pre .c{ color:#7fd4e2; }
   <h2>Languages in the code</h2>
   <p>The game contains <b>no Python at all</b>. A web browser can only run JavaScript natively, so all logic is JavaScript. The other languages describe appearance (CSS), page structure (HTML), GPU programs (GLSL) and vector graphics (SVG).</p>
   <div class="bars">
-    <div class="bar"><span>JavaScript</span><div class="track"><div class="fill" style="width:90.9%;background:#e0b100"></div></div><span class="val">90.9 %</span></div>
-    <div class="bar"><span>CSS</span><div class="track"><div class="fill" style="width:6.3%;background:#7a5cff"></div></div><span class="val">6.3 %</span></div>
-    <div class="bar"><span>HTML (incl. inline SVG)</span><div class="track"><div class="fill" style="width:2.3%;background:#e2603b"></div></div><span class="val">2.3 %</span></div>
+    <div class="bar"><span>JavaScript</span><div class="track"><div class="fill" style="width:91.1%;background:#e0b100"></div></div><span class="val">91.1 %</span></div>
+    <div class="bar"><span>CSS</span><div class="track"><div class="fill" style="width:6.2%;background:#7a5cff"></div></div><span class="val">6.2 %</span></div>
+    <div class="bar"><span>HTML (incl. inline SVG)</span><div class="track"><div class="fill" style="width:2.2%;background:#e2603b"></div></div><span class="val">2.2 %</span></div>
     <div class="bar"><span>GLSL (shaders)</span><div class="track"><div class="fill" style="width:0.4%;background:#0e8aa0"></div></div><span class="val">0.4 %</span></div>
     <div class="bar"><span>SVG in JS strings</span><div class="track"><div class="fill" style="width:0.1%;background:#1f8a4c"></div></div><span class="val">0.1 %</span></div>
     <div class="bar"><span>Python</span><div class="track"><div class="fill" style="width:0%"></div></div><span class="val">0 %</span></div>
   </div>
   <table>
     <tr><th>Language</th><th class="num">Lines</th><th class="num">Share</th><th class="num">Characters</th><th class="num">Share</th><th>Role in the game</th></tr>
-    <tr><td>JavaScript</td><td class="num">5,638</td><td class="num">90.9 %</td><td class="num">377,415</td><td class="num">87.8 %</td><td>All logic: rules (core.js), worlds, vehicles, AI, physics, audio, HUD, menus, error screen</td></tr>
-    <tr><td>CSS</td><td class="num">390</td><td class="num">6.3 %</td><td class="num">33,139</td><td class="num">7.7 %</td><td>Look of the HUD, cockpit, menus, warnings, error screen</td></tr>
-    <tr><td>HTML</td><td class="num">142</td><td class="num">2.3 %</td><td class="num">10,742</td><td class="num">2.5 %</td><td>Page skeleton, HUD panels, gauge and icons (inline SVG), script order, security policy</td></tr>
+    <tr><td>JavaScript</td><td class="num">5,796</td><td class="num">91.1 %</td><td class="num">389,641</td><td class="num">88.0 %</td><td>All logic: rules (core.js), worlds, vehicles, AI, physics, audio, HUD, menus, error screen</td></tr>
+    <tr><td>CSS</td><td class="num">394</td><td class="num">6.2 %</td><td class="num">33,473</td><td class="num">7.6 %</td><td>Look of the HUD, cockpit, menus, warnings, error screen</td></tr>
+    <tr><td>HTML</td><td class="num">142</td><td class="num">2.2 %</td><td class="num">10,742</td><td class="num">2.4 %</td><td>Page skeleton, HUD panels, gauge and icons (inline SVG), script order, security policy</td></tr>
     <tr><td>GLSL</td><td class="num">26</td><td class="num">0.4 %</td><td class="num">2,482</td><td class="num">0.6 %</td><td>Sky gradient, force field and the damage dents (run on the GPU)</td></tr>
     <tr><td>SVG in JS strings</td><td class="num">6</td><td class="num">0.1 %</td><td class="num">6,203</td><td class="num">1.4 %</td><td>Map pictures and fallback vehicle icons in the start menu</td></tr>
     <tr><td><b>Python</b></td><td class="num"><b>0</b></td><td class="num"><b>0 %</b></td><td class="num"><b>0</b></td><td class="num"><b>0 %</b></td><td>Not used</td></tr>
   </table>
-  <p class="mono" style="color:var(--muted)">Game code: 6,202 lines, 429,981 characters. The tests (1,690 lines), the dev server and SRI checker are JavaScript too; the CI pipeline is YAML. About 540 of the JavaScript lines are comments, including the “###” explanations.</p>
+  <p class="mono" style="color:var(--muted)">Game code: 6,364 lines, 442,541 characters. The tests (1,724 lines), the dev server and SRI checker are JavaScript too; the CI pipeline is YAML. About 570 of the JavaScript lines are comments, including the “###” explanations.</p>
   <h3>External code that is loaded, not written</h3>
   <table>
     <tr><th>Library</th><th>Language</th><th>Purpose</th></tr>
@@ -269,28 +269,28 @@ composer.render()  or  renderer.render(scene, camera)               <span class=
     <tr><td class="num">12</td><td>Modes &amp; vehicles</td><td>Takes the tables and rules from core.js; safe storage access</td><td><code>Core</code>, <code>readStore</code>, <code>sel</code></td></tr>
     <tr><td class="num">35</td><td>Renderer &amp; scene</td><td>Renderer (with WebGL check), camera, sky, environment map, lights</td><td><code>tuneEnv</code></td></tr>
     <tr><td class="num">112</td><td>Geometry batching</td><td>Merge thousands of boxes into few draw calls</td><td><code>Batch</code>, <code>mergeGeos</code></td></tr>
-    <tr><td class="num">163</td><td>Vehicle geometry</td><td>Extruded car bodies, instanced fleets</td><td><code>extrudeProfile</code>, <code>shapeBody</code>, <code>smoothGeo</code>, <code>Fleet</code></td></tr>
-    <tr><td class="num">344</td><td>Facade textures</td><td>Painted building and shop textures</td><td><code>makeFacade</code>, <code>makeShops</code></td></tr>
-    <tr><td class="num">662</td><td>Procedural surfaces</td><td>Asphalt, calçada, grass; light cones</td><td><code>surfaceSet</code>, <code>surfaceMat</code></td></tr>
-    <tr><td class="num">763</td><td>Worlds</td><td>World objects, ground height, hills, traffic lights, city build</td><td><code>groundH</code>, <code>laySlopes</code>, <code>buildCity</code>, <code>lightState</code></td></tr>
-    <tr><td class="num">1,542</td><td>City traffic</td><td>Lane following, turns, red lights, trams on their tracks</td><td><code>updateNpcs</code>, <code>startTurn</code>, <code>chooseNext</code></td></tr>
-    <tr><td class="num">1,688</td><td>Highway</td><td>Motorway, barriers, gantries, scenery</td><td><code>buildHighway</code>, <code>makeSign</code></td></tr>
-    <tr><td class="num">1,816</td><td>Highway traffic</td><td>Lane traffic both ways, recycling</td><td><code>updateTraffic</code>, <code>spawnVehicle</code></td></tr>
-    <tr><td class="num">1,895</td><td>Countryside</td><td>Spline road, terrain, farms, village, traffic</td><td><code>buildCountry</code>, <code>roadPoint</code>, <code>roadQuery</code></td></tr>
-    <tr><td class="num">2,221</td><td>Player vehicles</td><td>Coupe, superbike with rider, tractor unit; brake lights, damage parts, dents</td><td><code>setVehicle</code>, <code>loft</code>, <code>dentShader</code></td></tr>
-    <tr><td class="num">2,677</td><td>Police</td><td>Wanted stars, spawning, chase AI, ramming, bust meter (rules in core.js)</td><td><code>updateWanted</code>, <code>updatePolice</code>, <code>spawnPolice</code></td></tr>
-    <tr><td class="num">2,910</td><td>Police helicopter</td><td>Model, flight, searchlight</td><td><code>updateHeli</code></td></tr>
-    <tr><td class="num">3,053</td><td>Pickups</td><td>Shards, repair kits, finish gate and toll</td><td><code>placeRun</code></td></tr>
-    <tr><td class="num">3,137</td><td>Particles &amp; smoke</td><td>Sparks, damage smoke and flames</td><td><code>burst</code>, <code>updateSmoke</code></td></tr>
-    <tr><td class="num">3,281</td><td>Sound</td><td>Plays the engine model, rotor, road, wind and tyres, siren; the radio</td><td><code>setEngineVoice</code>, <code>updateEngine</code>, <code>radioNote</code>, <code>updateRadio</code></td></tr>
-    <tr><td class="num">3,536</td><td>Map boundary</td><td>Force-field wall, edge distance, HUD warning</td><td><code>buildBoundary</code>, <code>boundaryDistance</code>, <code>updateBoundary</code></td></tr>
-    <tr><td class="num">3,617</td><td>Input</td><td>Keyboard, touch pads, tilt steering on phones, audio suspend, error-screen and lost-graphics hooks</td><td><code>keys</code></td></tr>
-    <tr><td class="num">3,698</td><td>HUD</td><td>Gauges, pedals, pursuit, radar</td><td><code>updateHud</code>, <code>drawRadar</code>, <code>initGauge</code></td></tr>
-    <tr><td class="num">3,955</td><td>Game state</td><td>Runs, events, result cards, showroom menu and its previews, validated clicks</td><td><code>startRun</code>, <code>finish</code>, <code>showMenu</code>, <code>renderPreviews</code></td></tr>
-    <tr><td class="num">4,304</td><td>Physics</td><td>Driving model with slopes, collisions, cameras</td><td><code>updateCar</code>, <code>chaseCam</code>, <code>camClip</code></td></tr>
-    <tr><td class="num">4,579</td><td>Graphics quality</td><td>Ultra / Balanced, bloom composer</td><td><code>applyGfx</code>, <code>buildComposer</code></td></tr>
-    <tr><td class="num">4,619</td><td>Story mode</td><td>Three acts, radio timeline, letter, courier lorry, endings</td><td><code>startStoryAct</code>, <code>updateStory</code>, <code>showEnding</code>, <code>warmUp</code></td></tr>
-    <tr><td class="num">4,845</td><td>Loop</td><td>Resize handling and the frame loop</td><td><code>frame</code>, <code>resize</code></td></tr>
+    <tr><td class="num">235</td><td>Vehicle geometry</td><td>Extruded car bodies, instanced fleets</td><td><code>extrudeProfile</code>, <code>shapeBody</code>, <code>smoothGeo</code>, <code>Fleet</code></td></tr>
+    <tr><td class="num">416</td><td>Facade textures</td><td>Painted building and shop textures</td><td><code>makeFacade</code>, <code>makeShops</code></td></tr>
+    <tr><td class="num">734</td><td>Procedural surfaces</td><td>Asphalt, calçada, grass; light cones</td><td><code>surfaceSet</code>, <code>surfaceMat</code></td></tr>
+    <tr><td class="num">835</td><td>Worlds</td><td>World objects, ground height, hills, traffic lights, city build</td><td><code>groundH</code>, <code>laySlopes</code>, <code>buildCity</code>, <code>lightState</code></td></tr>
+    <tr><td class="num">1,667</td><td>City traffic</td><td>Lane following, turns, red lights, trams on their tracks</td><td><code>updateNpcs</code>, <code>startTurn</code>, <code>chooseNext</code></td></tr>
+    <tr><td class="num">1,813</td><td>Highway</td><td>Motorway, barriers, gantries, scenery</td><td><code>buildHighway</code>, <code>makeSign</code></td></tr>
+    <tr><td class="num">1,937</td><td>Highway traffic</td><td>Lane traffic both ways, recycling</td><td><code>updateTraffic</code>, <code>spawnVehicle</code></td></tr>
+    <tr><td class="num">2,016</td><td>Countryside</td><td>Spline road, terrain, farms, village, traffic</td><td><code>buildCountry</code>, <code>roadPoint</code>, <code>roadQuery</code></td></tr>
+    <tr><td class="num">2,338</td><td>Player vehicles</td><td>Coupe, superbike with rider, tractor unit; brake lights, damage parts, dents</td><td><code>setVehicle</code>, <code>loft</code>, <code>dentShader</code></td></tr>
+    <tr><td class="num">2,794</td><td>Police</td><td>Wanted stars, spawning, chase AI, ramming, bust meter (rules in core.js)</td><td><code>updateWanted</code>, <code>updatePolice</code>, <code>spawnPolice</code></td></tr>
+    <tr><td class="num">3,027</td><td>Police helicopter</td><td>Model, flight, searchlight</td><td><code>updateHeli</code></td></tr>
+    <tr><td class="num">3,170</td><td>Pickups</td><td>Shards, repair kits, finish gate and toll</td><td><code>placeRun</code></td></tr>
+    <tr><td class="num">3,254</td><td>Particles &amp; smoke</td><td>Sparks, damage smoke and flames</td><td><code>burst</code>, <code>updateSmoke</code></td></tr>
+    <tr><td class="num">3,398</td><td>Sound</td><td>Plays the engine model, rotor, road, wind and tyres, siren; the radio</td><td><code>setEngineVoice</code>, <code>updateEngine</code>, <code>radioNote</code>, <code>updateRadio</code></td></tr>
+    <tr><td class="num">3,668</td><td>Map boundary</td><td>Force-field wall, edge distance, HUD warning</td><td><code>buildBoundary</code>, <code>boundaryDistance</code>, <code>updateBoundary</code></td></tr>
+    <tr><td class="num">3,749</td><td>Input</td><td>Keyboard, touch pads, tilt steering on phones, audio suspend, error-screen and lost-graphics hooks</td><td><code>keys</code></td></tr>
+    <tr><td class="num">3,832</td><td>HUD</td><td>Gauges, pedals, pursuit, radar</td><td><code>updateHud</code>, <code>drawRadar</code>, <code>initGauge</code></td></tr>
+    <tr><td class="num">4,089</td><td>Game state</td><td>Runs, events, result cards, showroom menu and its previews, validated clicks</td><td><code>startRun</code>, <code>finish</code>, <code>showMenu</code>, <code>renderPreviews</code></td></tr>
+    <tr><td class="num">4,449</td><td>Physics</td><td>Driving model with slopes, collisions, cameras</td><td><code>updateCar</code>, <code>chaseCam</code>, <code>camClip</code></td></tr>
+    <tr><td class="num">4,724</td><td>Graphics quality</td><td>Ultra / Balanced, bloom composer</td><td><code>applyGfx</code>, <code>buildComposer</code></td></tr>
+    <tr><td class="num">4,764</td><td>Story mode</td><td>Three acts, radio timeline, letter, courier lorry, endings</td><td><code>startStoryAct</code>, <code>updateStory</code>, <code>showEnding</code>, <code>warmUp</code></td></tr>
+    <tr><td class="num">4,990</td><td>Loop</td><td>Resize handling and the frame loop</td><td><code>frame</code>, <code>resize</code></td></tr>
   </table>
   <h3>src/core.js: the rules</h3>
   <table>
@@ -515,7 +515,7 @@ damage += max(0, (impact − 3) · 1.6 · VEH.dmg)              <span class="c">
     <li><b>Performance</b>: Ultra (bloom, 4096² shadows, 2048² facades) needs a decent GPU; phones default to Balanced. The hills and detailed models added triangles; this has only been measured in software rendering, not on a real phone.</li>
     <li><b>AI</b>: traffic never changes lanes and keeps its speed on hills; city police can take detours when the grid route is blocked; police ignore traffic lights.</li>
     <li><b>Physics</b>: no real tyre grip or mass transfer; collisions use circles.</li>
-    <li><b>Structure</b>: game.js is one closure of about 4,900 lines whose sections share variables.</li>
+    <li><b>Structure</b>: game.js is one closure of about 5,100 lines whose sections share variables.</li>
     <li><b>Testing</b>: the rules and the main browser workflows are tested; long sessions, every map end to end and sound quality are not. CI renders in software.</li>
     <li><b>Persistence</b>: best times live in one browser and can be edited by the player.</li>
   </ul>
@@ -559,7 +559,7 @@ damage += max(0, (impact − 3) · 1.6 · VEH.dmg)              <span class="c">
     <tr><td><code>input.test.js</code></td><td class="num">9</td><td>Every menu action in its states, valid picks, valid saved data</td><td>Actions while driving, story actions without a story, unknown actions, picks like <code>constructor</code> or <code>__proto__</code>, tampered storage, implausible best times</td></tr>
     <tr><td><code>page.test.js</code></td><td class="num">36</td><td>Element ids, button actions, script order, dev server serves files; the same page checks for room 1</td><td>Unpinned or unhashed libraries, inline scripts, secrets in any file, <code>.git</code> requests, path traversal, wrong HTTP methods, one room loading the other’s files</td></tr>
     <tr><td><code>escape-rules.test.js</code></td><td class="num">16</td><td>Both endings, the grace minute, clues, lock, saved games</td><td>Actions before the briefing or after an ending, no exit, items twice, tile without spoon, door without mop, wheels that do not exist, clock below zero, tampered saves</td></tr>
-    <tr><td><code>browser.test.js</code></td><td class="num">17</td><td>Room 2: menu with previews, radio choice, vehicle choice, a run, pause, story act 1. Room 1: briefing, save and continue after reload, Ending A</td><td>Card buttons while driving, tampered saved data, blocked library, no WebGL; the tile without the spoon, a wrong code</td></tr>
+    <tr><td><code>browser.test.js</code></td><td class="num">18</td><td>Room 2: menu with previews, radio choice, vehicle choice, a run, pause, story act 1. Room 1: briefing, save and continue after reload, Ending A</td><td>Card buttons while driving, tampered saved data, blocked library, no WebGL; the tile without the spoon, a wrong code</td></tr>
   </table>
   <div class="note gold"><b>Bugs the tests found (fixed):</b> saved data such as <code>{"mode":"constructor"}</code> passed the old check, because every JavaScript object inherits <code>constructor</code>; the next load would have crashed. And the throttle let the car run about 5 km/h above the top speed shown in the menu; it now stops at the limit.</div>
   <h3>Security</h3>
@@ -599,7 +599,7 @@ damage += max(0, (impact − 3) · 1.6 · VEH.dmg)              <span class="c">
   </table>
   <p>Together they point to the Titanic and the code <b>1912</b>; “sailed only once” gives the missing digit to players who do not know the history. The code is the same every time. Every wrong code makes noise and costs 30 seconds; Hale warns at 5:00, 2:00, 1:00 and 0:30. The plot twist comes in Ending A: a note on the ladder (“Took you long enough. A car is waiting. — H.”) shows the guard wanted the detective out, which leads into the chase.</p>
   <h3>How it is built</h3>
-  <p>The structure is the one of the original Python project, rewritten in JavaScript: <code>rules.js</code> (206 lines) holds the story and the rules as pure functions, <code>room.js</code> (810 lines) only draws and turns clicks into actions.</p>
+  <p>The structure is the one of the original Python project, rewritten in JavaScript: <code>rules.js</code> (212 lines) holds the story and the rules as pure functions, <code>room.js</code> (824 lines) only draws and turns clicks into actions.</p>
 <pre><span class="c">// rules.js: one plain object is the whole state</span>
 state = { scene, time, inventory, clues, tileOpen, steam, wedged, graceUsed, lock, wrongTries, ending, warned }
 perform(state, action, target)  →  { state, ok, message, cue }   <span class="c">// refused: the SAME state, nothing saved</span>
@@ -622,10 +622,10 @@ marker or object clicked  →  use(action, target)  →  act()  →  rules.perfo
     <tr><td class="num">405</td><td>Hotspots</td><td>Markers placed over objects, “Walk to” buttons, clicking objects in 3D</td></tr>
     <tr><td class="num">470</td><td>Actions</td><td>use() and act(): everything goes through rules.perform(); syncWorld() moves the objects</td></tr>
     <tr><td class="num">509</td><td>HUD and cards</td><td>Clock, items, clues, messages; briefing, continue, pause, clue, lock and ending cards</td></tr>
-    <tr><td class="num">677</td><td>Sound</td><td>The hum of the tube, dripping water, the running tap and short effects for each kind of action, all synthesised</td><td></td></tr>
-    <tr><td class="num">735</td><td>Endings</td><td>Hatch opens and the camera climbs down; or the door bursts open</td></tr>
-    <tr><td class="num">742</td><td>Loop</td><td>Clock (rules.tick), animations, markers, render</td></tr>
-    <tr><td class="num">803</td><td>Start</td><td>Continue a saved game or start the briefing</td></tr>
+    <tr><td class="num">691</td><td>Sound</td><td>The hum of the tube, dripping water, the running tap and short effects for each kind of action, all synthesised</td><td></td></tr>
+    <tr><td class="num">749</td><td>Endings</td><td>Hatch opens and the camera climbs down; or the door bursts open</td></tr>
+    <tr><td class="num">756</td><td>Loop</td><td>Clock (rules.tick), animations, markers, render</td></tr>
+    <tr><td class="num">817</td><td>Start</td><td>Continue a saved game or start the briefing</td></tr>
   </table>
   <h3>Design decisions</h3>
   <ul>

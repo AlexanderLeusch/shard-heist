@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const PARTS = ['README.md', 'room-1-escape-room.md', 'room-2-shard-heist.md'];
+const PARTS = ['README.md', 'room-1-escape-room.md', 'room-2-shard-heist.md', 'settings.md'];
 
 const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 function inline(text){

@@ -194,7 +194,30 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
     const hs = k => click(`[data-hotspot="${k}"]`);
     const seconds = async () => { const [m, sec] = (await text('#time')).split(':').map(Number); return m * 60 + sec; };
 
+    await t.test('the game and music volumes are set in the menu, kept, and refused when tampered with', async () => {
+      await load();
+      const slide = (k, v) => evaluate(`(() => { const r = document.querySelector('[data-vol="${k}"]'); r.value = ${v}; r.dispatchEvent(new Event('input', { bubbles: true })); r.dispatchEvent(new Event('change', { bubbles: true })); return true; })()`);
+      assert.equal(await evaluate("document.querySelectorAll('#card [data-vol]').length"), 2, 'two sliders in the menu');
+      await slide('game', 40); await slide('music', 15);
+      assert.equal(await evaluate("localStorage.getItem('shard-heist-volume')"), '{"game":0.4,"music":0.15}');
+      await load();
+      assert.equal(await evaluate("document.querySelector('[data-vol=\"game\"]').value + '/' + document.querySelector('[data-vol=\"music\"]').value"), '40/15', 'kept after a reload');
+      await click('[data-action="go"]');
+      await waitFor(playing, 20000, 'a run');
+      await key('keydown', 'KeyP');
+      await waitFor("document.querySelectorAll('#card [data-vol]').length === 2", 10000, 'sliders on the pause card');
+      await click('[data-action="menu"]');
+      await evaluate("localStorage.setItem('shard-heist-volume', '{\"game\":\"loud\"}'), true");
+      await load();
+      assert.equal(await evaluate("document.querySelector('[data-vol=\"game\"]').value"), '100', 'rejected: tampered volume falls back to full');
+      await evaluate("localStorage.removeItem('shard-heist-volume'), true");
+      assert.deepEqual(errors, []);
+    });
+
     await t.test('phone: tilt steering is offered, hides the steering buttons sideways, and is refused upright', async () => {
+      await load();
+      // the choice is offered exactly when the browser reports a touch screen and a motion sensor (a mouse-only desktop is refused)
+      assert.equal(await evaluate("document.querySelectorAll('[data-steer]').length > 0"), await evaluate("matchMedia('(pointer: coarse)').matches && typeof DeviceOrientationEvent !== 'undefined'"), 'tilt is offered only to touch devices with a sensor');
       const phone = (width, height, type, angle) => send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: true, screenOrientation: { type, angle } });
       await phone(844, 390, 'landscapePrimary', 90);
       await send('Emulation.setTouchEmulationEnabled', { enabled: true });
@@ -221,8 +244,6 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       await send('DeviceOrientation.clearDeviceOrientationOverride');
       await send('Emulation.setTouchEmulationEnabled', { enabled: false });
       await send('Emulation.clearDeviceMetricsOverride');
-      await load();
-      assert.equal(await evaluate("document.querySelectorAll('[data-steer]').length"), 0, 'rejected: a desktop is not offered tilt');
     });
 
     await t.test('escape room: the briefing explains who, where and how, then the clock starts', async () => {
