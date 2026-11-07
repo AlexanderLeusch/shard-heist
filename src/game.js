@@ -142,7 +142,6 @@ class Batch {
     return new THREE.Mesh(g, mat);
   }
 }
-// ### Merges many geometries into one, so a whole street can be drawn in a single draw call.
 // ---------- Tree shapes ----------
 // ### Trees for all maps. A broadleaf crown is a cluster of lumps around a main one, each lump a sphere with a bumpy outline, so the
 // ### outline is irregular like foliage. Normals point away from each lump's centre, which shades the crown softly instead of in facets.
@@ -185,13 +184,13 @@ function treeCrown(lumps, detail, r, y, seed){
 }
 // ### A pine: drooping, slightly ragged cone layers from the bottom (y0) to the top (y1), widest at the bottom.
 function treePine(layers, r, y0, y1, seed){
-  const rnd = mulberry32(seed), parts = [], step = (y1 - y0) / (layers + 0.6);
+  const parts = [], step = (y1 - y0) / (layers + 0.6);
   for (let k = 0; k < layers; k++){
     const lr = r * (1 - k / (layers + 0.4)), h = step * 1.9, base = y0 + k * step;
-    const g = new THREE.ConeGeometry(lr, h, 9, 1, true).toNonIndexed(), p = g.attributes.position, col = new Float32Array(p.count * 3);
+    const g = new THREE.ConeGeometry(lr, h, 9, 1).toNonIndexed(), p = g.attributes.position, col = new Float32Array(p.count * 3);
     for (let i = 0; i < p.count; i++){
       const x = p.getX(i), yv = p.getY(i), z = p.getZ(i), rim = yv < 0 ? 1 : 0, rag = 1 + 0.18 * (hash3(x + k, yv, z) - 0.5) * rim;
-      p.setXYZ(i, x * rag, base + h / 2 + yv - rim * lr * 0.12 * (0.6 + rnd() * 0.4), z * rag);
+      p.setXYZ(i, x * rag, base + h / 2 + yv - rim * lr * 0.12 * (0.6 + 0.4 * hash3(x + seed, k, z)), z * rag);
       const c = rim ? 0.45 + 0.1 * hash3(x, k, z) : 0.95;
       col[i * 3] = c; col[i * 3 + 1] = c; col[i * 3 + 2] = c;
     }
@@ -215,6 +214,7 @@ function treeTrunk(h, r0, branches, seed){
 const leafMat = () => new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.92 });
 const barkMat = () => new THREE.MeshStandardMaterial({ color: 0x4f3a2b, roughness: 0.95 });
 
+// ### Merges many geometries into one, so a whole street can be drawn in a single draw call.
 function mergeGeos(list){
   const pos = [], nor = [], uvs = [];
   list.forEach(g => {
@@ -1393,7 +1393,7 @@ function buildCity(){
   const hillBump = (x, z) => 1.3 * Math.sin(x * 0.13 + z * 0.07) * Math.sin(z * 0.11 - x * 0.05) + 0.7 * Math.sin(x * 0.37 + z * 0.29) * Math.sin(z * 0.23 + 1.7);
   const hillSurf = (x, z) => { const h = hillH(x, z); return h + hillBump(x, z) * clamp((h - 1) / 6, 0, 1); };
   const hillPatch = (x, z) => Math.sin(x * 0.083 + z * 0.047) * Math.sin(z * 0.071 - x * 0.039) + 0.5 * Math.sin(x * 0.21 + z * 0.17);
-  const hillKind = (x, y, z) => Math.sin(y * 0.55 + hillPatch(x, z) * 1.6) > 0.9 ? 'street' : hillPatch(x, z) < -0.45 ? 'garden' : 'built';
+  const hillKind = (x, y, z) => Math.sin(y * 0.55 + hillPatch(x, z) * 1.6) > 0.975 ? 'street' : hillPatch(x, z) < -0.45 ? 'garden' : 'built';
   const hillLots = [];
   // ### Night and fog would turn a plainly lit hill into the colour of the sky, and the houses on it would seem to hang in the air. So
   // ### the hills paint their own colours and ignore the fog: dark gardens, built-up terracotta patches and streets along the slope,
@@ -1401,19 +1401,23 @@ function buildCity(){
   {
     // the ground of the hills is rough, not a smooth dome: small terraces and banks follow hillBump
     // one grid of about 6 m per hill, lifted to the real surface; where the hill is flat it stays just under the street
-    const geo = mergeGeos(HILLS.map(([cx, cz, rx, , rz]) => {
-      const g = new THREE.PlaneGeometry(rx * 2, rz * 2, Math.round(rx / 3), Math.round(rz / 3)).rotateX(-Math.PI / 2).translate(cx, 0, cz), q = g.attributes.position;
+    const geo = (() => {
+      const x0 = Math.min(...HILLS.map(([cx, , rx]) => cx - rx)), x1 = Math.max(...HILLS.map(([cx, , rx]) => cx + rx));
+      const z0 = Math.min(...HILLS.map(([, cz, , , rz]) => cz - rz)), z1 = Math.max(...HILLS.map(([, cz, , , rz]) => cz + rz));
+      const g = new THREE.PlaneGeometry(x1 - x0, z1 - z0, Math.round((x1 - x0) / 6), Math.round((z1 - z0) / 6)).rotateX(-Math.PI / 2).translate((x0 + x1) / 2, 0, (z0 + z1) / 2), q = g.attributes.position;
       for (let i = 0; i < q.count; i++){ const h = hillSurf(q.getX(i), q.getZ(i)); q.setY(i, h > 0.2 ? h : -0.6); }
-      g.computeVertexNormals();
-      return g;
-    }));
+      const idx = g.index.array, keep = [];
+      for (let i = 0; i < idx.length; i += 3) if (q.getY(idx[i]) > 0 || q.getY(idx[i + 1]) > 0 || q.getY(idx[i + 2]) > 0) keep.push(idx[i], idx[i + 1], idx[i + 2]);
+      g.setIndex(keep); g.computeVertexNormals();
+      return mergeGeos([g]);
+    })();
     const p = geo.attributes.position, col = new Float32Array(p.count * 3), L = Math.hypot(0.35, 0.8, 0.45);
     const n = geo.attributes.normal;
     for (let i = 0; i < p.count; i++){
       const x = p.getX(i), y = p.getY(i), z = p.getZ(i), lit = Math.max(0, (n.getX(i) * -0.35 + n.getY(i) * 0.8 + n.getZ(i) * 0.45) / L);
       const kind = hillKind(x, y, z), grain = 0.82 + 0.36 * hash3(Math.round(x), Math.round(y), Math.round(z));
       // night colours: lit streets, built-up ground between the houses, and gardens with trees
-      const c = kind === 'street' ? [0.11, 0.095, 0.075] : kind === 'garden' ? [0.018, 0.032, 0.02] : [0.05, 0.04, 0.034], s = (0.6 + 0.8 * lit) * grain;
+      const c = kind === 'street' ? [0.065, 0.056, 0.045] : kind === 'garden' ? [0.013, 0.024, 0.015] : [0.03, 0.026, 0.023], s = (0.6 + 0.8 * lit) * grain;
       col[i * 3] = c[0] * s; col[i * 3 + 1] = c[1] * s; col[i * 3 + 2] = c[2] * s;
     }
     geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
@@ -1435,10 +1439,12 @@ function buildCity(){
   for (let n = 0; n < 240; n++){
     const a = rng() * Math.PI * 2, r = 205 + rng() * 240, x = Math.cos(a) * r, z = Math.sin(a) * r;
     if (Math.max(Math.abs(x), Math.abs(z)) < 200 || z > 145 || (x > 186 && x < 220 && Math.abs(z) < 8)) continue;
-    const base = hillH(x, z), w = 12 + Math.floor(rng() * 4) * 3, d = 12 + Math.floor(rng() * 4) * 3, h = (3 + Math.floor(rng() * 3)) * FLOOR;
+    const w = 12 + Math.floor(rng() * 4) * 3, d = 12 + Math.floor(rng() * 4) * 3, h = (3 + Math.floor(rng() * 3)) * FLOOR;
+    const corners = [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, 0]].map(([sx, sz]) => hillSurf(x + sx * w / 2, z + sz * d / 2)), base = Math.max(...corners), low = Math.min(...corners);
     const style = rng() < 0.88 ? 'pombal' : 'tileB';
-    facade(style, x - w / 2, x + w / 2, base - 4, base + h, z - d / 2, z + d / 2, pick(style).multiplyScalar(0.85));
+    facade(style, x - w / 2, x + w / 2, low - 3, base + h, z - d / 2, z + d / 2, pick(style).multiplyScalar(0.85));
     hipRoof(x - w / 2, x + w / 2, base + h, z - d / 2, z + d / 2, 3, roofTile());
+    hillLots.push([x - w / 2, x + w / 2, z - d / 2, z + d / 2]);
   }
   // Houses climbing the hills, so the slopes are not empty at night
   for (const [hx, hz, rx, , rz] of HILLS) for (let n = 0; n < 190; n++){
@@ -1446,7 +1452,7 @@ function buildCity(){
     if (Math.max(Math.abs(x), Math.abs(z)) < 200 || z > 145 || (x > 186 && x < 220 && Math.abs(z) < 8)) continue;
     const w = 10 + Math.floor(rng() * 3) * 3, d = 10 + Math.floor(rng() * 3) * 3, h = (2 + Math.floor(rng() * 3)) * FLOOR;
     // the foundations reach below the lowest corner of the plot, so no house hangs over a steep slope
-    const corners = [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([sx, sz]) => hillH(x + sx * w / 2, z + sz * d / 2)), base = Math.max(...corners), low = Math.min(...corners);
+    const corners = [[-1, -1], [1, -1], [-1, 1], [1, 1], [0, 0]].map(([sx, sz]) => hillSurf(x + sx * w / 2, z + sz * d / 2)), base = Math.max(...corners), low = Math.min(...corners);
     const style = rng() < 0.88 ? 'pombal' : 'tileG';
     facade(style, x - w / 2, x + w / 2, low - 3, base + h, z - d / 2, z + d / 2, pick(style).multiplyScalar(0.85));
     hipRoof(x - w / 2, x + w / 2, base + h, z - d / 2, z + d / 2, 2.6, roofTile());
@@ -1484,7 +1490,9 @@ function buildCity(){
   }
   // The Se, Lisbon's cathedral, on the slope at the end of Rua da Conceicao: two crenellated towers and a rose window, facing west
   {
-    const x = 222, b = hillH(x, 0) - 3, tw = [];
+    const x = 222, tw = [], under = [];
+    for (let gx = x - 3; gx <= x + 43; gx += 4) for (let gz = -20; gz <= 20; gz += 4) under.push(hillSurf(gx, gz));
+    const b = Math.max(...under) - 2.5;
     for (const sz of [-8.5, 8.5]){
       tw.push(boxG(11, 34, 10, x + 5, b + 17, sz));
       for (let k = -1; k <= 1; k++){ tw.push(boxG(1.6, 2, 1.6, x + 0.4, b + 35, sz + k * 3.4), boxG(1.6, 2, 1.6, x + 9.6, b + 35, sz + k * 3.4)); }
@@ -1493,18 +1501,20 @@ function buildCity(){
     tw.push(boxG(9, 24, 7.6, x + 4, b + 12, 0), boxG(32, 18, 18, x + 26, b + 9, 0));
     const se = new THREE.Mesh(mergeGeos(tw), new THREE.MeshStandardMaterial({ color: 0xc9b48c, roughness: 0.9, emissive: 0x4a3f2c })); grp.add(se);
     // the terrace it stands on, lit from below, with the street climbing up to it
-    const terrace = new THREE.Mesh(boxG(46, b + 3, 40, x + 20, (b + 3) / 2, 0), new THREE.MeshStandardMaterial({ color: 0x7c6f58, roughness: 0.95, emissive: 0x2a241a }));
+    const terrace = new THREE.Mesh(boxG(46, b + 3, 40, x + 20, (b + 3) / 2, 0), new THREE.MeshStandardMaterial({ color: 0x4f463a, roughness: 0.95, emissive: 0x16130e }));
     grp.add(terrace);
-    for (const sz of [-7, 7]) for (let k = 0; k < 5; k++) glowPts.push(x - 44 + k * 10, 4 + k * b / 5, sz);
+    for (const sz of [-7, 7]) for (let k = 0; k < 5; k++) glowPts.push(x - 44 + k * 10, hillSurf(x - 44 + k * 10, sz) + 4, sz);
     const rose = new THREE.Mesh(new THREE.CircleGeometry(2.2, 20), new THREE.MeshBasicMaterial({ color: 0x4a3620 })); rose.rotation.y = -Math.PI / 2; rose.position.set(x - 0.56, b + 17, 0); grp.add(rose);
     neon.box(x - 0.55, x - 0.5, b + 3, b + 10, -1.7, 1.7, C(0x2a1e14));
   }
   // The Castelo de Sao Jorge, floodlit like every night
   {
-    const cx = 300, cz = -115, b = hillH(cx, cz) - 3, W2 = 40, D2 = 28, wall = C(0xd8a868), H = 13;
-    neon.box(cx - W2, cx + W2, b, b + H, cz - D2, cz - D2 + 3, wall); neon.box(cx - W2, cx + W2, b, b + H, cz + D2 - 3, cz + D2, wall);
-    neon.box(cx - W2, cx - W2 + 3, b, b + H, cz - D2, cz + D2, wall); neon.box(cx + W2 - 3, cx + W2, b, b + H, cz - D2, cz + D2, wall);
-    for (const [tx, tz] of [[-W2, -D2], [W2, -D2], [-W2, D2], [W2, D2], [0, D2], [-W2 / 2, -D2]]) neon.box(cx + tx - 5, cx + tx + 5, b, b + H + 8, cz + tz - 5, cz + tz + 5, C(0xe0b274));
+    const cx = 300, cz = -115, W2 = 40, D2 = 28, wall = C(0xd8a868), H = 13, ground = [];
+    for (let gx = -W2 - 5; gx <= W2 + 5; gx += 5) for (let gz = -D2 - 5; gz <= D2 + 5; gz += 5) ground.push(hillSurf(cx + gx, cz + gz));
+    const b = hillSurf(cx, cz) - 3, low = Math.min(...ground) - 2;
+    neon.box(cx - W2, cx + W2, low, b + H, cz - D2, cz - D2 + 3, wall); neon.box(cx - W2, cx + W2, low, b + H, cz + D2 - 3, cz + D2, wall);
+    neon.box(cx - W2, cx - W2 + 3, low, b + H, cz - D2, cz + D2, wall); neon.box(cx + W2 - 3, cx + W2, low, b + H, cz - D2, cz + D2, wall);
+    for (const [tx, tz] of [[-W2, -D2], [W2, -D2], [-W2, D2], [W2, D2], [0, D2], [-W2 / 2, -D2]]) neon.box(cx + tx - 5, cx + tx + 5, low, b + H + 8, cz + tz - 5, cz + tz + 5, C(0xe0b274));
     for (let x = -W2; x < W2; x += 6){ neon.box(cx + x, cx + x + 3, b + H, b + H + 2, cz + D2 - 2, cz + D2, wall); neon.box(cx + x, cx + x + 3, b + H, b + H + 2, cz - D2, cz - D2 + 2, wall); }
     for (let z = -D2; z < D2; z += 6) neon.box(cx - W2, cx - W2 + 2, b + H, b + H + 2, cz + z, cz + z + 3, wall);
   }
@@ -3549,7 +3559,7 @@ function radioNote(e, at, beat){
 // ### Schedules the next bar ahead on the audio clock, and silences the radio outside of driving.
 function updateRadio(){
   if (!audio) return;
-  const t = audio.ctx.currentTime, playing = radio.key !== 'off' && (state === 'play' || performance.now() < musicPreview) && !muted;
+  const t = audio.ctx.currentTime, playing = radio.key !== 'off' && volume.music > 0 && (state === 'play' || performance.now() < musicPreview) && !muted;
   audio.radioBus.gain.setTargetAtTime(playing ? 0.9 * (Core.RADIO[radio.key].level || 1) : 0, t, 0.08);
   if (!playing) return;
   if (!radio.out) radioBuses();
@@ -3629,7 +3639,7 @@ function updateEngine(dt){
   a.layers.forEach((l, i) => { const r = i >> 1; l.src.playbackRate.setTargetAtTime(clamp(rpm / l.ref + hunt, 0.4, 2.5), t, 0.02); l.g.gain.setTargetAtTime(w[r] * (i & 1 ? offW * (r ? 1 : E.idling.gain) : onW), t, 0.03); });
   const on = live && !muted;
   // the engine is quieter than the music, and drops further under it while the radio plays
-  const under = radio.key !== 'off' ? 0.55 : 1;
+  const under = radio.key !== 'off' && volume.music > 0.05 ? 0.55 : 1;
   let vol = (0.2 + 0.05 * eng.load) * E.vol * under;
   // a badly damaged engine misfires
   if (live && damage >= 50 && Math.random() < dt * (damage - 40) / 10) eng.miss = 0.05;

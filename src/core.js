@@ -56,7 +56,7 @@
   const newQuality = () => ({ level: 0, t: 0, n: 0, good: 0, raises: 0, tried: null, locked: false });
   function stepQuality(q, ms){
     if (!Number.isFinite(ms) || ms <= 0 || ms > 250) return q;
-    q.t += ms; q.n++;
+    q.t += Math.min(ms, 50); q.n++;
     if (q.t < 2000) return q;
     const fps = 1000 * q.n / q.t;
     q.t = 0; q.n = 0;
@@ -342,7 +342,7 @@
   const helicopterDue = (runTime, stars) => runTime >= HELI_AFTER || stars >= MAX_STARS;
   // A police car's top speed: its map's speed, faster with more stars, when far behind and when the helicopter has you in its
   // light, and slower uphill, like every other vehicle
-  const copTopSpeed = (base, stars, dist, spotted, grade) => base * pursuit(stars).speed * (dist > 140 ? 1.2 : 1) * (spotted ? 1.06 : 1) * (1 - clamp((grade || 0) * 2.6, -0.22, 0.32));
+  const copTopSpeed = (base, stars, dist, spotted, grade) => base * pursuit(stars).speed * (dist > 140 ? 1.2 : 1) * (spotted ? 1.06 : 1) * (1 - clamp((grade || 0) * 2.6 * (grade > 0 ? UPHILL : 1), -0.22, 0.16));
   // Moves a point towards a target at no more than maxSpeed, and never past it: the helicopter and its searchlight
   function trackStep(x, z, tx, tz, maxSpeed, dt){
     const dx = tx - x, dz = tz - z, d = Math.hypot(dx, dz), step = maxSpeed * clamp(dt, 0, MAX_DT);

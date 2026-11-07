@@ -50,7 +50,7 @@ You need [Node.js](https://nodejs.org) 22 or newer. There is nothing to install.
 npm start          # serves both rooms: http://localhost:8080/escape-room/ and http://localhost:8080
 npm test           # rules, story, input, page and escape-room tests (about 1 s)
 npm run test:sri   # checks the library files against their integrity hashes (needs internet)
-npm run test:browser   # plays both rooms in headless Chrome or Edge (about 1.5 min)
+npm run test:browser   # plays both rooms in headless Chrome or Edge (about 3 to 4 min)
 npm run test:all   # all of the above
 cd plot-twist && uv run pytest   # the 36 Python tests of the original Plot Twist project (needs uv)
 ```
@@ -120,8 +120,8 @@ Writing the tests found two real bugs. Both are fixed:
 
 ## Security
 
-- **No accounts, no server, no personal data.** The only data the game stores is your last map and vehicle, best times, the radio station, the graphics setting and the saved escape-room game, all in your browser's `localStorage`. The game has no server of its own, but your browser asks Google Fonts, cdnjs and jsDelivr for the fonts and libraries, so those services see your IP address. There are no credentials anywhere in the repository; a test scans every file for keys and tokens.
-- **Input validation.** Everything read back from `localStorage` is checked (`parsePick`, `parseBest`, `parseRadio`, and `restore` in room 1) and replaced by defaults when it is invalid. Menu picks and actions are checked against fixed lists using own properties only. Error messages are inserted as text, never as HTML.
+- **No accounts, no server, no personal data.** The only data the game stores is your last map and vehicle, best times, the radio station, the graphics setting, the steering choice, the volumes and the saved escape-room game, all in your browser's `localStorage` (the full list is in [rules/settings.md](rules/settings.md)). The game has no server of its own, but your browser asks Google Fonts, cdnjs and jsDelivr for the fonts and libraries, so those services see your IP address. There are no credentials anywhere in the repository; a test scans every file for keys and tokens.
+- **Input validation.** Everything read back from `localStorage` is checked (`parsePick`, `parseBest`, `parseRadio`, `parseSteer`, `parseVolume`, and `restore` and `parseVolume` in room 1) and replaced by defaults when it is invalid. Menu picks and actions are checked against fixed lists using own properties only. Error messages are inserted as text, never as HTML.
 - **Access control.** Nothing on the site needs a login. Cards accept only the actions allowed in the current state, and the dev server only serves known file types from the project folder (no `.git`, no path traversal, GET and HEAD only).
 - **Dependencies.** No npm packages at all. The Python project pins every package in `uv.lock`, and CI audits them with `pip-audit` (0 known vulnerabilities on 3 November 2026). The only runtime library is three.js 0.128.0 (9 files), pinned by exact URL, checked by SRI hashes (`npm run test:sri`) and loaded with `crossorigin="anonymous"`. `npm audit` reports 0 known vulnerabilities for `three@0.128.0` (checked 3 November 2026). GitHub Actions are pinned to commit hashes.
 - **Content Security Policy.** Scripts may only come from this site and the two pinned CDNs; there are no inline scripts, plugins, forms or foreign base URLs.
@@ -133,7 +133,7 @@ Writing the tests found two real bugs. Both are fixed:
 - **Performance:** Ultra graphics (bloom, large shadow maps) needs a decent GPU; phones start in Balanced. When the frame rate stays under 48 per second, the resolution drops by itself, down to 60 %. Frame rates were only measured in software rendering, not on a real phone.
 - **AI:** traffic never changes lanes and keeps its speed on hills; police ignore traffic lights and can take detours in the city.
 - **Physics:** arcade model with collision circles; no tyre grip or mass transfer.
-- **Structure:** `game.js` is one large closure (about 4,900 lines) whose sections share variables, so it is harder to work on in parallel than separate modules would be.
+- **Structure:** `game.js` is one large closure (about 5,100 lines) whose sections share variables, so it is harder to work on in parallel than separate modules would be.
 - **Testing:** the browser test checks the main workflows, but not long play sessions, every map end to end, or sound quality, and the CI browser renders in software.
 - **Persistence:** best times live in one browser only and can be edited by the player.
 

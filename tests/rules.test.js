@@ -172,6 +172,10 @@ test('damage: soft bumps are free, the truck takes 55 %, damage stays within 0-1
   assert.equal(q.level, 1, 'not up before 20 good seconds');
   play(q, 60, 4);
   assert.equal(q.level, 0, 'up again after them');
+  // two stalls of a quarter second, as when a new map compiles its shaders, do not lower a smooth game
+  const hitch = Core.newQuality();
+  for (let i = 0; i < 125; i++) Core.stepQuality(hitch, i === 40 || i === 80 ? 240 : 1000 / 60);
+  assert.equal(hitch.level, 0, 'a stall is not a slow game');
   for (const bad of [NaN, Infinity, -5, 0, 400, undefined]){
     const fresh = Core.newQuality();
     assert.deepEqual(Core.stepQuality(fresh, bad), Core.newQuality(), 'refused frame time: ' + bad);
@@ -591,6 +595,11 @@ test('audit: every vehicle can earn three stars and beat the clock on the highwa
 test('audit: police slow down uphill, and times never read 0:60.0', () => {
   assert.ok(Core.copTopSpeed(33, 1, 50, false, 0.1) < Core.copTopSpeed(33, 1, 50, false, 0));
   assert.ok(Core.copTopSpeed(33, 1, 50, false, -0.1) > Core.copTopSpeed(33, 1, 50, false, 0));
+  // the police lose exactly as much on a hill as the player does
+  for (const g of [0.05, 0.1, 0.3, -0.05, -0.3]){
+    const cop = Core.copTopSpeed(30, 1, 50, false, g) / 30, car = Core.slopeTop(30, g, { accel: 1 }) / 30;
+    assert.ok(Math.abs(cop - car) < 1e-9, 'grade ' + g + ': police ' + cop + ', player ' + car);
+  }
   assert.equal(Core.fmtTimeExact(59.96), '1:00.0');
   assert.equal(Core.fmtTimeExact(119.97), '2:00.0');
   assert.equal(Core.fmtTimeExact(61.24), '1:01.2');
