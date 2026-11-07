@@ -126,6 +126,18 @@ Writing the tests found two real bugs. Both are fixed:
 - **Dependencies.** No npm packages at all. The Python project pins every package in `uv.lock`, and CI audits them with `pip-audit` (0 known vulnerabilities on 3 November 2026). The only runtime library is three.js 0.128.0 (9 files), pinned by exact URL, checked by SRI hashes (`npm run test:sri`) and loaded with `crossorigin="anonymous"`. `npm audit` reports 0 known vulnerabilities for `three@0.128.0` (checked 3 November 2026). GitHub Actions are pinned to commit hashes.
 - **Content Security Policy.** Scripts may only come from this site and the two pinned CDNs; there are no inline scripts, plugins, forms or foreign base URLs.
 
+## When something is unavailable
+
+The game needs no server of its own and calls no API. It depends on three outside things, and each has a defined behaviour:
+
+| Missing | What happens |
+|---|---|
+| three.js or one of its effect files (cdnjs, jsDelivr), offline or blocked, or a file that fails its integrity check | The error screen in `src/boot.js` says which file could not load and offers *Reload*, instead of a black page. A browser test blocks the library on purpose and checks this card |
+| WebGL (old or locked-down browser) | The same error screen explains how to turn on hardware acceleration. A browser test removes WebGL and checks it |
+| Google Fonts | The pages fall back to the system fonts listed in the CSS; nothing else changes |
+| `localStorage` (private mode, blocked storage) | Every read and write is wrapped, so the game runs with the defaults and simply does not remember settings, best times or the escape-room save |
+| The motion sensor on a phone (missing or refused) | Steering stays on the buttons |
+
 ## Limits
 
 - **Lisbon:** the map is a simplified Baixa: square blocks, 7 streets each way, and some real streets left out. It has hills, which the real Baixa does not: a game decision. The houses follow the Pombaline pattern and the landmarks are modelled freely from descriptions, not from plans. It is recognisable, not surveyed. The other two maps are not Lisbon yet.
