@@ -131,13 +131,17 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-display)
 .card .news .by + p{text-indent:0}
 .news .by + p::first-letter{float:left;font-size:46px;line-height:.8;font-weight:700;padding:4px 6px 0 0}
 .news figure{margin:2px 0 8px;break-inside:avoid}
-.news .photo{position:relative;height:118px;overflow:hidden;border:1px solid rgba(35,29,18,.6);background:radial-gradient(circle,rgba(28,22,12,.55) 34%,transparent 40%) 0 0/4px 4px,radial-gradient(ellipse at 50% 35%,#e3d5ae,#8f805f)}
-.news .photo i{position:absolute;left:50%;top:7%;width:50%;height:66%;transform:translateX(-50%);border:2px solid rgba(25,20,10,.8);background:linear-gradient(180deg,#5a4c35,#3a3021);overflow:hidden}
-.news .photo i::after{content:"";position:absolute;inset:0;background:linear-gradient(125deg,rgba(255,255,255,.4),transparent 38%,transparent 70%,rgba(255,255,255,.12))}
-.news .necklace{position:absolute;inset:6% 4% 0;width:92%;height:94%}
-/* the whole photo is printed through a halftone screen, the necklace too */
-.news .photo::after{content:"";position:absolute;inset:0;background:radial-gradient(circle,rgba(28,22,12,.3) 30%,transparent 38%) 0 0/3px 3px;pointer-events:none}
-.news .photo b{position:absolute;left:50%;bottom:6%;width:60%;height:20%;transform:translateX(-50%);background:rgba(25,20,10,.75)}
+/* ### The photo is a real halftone print: the scene is a soft greyscale picture (.ht svg), a 45° screen of dots is
+   ### multiplied over it, and a hard contrast turns every cell into one black dot whose size follows the tone underneath.
+   ### The result is inked in brown and multiplied onto the paper, with faded ink, a smudge and scratches (b) on top. */
+.news .photo{position:relative;height:118px;overflow:hidden;isolation:isolate;mix-blend-mode:multiply;border:1px solid rgba(35,29,18,.7);box-shadow:0 0 0 2px rgba(238,226,195,.5)}
+.news .photo .ht{position:absolute;inset:0;overflow:hidden;background:#fff;filter:brightness(2.05) contrast(12) blur(.25px)}
+.news .necklace{position:absolute;inset:0;width:100%;height:100%;filter:grayscale(1) sepia(.15) blur(.45px) contrast(.8)}
+.news .photo .ht::after{content:"";position:absolute;inset:-60%;background:radial-gradient(circle,#3a3a3a 0,#fff 1.77px) 0 0/2.5px 2.5px;transform:rotate(45deg);mix-blend-mode:multiply}
+/* ink colour: black dots become warm brown ink */
+.news .photo::after{content:"";position:absolute;inset:0;background:#2b2216;mix-blend-mode:lighten;pointer-events:none}
+/* worn print: uneven inking, a thumb smudge, scratches and the fold of the page */
+.news .photo b{position:absolute;inset:0;z-index:1;pointer-events:none;mix-blend-mode:lighten;background:linear-gradient(101deg,transparent 30%,rgba(220,205,170,.35) 30.2%,transparent 30.5%),linear-gradient(77deg,transparent 64%,rgba(220,205,170,.25) 64.15%,transparent 64.35%),radial-gradient(ellipse 30% 45% at 12% 80%,rgba(150,130,95,.55),transparent),radial-gradient(ellipse 22% 30% at 88% 18%,rgba(170,150,110,.45),transparent),radial-gradient(ellipse 60% 40% at 50% 100%,rgba(110,92,62,.3),transparent)}
 .news figcaption{font-size:11px;font-style:italic;line-height:1.3;margin-top:3px}
 @media (max-width:520px){.news{padding:12px 14px 26px}.news .cols{columns:1}.news .dateline span:first-child{display:none}}
 
