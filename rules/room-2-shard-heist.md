@@ -141,7 +141,7 @@ All of it is composed and synthesised by the game, with no music files. The tune
 |---|---|---|---|
 | **1 · The Scatter** | Lisbon | Recover the 8 shards, then the gate | An optional **sealed letter** is hidden in a park. It is **not shown on the radar**. |
 | **2 · The Courier** | Highway | Catch the gold-marked courier lorry (get within 9 m) to take the **clasp**, then the finish | The **toll at the finish only opens with the clasp**: without it you stop there |
-| **3 · Homecoming** | Countryside | Drive back to the Ashford mansion | The confrontation decides the ending |
+| **3 · Homecoming** | Countryside | Drive back to the Ashford mansion | Officer Hale waits on the right verge 70 m before the finish and calls out when you are close. The confrontation decides the ending |
 
 | Ending | When |
 |---|---|

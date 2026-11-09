@@ -3399,6 +3399,7 @@ function glowSprite(color, size, opacity){
 
 // ### Sets up one run: places the shards, repair kits and finish gate for the current map.
 function placeRun(){
+  dropHaleCollider(); hale = null;
   if (runGroup){
     scene.remove(runGroup);
     runGroup.traverse(o => {
@@ -5097,6 +5098,7 @@ function startStoryAct(i){
   ui.eye.textContent = `Act ${i + 1} · ${A.title}`;
   if (i === 0 && !story.letter) placeEnvelope();
   if (i === 1) setupCourier();
+  if (i === 2) placeHale();
   warmUp();
   toast(`Act ${i + 1} · ${A.title}: ${A.goal}`, 'gold', 4200);
 }
@@ -5135,6 +5137,108 @@ function setupCourier(){
   courier.g.position.set(courier.x, hill(courier.x, courier.z), courier.z);
 }
 
+// ### Officer Hale waits at the end of act 3, as he promised on the radio: a low-poly prison guard in a dark slate uniform with
+// ### a peaked cap, a moustache, a cross belt and a ring of keys on his belt, hands behind his back. He stands on the right
+// ### verge just before the finish, faces the road you come in on and turns his head to follow you. He has a small collider,
+// ### so you cannot drive through him, and it is taken out of the grid again when the next run starts.
+let hale = null;
+// A tapered limb from point a to point b
+function limbG(a, b, r0, r1){
+  const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), d = B.clone().sub(A), len = d.length();
+  const g = new THREE.CylinderGeometry(r1, r0, len, 7);
+  g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())));
+  g.translate((A.x + B.x) / 2, (A.y + B.y) / 2, (A.z + B.z) / 2);
+  return g;
+}
+// ### Builds Hale from boxes and cylinders, one merged mesh per material. Local +z is his front; he is about 1.85 m tall.
+function buildHale(){
+  const cyl = (rt, rb, h, x, y, z, n, sz) => { const g = new THREE.CylinderGeometry(rt, rb, h, n || 6); if (sz) g.scale(1, 1, sz); g.translate(x, y, z); return g; };
+  const uniform = [], shirt = [], leather = [], metal = [], skin = [];
+  for (const s of [-1, 1]){
+    leather.push(boxG(0.15, 0.14, 0.3, s * 0.11, 0.07, 0.04));                                    // boots
+    leather.push(boxG(0.16, 0.12, 0.17, s * 0.11, 0.2, -0.01));                                   // boot shafts
+    uniform.push(limbG([s * 0.11, 0.24, 0], [s * 0.12, 0.92, 0], 0.095, 0.12));                    // trouser legs
+    uniform.push(limbG([s * 0.27, 1.5, 0], [s * 0.29, 1.17, -0.12], 0.075, 0.065));               // upper arms
+    uniform.push(limbG([s * 0.29, 1.17, -0.12], [s * 0.08, 1.02, -0.21], 0.065, 0.055));          // forearms to the back
+    skin.push(boxG(0.08, 0.08, 0.07, s * 0.05, 1.01, -0.22));                                     // hands behind the back
+    uniform.push(boxG(0.12, 0.03, 0.11, s * 0.24, 1.545, 0));                                     // epaulettes
+    metal.push(boxG(0.025, 0.025, 0.02, s * 0.25, 1.565, 0.03));
+    uniform.push(boxG(0.12, 0.11, 0.025, s * 0.1, 1.36, 0.145));                                  // chest pockets
+    metal.push(boxG(0.022, 0.022, 0.015, s * 0.1, 1.395, 0.16));
+  }
+  uniform.push(cyl(0.235, 0.215, 0.6, 0, 1.25, 0, 8, 0.66));                                       // jacket
+  uniform.push(cyl(0.215, 0.24, 0.24, 0, 0.85, 0, 8, 0.7));                                      // jacket skirt
+  leather.push(cyl(0.222, 0.222, 0.07, 0, 0.98, 0, 8, 0.72));                                     // belt
+  metal.push(boxG(0.09, 0.065, 0.02, 0, 0.98, 0.165));                                            // buckle
+  const cross = new THREE.BoxGeometry(0.05, 0.62, 0.02); cross.rotateZ(-0.62); cross.translate(0.03, 1.27, 0.155); leather.push(cross);
+  for (const y of [1.18, 1.3]) metal.push(boxG(0.025, 0.025, 0.015, 0, y, 0.16));                // buttons
+  shirt.push(cyl(0.075, 0.09, 0.08, 0, 1.585, 0.01, 8));                                          // collar
+  leather.push(boxG(0.045, 0.2, 0.015, 0, 1.47, 0.155));                                          // tie
+  // The key ring on the right hip
+  const ring = new THREE.TorusGeometry(0.045, 0.008, 5, 12); ring.translate(0.13, 0.91, 0.16); metal.push(ring);
+  for (let k = 0; k < 4; k++) metal.push(boxG(0.014, 0.1, 0.01, 0.105 + k * 0.016, 0.83, 0.165), boxG(0.03, 0.014, 0.01, 0.112 + k * 0.016, 0.785, 0.165));
+
+  // The head is its own group, so it can turn
+  const hs = [], hh = [], hc = [], hm = [], hb = [];
+  hs.push(cyl(0.05, 0.055, 0.1, 0, 0.03, 0, 6));                                                 // neck
+  const skull = new THREE.IcosahedronGeometry(0.115, 0); skull.scale(0.95, 1.15, 1.05); skull.translate(0, 0.15, 0.01); hs.push(skull);
+  hs.push(boxG(0.035, 0.05, 0.04, 0, 0.14, 0.12));                                               // nose
+  for (const s of [-1, 1]) hs.push(boxG(0.025, 0.05, 0.035, s * 0.11, 0.15, 0));                 // ears
+  hh.push(boxG(0.11, 0.028, 0.035, 0, 0.1, 0.115));                                                 // moustache
+  hh.push(boxG(0.22, 0.09, 0.12, 0, 0.19, -0.05));                                                // hair at the back
+  hc.push(cyl(0.15, 0.125, 0.08, 0, 0.29, -0.005, 10));                                           // cap crown
+  hm.push(cyl(0.122, 0.122, 0.04, 0, 0.24, 0, 10));                                               // cap band
+  const visor = new THREE.CylinderGeometry(0.12, 0.12, 0.015, 10, 1, false, -Math.PI / 2, Math.PI);
+  visor.rotateX(0.18); visor.translate(0, 0.225, 0.04); hm.push(visor);
+  hb.push(boxG(0.03, 0.03, 0.015, 0, 0.29, 0.14));                                                // cap badge
+
+  const mats = {
+    uniform: flatMat({ color: 0x2c343e, roughness: 0.8, emissive: 0x0a0d12 }), shirt: flatMat({ color: 0x8b9097 }), leather: flatMat({ color: 0x17181b, roughness: 0.5 }),
+    metal: flatMat({ color: 0xb9bdc2, roughness: 0.35, metalness: 0.8 }), skin: flatMat({ color: 0xc89878, roughness: 0.75 }),
+    hair: flatMat({ color: 0x5b3b26, roughness: 0.9 }), cap: flatMat({ color: 0x252c35, roughness: 0.6 })
+  };
+  const g = new THREE.Group(), headG = new THREE.Group();
+  const add = (grp, list, mat) => { if (!list.length) return; const m = new THREE.Mesh(mergeGeos(list), mat); m.castShadow = true; grp.add(m); };
+  add(g, uniform, mats.uniform); add(g, shirt, mats.shirt); add(g, leather, mats.leather); add(g, metal, mats.metal); add(g, skin, mats.skin);
+  add(headG, hs, mats.skin); add(headG, hh, mats.hair); add(headG, hc, mats.cap); add(headG, hm, mats.leather); add(headG, hb, mats.metal);
+  headG.position.y = 1.6; g.add(headG);
+  return { g, headG };
+}
+// Removes Hale's collider from the countryside grid
+function dropHaleCollider(){
+  if (!hale || !hale.col) return;
+  for (const a of CTRY.grid.values()){ const i = a.indexOf(hale.col); if (i >= 0) a.splice(i, 1); }
+  const i = CTRY.colliders.indexOf(hale.col); if (i >= 0) CTRY.colliders.splice(i, 1);
+  hale.col = null;
+}
+// ### Puts Hale on the right verge 70 m before the finish of act 3, facing the road you arrive on.
+function placeHale(){
+  dropHaleCollider();
+  const s = ROAD.len - 70, p = roadPoint(s, 7), from = roadPoint(s - 30, 0);
+  const { g, headG } = buildHale();
+  g.position.set(p.x, groundH(p.x, p.z), p.z);
+  g.rotation.y = Math.atan2(from.x - p.x, from.z - p.z);
+  const glow = glowSprite(0xff8a3d, 3.2, 0.35); glow.position.y = 0.1; g.add(glow);
+  tuneEnv(g);
+  runGroup.add(g);
+  const col = { t: 'c', x: p.x, z: p.z, r: 0.45 };
+  gridAdd(col);
+  hale = { x: p.x, z: p.z, g, headG, col, yaw: 0, greeted: false };
+}
+// ### Hale turns his head to follow you and calls out once when you are close.
+function updateHale(dt){
+  if (!hale || !hale.col) return;
+  let want = Math.atan2(car.x - hale.x, car.z - hale.z) - hale.g.rotation.y;
+  want = Math.atan2(Math.sin(want), Math.cos(want));
+  want = clamp(want, -1.1, 1.1);
+  hale.yaw += (want - hale.yaw) * Math.min(1, dt * 4);
+  hale.headG.rotation.y = hale.yaw;
+  if (!hale.greeted && Math.hypot(car.x - hale.x, car.z - hale.z) < 60){
+    hale.greeted = true;
+    toast('HALE: Over here. Through the gate, the mansion is just behind it.', 'hale', 3600, true);
+  }
+}
+
 // ### Runs the story during an act: radio messages, the courier, and the conditions for the next act.
 function updateStory(dt){
   // Radio and narrator lines on a timeline
@@ -5143,6 +5247,7 @@ function updateStory(dt){
   const radio = Core.dueRadio(lines, story.radioIdx, story.clock);
   story.radioIdx = radio.idx;
   for (const [, text, tone] of radio.due) toast(text.replace('%V', VEH_DESC[V.key]), tone, 4200, true);
+  if (story.act === 2) updateHale(dt);
   const env = story.env;
   if (env && !env.taken){
     env.env.rotation.y += dt * 1.4;
