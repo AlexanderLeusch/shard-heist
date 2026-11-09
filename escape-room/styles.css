@@ -84,7 +84,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-display)
 .mk:focus-visible i{outline:2px solid #fff;outline-offset:2px}
 @keyframes ping{0%{box-shadow:0 0 0 0 rgba(255,122,26,.5)}100%{box-shadow:0 0 0 14px rgba(255,122,26,0)}}
 .hint-look{position:fixed;left:50%;top:calc(18px + env(safe-area-inset-top,0px));transform:translateX(-50%);font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);pointer-events:none;transition:opacity .6s}
-.hint-look.gone{opacity:0}
+.hint-look.gone,.hint-look.hush{opacity:0}
 
 /* Overlay cards */
 #overlay{position:fixed;inset:0;display:grid;place-items:center;padding:16px;background:radial-gradient(ellipse at center,rgba(5,7,8,.35),rgba(5,7,8,.82))}
@@ -122,6 +122,19 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-display)
 .empty{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
 .ending-a h1 em{color:var(--ok)}
 .ending-b h1 em{color:var(--alarm)}
+.cine-line + .actions{align-items:center}
+/* Briefing card 3 is a scene in the room: no dark veil, black bars top and bottom, and the card sits low like subtitles */
+#overlay.cine{place-items:end center;padding-bottom:calc(9vh + 14px);background:linear-gradient(180deg,rgba(5,7,8,0) 50%,rgba(5,7,8,.7))}
+#overlay.cine::before,#overlay.cine::after{content:"";position:fixed;left:0;right:0;height:9vh;background:#000;animation:bars .9s cubic-bezier(.2,.8,.2,1) both}
+#overlay.cine::before{top:0;transform-origin:top}
+#overlay.cine::after{bottom:0;transform-origin:bottom}
+@keyframes bars{from{transform:scaleY(0)}}
+.card.cine{position:relative;z-index:1;width:min(680px,100%);gap:10px;padding:18px 22px;background:rgba(10,13,15,.8)}
+.card p.cine-line{font-family:var(--f-display);font-size:23px;font-weight:500;line-height:1.3;color:var(--ink);min-height:2.6em}
+.cine-line b{color:var(--orange);font-weight:800;text-transform:uppercase;letter-spacing:.03em}
+.cine-line .narr{color:var(--muted)}
+.cine-clock{margin-left:auto;font-family:var(--f-mono);font-size:30px;font-weight:700;color:var(--orange);opacity:0;transform:scale(1.4);transition:opacity .5s,transform .5s cubic-bezier(.2,.8,.2,1)}
+.cine-clock.on{opacity:1;transform:none}
 .next{border:1px dashed var(--line);border-radius:10px;padding:10px 12px;font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 
 /* Error screen */
@@ -158,5 +171,6 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-display)
   .say{bottom:calc(210px + env(safe-area-inset-bottom,0px))}
 }
 @media (prefers-reduced-motion:reduce){
-  .mk i,.time.low,.card{animation:none}
+  .mk i,.time.low,.card,#overlay.cine::before,#overlay.cine::after{animation:none}
+  .cine-clock{transition:none}
 }

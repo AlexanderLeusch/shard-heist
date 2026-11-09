@@ -257,7 +257,11 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       assert.equal(await evaluate("getComputedStyle(document.getElementById('btnNotes')).visibility"), 'hidden', 'rejected: the clue button cannot be reached during the briefing');
       await click('[data-do="next"]');
       assert.match(await text('#card'), /inmate 4471/);
-      for (let i = 0; i < 3; i++) await click('[data-do="next"]');
+      await click('[data-do="next"]');
+      assert.ok(await evaluate("document.getElementById('overlay').classList.contains('cine')"), 'card 3 is a scene in the room: Hale shuts the door');
+      await waitFor("/ten minutes have begun/.test(document.getElementById('cineLine').textContent)", 60000, 'Hale says the ten minutes have begun');
+      for (let i = 0; i < 2; i++) await click('[data-do="next"]');
+      assert.ok(!(await evaluate("document.getElementById('overlay').classList.contains('cine')")), 'the scene ends with card 3');
       assert.match(await text('#card'), /Drag/);
       await click('[data-do="start"]');
       await waitFor("document.getElementById('overlay').hidden && !document.getElementById('hud').classList.contains('off')", 10000, 'clock to start');
