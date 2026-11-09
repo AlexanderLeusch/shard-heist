@@ -417,9 +417,11 @@ const SHARED = {
   cargo: new THREE.MeshStandardMaterial({ color: 0xe6e8ee, roughness: 0.55, metalness: 0.15 }),
   lit: new THREE.MeshBasicMaterial({ color: 0xe8bd78 }),
   lens: (() => { const m = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.28, clearcoat: 1, depthWrite: false }); m.userData.env = 1.4; return m; })(),
-  paint: (() => { const m = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.5, clearcoat: 1, clearcoatRoughness: 0.07 }); m.userData.env = 1.0; return m; })()
+  // traffic paint reflects the sky a little more, so even a black car standing in the dark shows its outline
+  paint: (() => { const m = new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.5, clearcoat: 1, clearcoatRoughness: 0.07 }); m.userData.env = 1.6; return m; })()
 };
-const CAR_COLS = [0xe8e8ec, 0x2b2f3a, 0x9c2d3a, 0x2f5d8c, 0xc9a24a, 0x5b6b5e, 0x7d8494, 0x1d1f26, 0xd06030, 0xb8c4cf, 0x6e2340, 0x2f6b6a];
+// the two darkest paints are a shade lighter than true black, which disappears completely at night
+const CAR_COLS = [0xe8e8ec, 0x363b48, 0x9c2d3a, 0x2f5d8c, 0xc9a24a, 0x5b6b5e, 0x7d8494, 0x2a2d36, 0xd06030, 0xb8c4cf, 0x6e2340, 0x2f6b6a];
 
 // Instanced fleet of identical vehicles; each part one InstancedMesh
 class Fleet {
@@ -464,6 +466,42 @@ class GlowPts {
   set(i, x, y, z){ this.a.setXYZ(i, x, y, z); }
   commit(){ this.a.needsUpdate = true; }
 }
+// ### The light that traffic throws on the road: a soft, widening pool ahead of each vehicle. Without it a car waiting at a dark
+// ### crossing is only two small dots; with it you see the car, and the road it lights, from far away. One instanced mesh per map.
+const roadLightTex = (() => {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 128;
+  const g = c.getContext('2d');
+  for (let y = 0; y < 128; y++){
+    // the bottom row of the canvas lies at the vehicle, the top row at the far end
+    const t = (127 - y) / 127, a = Math.min(1, t / 0.1) * Math.pow(1 - t, 1.6), w = 32 * (0.3 + 0.7 * Math.sqrt(t));
+    const gr = g.createLinearGradient(32 - w, 0, 32 + w, 0);
+    gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,' + a.toFixed(3) + ')'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, y, 64, 1);
+  }
+  return new THREE.CanvasTexture(c);
+})();
+class RoadLights {
+  constructor(group, n){
+    const geo = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2).rotateY(Math.PI).translate(0, 0, 0.5);
+    this.m = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ map: roadLightTex, color: 0xfff0d8, transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }), n);
+    this.m.frustumCulled = false; this.m.userData.dynamic = true; this.m.renderOrder = 1; group.add(this.m);
+  }
+  // starts at the front of the vehicle and reaches len metres down the road, wid wide at the far end, tipped with the slope
+  set(i, x, z, h, front, len, wid, on){
+    const fx = Math.sin(h), fz = Math.cos(h), x0 = x + fx * front, z0 = z + fz * front, y0 = hill(x0, z0), y1 = hill(x0 + fx * len, z0 + fz * len);
+    dummy.position.set(x0, y0 + 0.08, z0); dummy.rotation.set(-Math.atan2(y1 - y0, len), h, 0, 'YXZ');
+    dummy.scale.set(on ? wid : 0.0001, 1, on ? len : 0.0001); dummy.updateMatrix(); dummy.rotation.order = 'XYZ';
+    this.m.setMatrixAt(i, dummy.matrix);
+  }
+  commit(){ this.m.instanceMatrix.needsUpdate = true; }
+}
+// the bright brake lights of a vehicle that slows down or waits, on top of its dim tail lights
+function stopGlow(pts, i, x, z, h, back, y, off, on){
+  const fx = Math.sin(h), fz = Math.cos(h), rx = -fz, rz = fx, Y = on ? y + hill(x, z) : -999;
+  pts.set(i * 2, x - fx * back + rx * off, Y, z - fz * back + rz * off); pts.set(i * 2 + 1, x - fx * back - rx * off, Y, z - fz * back - rz * off);
+}
+// a vehicle brakes when it is slower than it wants to be and not speeding up; standing, it holds the brake
+function braking(v, speed, cruise){ const b = speed < 0.5 || (speed < cruise * 0.8 && speed <= (v.prevSpeed === undefined ? speed : v.prevSpeed) + 0.002); v.prevSpeed = speed; return b; }
 // head/tail glow for a vehicle at heading h
 function vehicleGlow(head, tail, i, x, z, h, front, back, y, off, on){
   const fx = Math.sin(h), fz = Math.cos(h), rx = -fz, rz = fx, Y = on ? y + hill(x, z) : -999;
@@ -889,11 +927,13 @@ function lightCones(list, opacity){
 }
 // ### Street lamps: a soft halo around each lamp head and a faint pool on the road. They are kept dim on purpose: bright
 // ### additive dots set off the bloom and dot the whole city like confetti, and a bright pool hides the road under it.
-const LAMP_HALO = 0.5, LAMP_POOL = 0.2;
+const LAMP_HALO = 0.5, LAMP_POOL = 0.28;
 const lampHalo = (size, color) => new THREE.PointsMaterial({ map: glowTexture, color: color || 0xffd79a, size, sizeAttenuation: true, transparent: true, opacity: LAMP_HALO, depthWrite: false, blending: THREE.AdditiveBlending });
 const lampPool = () => new THREE.MeshBasicMaterial({ map: glowTexture, vertexColors: true, transparent: true, opacity: LAMP_POOL, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
-const BEAM_GEO = new THREE.ConeGeometry(2.4, 14, 20, 1, true).rotateX(-Math.PI / 2).translate(0, 0, 7);
 const BEAM_MAT = new THREE.MeshBasicMaterial({ map: coneTex, color: 0xe8f0ff, transparent: true, opacity: 0.055, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+// the player's headlight haze: short and narrow, so it never reaches the road and draws no hard edge on it
+const HAZE_GEO = new THREE.ConeGeometry(0.7, 6, 20, 1, true).rotateX(-Math.PI / 2).translate(0, 0, 3);
+const HAZE_MAT = new THREE.MeshBasicMaterial({ map: coneTex, color: 0xfff4e4, transparent: true, opacity: 0.045, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
 
 // ---------- Worlds ----------
 // ### Each map is a "world" object: a scene group, a list of colliders (boxes, circles, walls) and radar shapes.
@@ -1743,7 +1783,7 @@ function buildCity(){
 // ### and is stunned for a moment when hit. Leftover distance is carried over between straight and arc so motion stays smooth.
 // ### Trams use the same logic, but Core.tramNext keeps them on the loop, which is where buildCity lays the tracks.
 const npcs = [];
-let npcFleets = null, npcHead = null, npcTail = null;
+let npcFleets = null, npcHead = null, npcTail = null, npcStop = null, npcPools = null;
 const N_NPC = 26, NPC_SUV = 8, N_TRAM = 3, N_BUS = 2, N_MOTO = 4;
 // half the length of each kind of city vehicle, and where its lights sit: [front, back, height, half the gap between the pair]
 const NPC_KIND = { sedan: { half: 2.3, glow: [2.3, 2.3, 0.75, 0.62] }, suv: { half: 2.3, glow: [2.3, 2.3, 0.75, 0.62] }, tram: { half: 4.25, glow: [4.25, 4.25, 1.3, 0.1] },
@@ -1764,6 +1804,7 @@ function initCityTraffic(){
     bus: new Fleet(grp, PARTS.bus, N_BUS, rnd, BUS_COL), moto: new Fleet(grp, PARTS.moto, N_MOTO, rnd) };
   const all = N_NPC + N_TRAM + N_BUS + N_MOTO;
   npcHead = new GlowPts(grp, all * 2, 0xfff1cc, 1.5); npcTail = new GlowPts(grp, all * 2, 0xff3344, 1.1);
+  npcStop = new GlowPts(grp, all * 2, 0xff1e2a, 2.1); npcPools = new RoadLights(grp, all);
   const add = (fleet, fi, extra) => npcs.push(Object.assign({ fleet, fi, half: NPC_KIND[fleet].half, x: 0, z: 0, dx: 0, dz: 1, node: null, next: 's', speed: 0, cruise: 10, turn: null, stun: 0, on: false, h: 0 }, extra));
   for (let i = 0; i < N_NPC; i++){
     const suv = i >= N_NPC - NPC_SUV;
@@ -1839,7 +1880,7 @@ function npcGap(n, fx, fz){
   };
   for (const o of npcs) if (o !== n && o.on) test(o.x, o.z, o.tram || o.bus ? 2.6 : 2.2, o.half);
   test(car.x, car.z, 2.6, 2.3);
-  for (const p of police) if (p.active) test(p.x, p.z, 2.4, 2.3);
+  for (const p of police) if (p.active || p.g.visible) test(p.x, p.z, 2.4, 2.3);
   return gap;
 }
 // ### Moves the city traffic each frame: follows lanes, turns on arcs, obeys signals, and keeps its distance.
@@ -1888,8 +1929,10 @@ function updateNpcs(dt){
     const g = NPC_KIND[n.fleet].glow;
     npcFleets[n.fleet].set(n.fi, n.x, 0, n.z, n.h, n.on);
     vehicleGlow(npcHead, npcTail, i, n.x, n.z, n.h, g[0], g[1], g[2], g[3], n.on);
+    stopGlow(npcStop, i, n.x, n.z, n.h, g[1] + 0.05, g[2], g[3], n.on && braking(n, n.speed, n.cruise));
+    npcPools.set(i, n.x, n.z, n.h, g[0], n.moto ? 8 : 13, n.moto ? 2.6 : 4.6, n.on);
   });
-  Object.values(npcFleets).forEach(f => f.commit()); npcHead.commit(); npcTail.commit();
+  Object.values(npcFleets).forEach(f => f.commit()); npcHead.commit(); npcTail.commit(); npcStop.commit(); npcPools.commit();
   if (CITY.water) CITY.water.material.normalMap.offset.x += dt * 0.012;
 }
 // ### Returns the city traffic to its starting places for a new run.
@@ -2023,7 +2066,7 @@ function buildHighway(){
 // ### Cars, SUVs and lorries move along fixed lanes. Each one cruises at its lane speed, slows behind the vehicle ahead
 // ### (including the player and police) and is recycled ahead of or behind the player when it leaves the visible window.
 const traffic = [];
-let hwFleets = null, headPts = null, tailPts = null;
+let hwFleets = null, headPts = null, tailPts = null, stopPts = null, hwPools = null;
 const HW_FLEET = { sedan: 30, suv: 14, truck: 10, coach: 3, moto: 6 };
 const VDIM = { sedan: { len: 4.6, hw: 0.95, front: 2.3, back: 2.3, y: 0.75, off: 0.62 }, suv: { len: 4.6, hw: 1.0, front: 2.3, back: 2.3, y: 0.86, off: 0.62 }, truck: { len: 9.7, hw: 1.3, front: 4.35, back: 5.35, y: 1.05, off: 0.9 },
   coach: { len: 12, hw: 1.27, front: 6, back: 6, y: 0.85, off: 0.86 }, moto: { len: 2.1, hw: 0.45, front: 0.8, back: 0.75, y: 1.02, off: 0.01 } };
@@ -2038,6 +2081,7 @@ function initTraffic(){
   for (const type of Object.keys(HW_FLEET)) hwFleets[type] = new Fleet(grp, PARTS[type], HW_FLEET[type], rnd, FLEET_COL[type]);
   const total = Object.values(HW_FLEET).reduce((a, b) => a + b, 0);
   headPts = new GlowPts(grp, total * 2, 0xfff1cc, 1.8); tailPts = new GlowPts(grp, total * 2, 0xff3344, 1.3);
+  stopPts = new GlowPts(grp, total * 2, 0xff1e2a, 2.4); hwPools = new RoadLights(grp, total);
   for (const type of Object.keys(HW_FLEET)) for (let i = 0; i < HW_FLEET[type]; i++){
     const d = VDIM[type];
     traffic.push({ type, mi: i, len: d.len, hw: d.hw, dir: i < HW_FLEET[type] * 0.6 ? 1 : -1, x: 0, z: 0, speed: 0, cruise: 30, on: false });
@@ -2084,7 +2128,7 @@ function updateTraffic(dt){
     };
     obstacle(car.x, car.z, car.speed * Math.cos(car.heading));
     if (courier && courier.on) obstacle(courier.x, courier.z, courier.speed);
-    for (const p of police) if (p.active) obstacle(p.x, p.z, p.speed * Math.cos(p.heading));
+    for (const p of police) if (p.active || p.g.visible) obstacle(p.x, p.z, p.active ? p.speed * Math.cos(p.heading) : 0);
     let desired = t.cruise;
     if (gap < 45) desired = Math.min(desired, aheadV + (gap - 10) * 0.5);
     t.speed = Math.max(0, t.speed + clamp((desired - t.speed) * Math.min(1, dt * 3), -14 * dt, 3.5 * dt));
@@ -2099,9 +2143,11 @@ function updateTraffic(dt){
     const h = t.dir > 0 ? 0 : Math.PI, d = VDIM[t.type];
     hwFleets[t.type].set(t.mi, t.x, 0, t.z, h, t.on);
     vehicleGlow(headPts, tailPts, i, t.x, t.z, h, d.front, d.back, d.y, d.off, t.on);
+    stopGlow(stopPts, i, t.x, t.z, h, d.back + 0.05, d.y, d.off, t.on && braking(t, t.speed, t.cruise));
+    hwPools.set(i, t.x, t.z, h, d.front, t.type === 'moto' ? 10 : 18, t.type === 'moto' ? 3 : 5.5, t.on);
   });
   Object.values(hwFleets).forEach(f => f.commit());
-  headPts.commit(); tailPts.commit();
+  headPts.commit(); tailPts.commit(); stopPts.commit(); hwPools.commit();
 }
 
 // ---------- Countryside: a winding two-lane road through hills, fields, farms and a village ----------
@@ -2196,7 +2242,7 @@ function ribbon(a, b, y, keep){
 }
 
 const ctraffic = [];
-let ctryFleets = null, ctryHead = null, ctryTail = null;
+let ctryFleets = null, ctryHead = null, ctryTail = null, ctryStop = null, ctryPools = null;
 // ### Builds the countryside: a spline road, terrain, forests, farms, a village and the finish.
 function buildCountry(){
   const grp = CTRY.group, rng = mulberry32(314);
@@ -2366,6 +2412,7 @@ function buildCountry(){
   ctryFleets = {};
   for (const type of Object.keys(CTRY_FLEET)) ctryFleets[type] = new Fleet(grp, PARTS[type], CTRY_FLEET[type], rnd, FLEET_COL[type]);
   ctryHead = new GlowPts(grp, nTraffic * 2, 0xfff1cc, 1.8); ctryTail = new GlowPts(grp, nTraffic * 2, 0xff3344, 1.3);
+  ctryStop = new GlowPts(grp, nTraffic * 2, 0xff1e2a, 2.4); ctryPools = new RoadLights(grp, nTraffic);
   for (const type of Object.keys(CTRY_FLEET)) for (let i = 0; i < CTRY_FLEET[type]; i++)
     ctraffic.push({ type, mi: i, s: 0, dir: 1, lat: ROAD.lane, speed: 0, cruise: 22, on: false, stun: 0, x: 0, z: 0, h: 0 });
   tuneEnv(grp);
@@ -2420,8 +2467,10 @@ function updateCountryTraffic(dt){
     t.x = pt.x; t.z = pt.z; t.h = h;
     ctryFleets[t.type].set(t.mi, pt.x, 0.03, pt.z, h, t.on);
     vehicleGlow(ctryHead, ctryTail, i, pt.x, pt.z, h, d.front, d.back, d.y + 0.03, d.off, t.on);
+    stopGlow(ctryStop, i, pt.x, pt.z, h, d.back + 0.05, d.y + 0.03, d.off, t.on && braking(t, t.speed, t.cruise));
+    ctryPools.set(i, pt.x, pt.z, h, d.front, t.type === 'moto' ? 10 : 16, t.type === 'moto' ? 3 : 5.2, t.on);
   });
-  Object.values(ctryFleets).forEach(f => f.commit());
+  Object.values(ctryFleets).forEach(f => f.commit()); ctryStop.commit(); ctryPools.commit();
   ctryHead.commit(); ctryTail.commit();
 }
 
@@ -2471,25 +2520,38 @@ function loft(rings, seg){
 // A limb from a to b with a radius at each ring, so it can bulge and taper like a thigh or a forearm
 const limbLoft = (a, b, radii, seg) => loft(radii.map((r, i) => { const t = i / (radii.length - 1); return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, r, r]; }), seg);
 const MODELS = {};
-// The paint dents and scratches as damage rises: the surface is pushed in and out, its shading follows, bare metal shows
-// in thin scratches and soot in patches. uDent is 0 on an undamaged vehicle, so it then looks and costs nothing extra.
+// The paint dents and scratches as damage rises. Everything comes from smooth random noise, never from repeating waves, so
+// there are no rows of dots: dents are pushed in, most of all at the nose and the tail where the crashes happen, and their
+// shading crinkles; scratches are long thin streaks along the body where the bare metal shows; dirt and soot gather in
+// patches, thickest low down. uDent is 0 on an undamaged vehicle, so it then looks and costs nothing extra.
 const dentU = { value: 0 };
+const DENT_NOISE = `
+  float dHash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+  float dNoise(vec3 x){
+    vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(mix(dHash(i), dHash(i + vec3(1, 0, 0)), f.x), mix(dHash(i + vec3(0, 1, 0)), dHash(i + vec3(1, 1, 0)), f.x), f.y),
+               mix(mix(dHash(i + vec3(0, 0, 1)), dHash(i + vec3(1, 0, 1)), f.x), mix(dHash(i + vec3(0, 1, 1)), dHash(i + vec3(1, 1, 1)), f.x), f.y), f.z);
+  }`;
 function dentShader(shader){
   shader.uniforms.uDent = dentU;
-  shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nuniform float uDent; varying vec3 vDentP;')
+  shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nuniform float uDent; varying vec3 vDentP;' + DENT_NOISE)
     .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
-      objectNormal = normalize(objectNormal + uDent * 0.8 * vec3(cos(position.x * 5.3 + position.z * 3.1), cos(position.y * 7.7 + position.z * 4.3), cos(position.z * 2.3 + position.x * 6.1)));`)
+      vec3 dN = vec3(dNoise(position * 3.1), dNoise(position * 3.1 + 7.3), dNoise(position * 3.1 + 13.1)) - 0.5;
+      objectNormal = normalize(objectNormal + uDent * 0.9 * dN);`)
     .replace('#include <begin_vertex>', `#include <begin_vertex>
       vDentP = position;
-      transformed += normal * uDent * 0.1 * sin(position.x * 5.3 + position.z * 3.1) * sin(position.y * 7.7 + position.z * 4.3) * sin(position.z * 2.3 + position.x * 6.1);`);
-  shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uDent; varying vec3 vDentP;')
+      float dEnds = 0.45 + 0.55 * smoothstep(0.9, 2.2, abs(position.z));
+      transformed -= normal * uDent * 0.085 * dEnds * smoothstep(0.42, 0.85, dNoise(position * 1.8 + 3.7));`);
+  shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uDent; varying vec3 vDentP;' + DENT_NOISE)
     .replace('#include <color_fragment>', `#include <color_fragment>
-      float scratch = sin(vDentP.y * 53.0 + 2.0 * sin(vDentP.z * 2.0)) * sin(vDentP.x * 29.0 + vDentP.z * 1.5) + 0.5 * sin(vDentP.z * 3.0 + vDentP.y * 5.0);
-      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.62, 0.62, 0.64), smoothstep(1.0, 1.35, scratch) * min(1.0, uDent * 2.0));
-      float soot = sin(vDentP.x * 2.7 + vDentP.z * 3.3) * sin(vDentP.y * 4.1 + vDentP.z * 1.9);
-      diffuseColor.rgb *= 1.0 - uDent * 0.5 * smoothstep(0.1, 0.7, soot);`);
+      float dWarp = dNoise(vDentP * vec3(0.7, 3.0, 0.7)) * 2.5;
+      float dLine = abs(fract(vDentP.y * 22.0 + dWarp) - 0.5);
+      float dScratch = (1.0 - smoothstep(0.015, 0.045, dLine)) * smoothstep(0.6, 0.75, dNoise(vDentP * vec3(0.9, 5.0, 1.6) + 11.0));
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.58, 0.58, 0.6), dScratch * min(1.0, uDent * 1.6));
+      float dDirt = smoothstep(0.45, 0.85, dNoise(vDentP * 1.4 + 5.0)) * (0.5 + 0.5 * smoothstep(1.0, 0.25, vDentP.y));
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.07, 0.06, 0.055), dDirt * uDent * 0.6);`);
 }
-const headlights = [], beams = [];
+const headlights = [], beams = [], headGlows = [];
 // the player's tail lights: dim red, and bright with a glow around each lamp while braking
 const brakeLights = { mat: new THREE.MeshBasicMaterial({ color: 0x7a0c14 }), glows: [], on: false };
 // the white reversing lights: unlit glass until the vehicle rolls backwards, then a glow around each lamp and a pool of light behind it
@@ -2861,12 +2923,16 @@ const reverseLights = { mat: new THREE.MeshBasicMaterial({ color: 0x4a4e55 }), g
   }
 
   Object.values(MODELS).forEach(m => { m.g.visible = false; carTilt.add(m.g); });
+  // ### The headlights: two spot lights with a wide, soft edge, so the road ahead is lit in one smooth fan that fades into the
+  // ### dark instead of two hard-edged triangles. A small glow sits on each lamp, and a faint haze shows the beam only close to
+  // ### the lamp, as on a slightly misty night.
   [-0.62, 0.62].forEach(x => {
-    const s = new THREE.SpotLight(0xf2f7ff, 2.2, 85, 0.5, 0.55, 1.2);
-    s.position.set(x, 0.85, 2.4); s.target.position.set(x * 2, -0.5, 16);
+    const s = new THREE.SpotLight(0xfff6ea, 3.0, 95, 0.6, 0.9, 1.1);
+    s.position.set(x, 0.85, 2.4); s.target.position.set(x * 2.6, -0.6, 18);
     carTilt.add(s, s.target);
     headlights.push(s);
-    const beam = new THREE.Mesh(BEAM_GEO, BEAM_MAT); beam.rotation.x = 0.02; carTilt.add(beam); beams.push(beam);
+    const beam = new THREE.Mesh(HAZE_GEO, HAZE_MAT); beam.rotation.x = -0.035; carTilt.add(beam); beams.push(beam);
+    const glow = glowSprite(C(0xfff4e0), 0.85, 0.75); carTilt.add(glow); headGlows.push(glow);
   });
 })();
 // ### Shows the chosen vehicle and moves the headlights to fit it.
@@ -2877,8 +2943,9 @@ function setVehicle(key){
     const x = key === 'bike' ? 0 : (i ? 0.62 : -0.62) * (key === 'truck' ? 1.45 : 1.05);
     s.position.set(x, V.lightY, V.light);
     s.target.position.set(x * 2, -0.5, V.light + 16);
-    s.intensity = key === 'bike' ? 1.4 : 2.2;
+    s.intensity = key === 'bike' ? 2.0 : 3.0;
     beams[i].position.copy(s.position); beams[i].visible = key !== 'bike' || i === 0;
+    headGlows[i].position.set(x, V.lightY, V.light + 0.08); headGlows[i].visible = beams[i].visible;
   });
   if (audio) setEngineVoice();
 }
@@ -2906,7 +2973,10 @@ const policeTex = (() => {
   for (let i = 0; i < Core.pursuit(Core.MAX_STARS).cops; i++){
     const g = new THREE.Group();
     const mk = (geo, mat) => { const m = new THREE.Mesh(geo, mat); m.castShadow = true; g.add(m); return m; };
-    mk(P.bodyOnly, black); mk(P.roof, white); mk(P.glass, SHARED.glass); mk(P.trim, SHARED.trim); mk(P.chrome, SHARED.chrome); mk(P.tire, SHARED.tire); mk(P.head, SHARED.head); mk(P.tail, SHARED.tail); mk(P.lens, SHARED.lens);
+    // each car its own paint, so a wreck can go dull and dented while the others stay clean
+    const paint = black.clone(); paint.userData.env = black.userData.env; paint.onBeforeCompile = shader => { dentShader(shader); shader.uniforms.uDent = paint.userData.dent; };
+    paint.userData.dent = { value: 0 };
+    mk(P.bodyOnly, paint); mk(P.roof, white); mk(P.glass, SHARED.glass); mk(P.trim, SHARED.trim); mk(P.chrome, SHARED.chrome); mk(P.tire, SHARED.tire); mk(P.head, SHARED.head); mk(P.tail, SHARED.tail); mk(P.lens, SHARED.lens);
     for (const s of [-1, 1]){
       const door = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 0.52), doorMat);
       door.position.set(s * 0.95, 0.7, 0.05); door.rotation.y = s * Math.PI / 2; g.add(door);
@@ -2920,7 +2990,7 @@ const policeTex = (() => {
     const light = new THREE.PointLight(0xff2a3a, 0, 26, 2); scene.add(light);
     g.visible = false;
     scene.add(g);
-    police.push({ g, red, blue, sRed, sBlue, light, idx: i, active: false, x: 0, z: 0, heading: 0, speed: 0, steer: 0, hp: 3, stun: 0, stuck: 0, rev: 0, wp: null, respawn: 0, hitCool: 0 });
+    police.push({ g, paint, red, blue, sRed, sBlue, light, idx: i, active: false, wreck: 0, x: 0, z: 0, heading: 0, speed: 0, steer: 0, hp: 3, stun: 0, stuck: 0, rev: 0, wp: null, respawn: 0, hitCool: 0 });
   }
 })();
 let endReason = '', bumpQuiet = 0;
@@ -2973,16 +3043,45 @@ function spawnPolice(p){
     x = HW.our[Math.floor(Math.random() * 3)]; z = car.z - 120 - Math.random() * 40;
   }
   Object.assign(p, { x, z, heading: Math.atan2(car.x - x, car.z - z), speed: mode !== 'city' ? Math.max(20, car.speed) : 6, ri: undefined, road: null, steer: 0, hp: Core.pursuit(stars).hp, stun: 0, stuck: 0, rev: 0, wp: null, active: true, hitCool: 0 });
+  fixPolice(p);
   p.g.visible = true;
   return true;
 }
-// ### Takes a police car out of the chase with a burst of sparks. It returns after the time set by the stars.
+// ### Takes a police car out of the chase with a burst of sparks. The wreck stays where it stopped: light bar dead, paint dented
+// ### and dull, sagging to one side and smoking from the engine. The same car comes back clean after the time set by the stars.
+const WRECK_SMOKE = Object.freeze({ rate: 9, color: 0x232326, opacity: 0.66, rise: 3 });
 function wreckPolice(p){
   p.active = false; p.respawn = Core.pursuit(stars).respawn; copsWrecked++;
   burst(p.x, p.g.position.y + 1.2, p.z, SPARKS, 40, 1);
   burst(p.x, p.g.position.y + 1.2, p.z, C(0x2a6bff), 16, 0.8);
-  p.g.visible = false; p.light.intensity = 0;
+  p.light.intensity = 0; p.wreck = 14; p.wreckAge = 0; p.speed = 0;
+  p.red.color.setHex(0x2a0a0e); p.blue.color.setHex(0x080e26); p.sRed.material.opacity = 0; p.sBlue.material.opacity = 0;
+  p.paint.color.setHex(0x0e0f12); p.paint.clearcoat = 0.15; p.paint.roughness = 0.75; p.paint.userData.dent.value = 0.9;
+  // a broken wheel lets it sag to one side; lifted by as much, so the low wheel stays on the road
+  const sag = (Math.random() < 0.5 ? -1 : 1) * 0.05;
+  p.g.rotation.z = sag; p.g.position.y += 0.95 * Math.abs(Math.sin(sag));
   toast('Police car taken out!', 'gold', 2000);
+}
+// ### A police car back in the chase: clean paint, working lights, level.
+function fixPolice(p){
+  p.wreck = 0; p.g.rotation.z = 0;
+  p.paint.color.setHex(0x14161c); p.paint.clearcoat = 1; p.paint.roughness = 0.3; p.paint.userData.dent.value = 0;
+}
+// ### The wrecks smoke for a while; one left far behind is cleared away.
+function updateWrecks(dt){
+  for (const p of police){
+    if (p.active || !p.g.visible) continue;
+    // cleared away when far behind, or after half a minute once the player is not looking on (traffic would queue for ever)
+    p.wreckAge = (p.wreckAge || 0) + dt;
+    const far = Math.hypot(p.x - car.x, p.z - car.z);
+    if (far > 260 || (p.wreckAge > 30 && far > 70)){ p.g.visible = false; p.wreck = 0; continue; }
+    if (p.wreck > 0){
+      p.wreck -= dt;
+      p.smokeAcc = (p.smokeAcc || 0) + dt * WRECK_SMOKE.rate * Math.min(1, p.wreck / 4);
+      const fx = Math.sin(p.heading), fz = Math.cos(p.heading);
+      while (p.smokeAcc >= 1){ p.smokeAcc -= 1; puff(p.x + fx * 1.5, p.g.position.y + 1.0, p.z + fz * 1.5, 0, 0, WRECK_SMOKE); }
+    }
+  }
 }
 // ### The police AI each frame: choose a target, steer, control speed, collide, hit the player, fill the bust meter.
 function updatePolice(dt){
@@ -2990,6 +3089,7 @@ function updatePolice(dt){
   if (live){
     heli.runTime += dt;
     updateWanted();
+    updateWrecks(dt);
     spawnTimer -= dt;
     police.forEach(p => { if (!p.active && p.respawn > 0) p.respawn -= dt; });
     const active = police.filter(p => p.active).length;
@@ -3112,7 +3212,7 @@ function updatePoliceVisuals(){
   });
 }
 function resetPolice(){
-  police.forEach(p => { p.active = false; p.respawn = 0; p.g.visible = false; p.light.intensity = 0; });
+  police.forEach(p => { p.active = false; p.respawn = 0; p.wreck = 0; p.g.visible = false; p.light.intensity = 0; });
   spawnTimer = 4; bust = 0; copsWrecked = 0; copsWarned = false; nearestCop = Infinity; stars = 1;
   heli.runTime = 0; heli.on = false; heli.spotted = false; heli.g.visible = false; heli.beam.visible = false; heli.pool.visible = false;
 }
@@ -3243,10 +3343,19 @@ function vehicleObstacles(){
   obsStamp = frameNo;
   return (obsCache = buildObstacles());
 }
-// ### Lists the moving vehicles near the player as circles, for collisions.
 // circles along each kind of vehicle: where they sit from the middle, and their radius
 const OBST = { truck: [[-4.2, -1.5, 1.2, 3.6], 1.35], tram: [[-2.9, 0, 2.9], 1.3], bus: [[-4.6, -1.55, 1.55, 4.6], 1.3], coach: [[-4.6, -1.55, 1.55, 4.6], 1.3], moto: [[-0.45, 0.45], 0.55], car: [[-1.2, 1.2], 1.05] };
+// ### Lists the moving vehicles near the player as circles, for collisions, and the police wrecks, which stand still.
 function buildObstacles(){
+  const out = buildTraffic();
+  for (const p of police){
+    if (p.active || !p.g.visible) continue;
+    const fx = Math.sin(p.heading), fz = Math.cos(p.heading);
+    for (const o of OBST.car[0]) out.push({ x: p.x + fx * o, z: p.z + fz * o, r: OBST.car[1], npc: null, vx: 0, vz: 0 });
+  }
+  return out;
+}
+function buildTraffic(){
   const out = [];
   if (mode === 'country'){
     for (const t of ctraffic){
@@ -3423,23 +3532,24 @@ function clearEffects(){
   smokeAcc = flameAcc = 0;
 }
 // ### Emits the smoke and flames that Core.smokeFor asks for at the current damage, and lets them rise and fade.
+// ### Lets one puff of smoke rise from a point: P is what Core.smokeFor returns; vx, vz is how the source is moving.
+function puff(ox, oy, oz, vx, vz, P){
+  const p = smoke[smokeIdx++ % smoke.length];
+  // thicker smoke billows into bigger clouds and hangs in the air longer
+  p.life = 1; p.s.visible = true; p.peak = P.opacity * (0.7 + Math.random() * 0.25);
+  p.size = 0.3 + Math.random() * 0.3; p.grow = 1.6 + P.rate * 0.07 + Math.random() * 1.2; p.decay = 0.46 - P.rate * 0.004 + Math.random() * 0.1;
+  p.s.material.rotation = Math.random() * Math.PI * 2; p.spin = (Math.random() - 0.5) * 0.9; p.phase = Math.random() * 6.28;
+  p.s.position.set(ox + (Math.random() - 0.5) * 0.5, oy, oz + (Math.random() - 0.5) * 0.5);
+  p.vx = (Math.random() - 0.5) * 0.9 - vx * 0.2; p.vy = P.rise * (0.7 + Math.random() * 0.5); p.vz = (Math.random() - 0.5) * 0.9 - vz * 0.2;
+  p.c0.set(P.color); p.c1.copy(p.c0).lerp(SMOKE_PALE, 0.55);
+  p.s.material.color.copy(p.c0);
+}
 function updateSmoke(dt){
   const P = Core.smokeFor(damage), md = MODELS[V.key];
   const fx = Math.sin(car.heading), fz = Math.cos(car.heading), ox = car.x + fx * md.smoke[0], oz = car.z + fz * md.smoke[0], oy = car.y + md.smoke[1];
   if (state === 'play' && P.rate > 0){
     smokeAcc += dt * P.rate;
-    while (smokeAcc >= 1){
-      smokeAcc -= 1;
-      const p = smoke[smokeIdx++ % smoke.length];
-      // thicker smoke billows into bigger clouds and hangs in the air longer
-      p.life = 1; p.s.visible = true; p.peak = P.opacity * (0.7 + Math.random() * 0.25);
-      p.size = 0.3 + Math.random() * 0.3; p.grow = 1.6 + P.rate * 0.07 + Math.random() * 1.2; p.decay = 0.46 - P.rate * 0.004 + Math.random() * 0.1;
-      p.s.material.rotation = Math.random() * Math.PI * 2; p.spin = (Math.random() - 0.5) * 0.9; p.phase = Math.random() * 6.28;
-      p.s.position.set(ox + (Math.random() - 0.5) * 0.5, oy, oz + (Math.random() - 0.5) * 0.5);
-      p.vx = (Math.random() - 0.5) * 0.9 - fx * car.speed * 0.2; p.vy = P.rise * (0.7 + Math.random() * 0.5); p.vz = (Math.random() - 0.5) * 0.9 - fz * car.speed * 0.2;
-      p.c0.set(P.color); p.c1.copy(p.c0).lerp(SMOKE_PALE, 0.55);
-      p.s.material.color.copy(p.c0);
-    }
+    while (smokeAcc >= 1){ smokeAcc -= 1; puff(ox, oy, oz, fx * car.speed, fz * car.speed, P); }
     if (P.fire){
       flameAcc += dt * 26;
       while (flameAcc >= 1){
@@ -4672,7 +4782,7 @@ function updateCar(dt){
         const hit = collidePoint(car.x + fx * s, car.z + fz * s, V.r, { t: 'c', x: o.x, z: o.z, r: o.r });
         if (!hit) continue;
         const impact = hitWith(hit, o.vx, o.vz);
-        o.npc.stun = Math.max(o.npc.stun, 2.5);
+        if (o.npc) o.npc.stun = Math.max(o.npc.stun, 2.5);
         if (impact > 2){ worst = Math.max(worst, impact); car.speed *= V.key === 'truck' ? 0.7 : 0.4; }
         break;
       }
@@ -4769,6 +4879,9 @@ function applyCarMesh(dt){
   md.wheels.forEach(w => w.rotation.x = car.wheelRot / md.r);
   md.pivots.forEach(p => p.rotation.y = car.steer * 0.45);
   md.paint.color.copy(md.base).lerp(PAINT_DEAD, damage / 100 * 0.65);
+  // battered paint loses its shine: the clear coat goes dull and the surface rough
+  if (md.rough0 === undefined) md.rough0 = md.paint.roughness;
+  md.paint.clearcoat = 1 - 0.85 * damage / 100; md.paint.roughness = md.rough0 + 0.45 * damage / 100;
 }
 
 // Keeps the chase camera out of buildings
