@@ -387,10 +387,19 @@ class Fleet {
       group.add(m); this.meshes.push(m);
     }
   }
-  // Places one vehicle on the hills, nose up or down with the slope under it
+  // Places one vehicle on the hills: nose up or down with the slope under it, and tilted sideways when the road falls
+  // across, so on a hillside street no wheel sinks into the road and none floats above it
   set(i, x, y, z, h, on){
-    const fx = Math.sin(h), fz = Math.cos(h), rise = on ? hill(x + fx * 2, z + fz * 2) - hill(x - fx * 2, z - fz * 2) : 0;
-    dummy.position.set(x, y + hill(x, z), z); dummy.rotation.set(-Math.atan2(rise, 4), h, 0, 'YXZ'); dummy.scale.setScalar(on ? 1 : 0.0001); dummy.updateMatrix();
+    const fx = Math.sin(h), fz = Math.cos(h);
+    let pitch = 0, roll = 0, ground = hill(x, z);
+    if (on){
+      const hF = hill(x + fx * 2, z + fz * 2), hB = hill(x - fx * 2, z - fz * 2);
+      const hL = hill(x + fz * 0.9, z - fx * 0.9), hR = hill(x - fz * 0.9, z + fx * 0.9);
+      pitch = -Math.atan2(hF - hB, 4); roll = Math.atan2(hL - hR, 1.8);
+      // the hill is made of flat triangles; where the car straddles a crease, it rests on the higher side
+      ground = Math.max(ground, (hF + hB + hL + hR) / 4);
+    }
+    dummy.position.set(x, y + ground, z); dummy.rotation.set(pitch, h, roll, 'YXZ'); dummy.scale.setScalar(on ? 1 : 0.0001); dummy.updateMatrix();
     dummy.rotation.order = 'XYZ';
     for (const m of this.meshes) m.setMatrixAt(i, dummy.matrix);
   }
@@ -827,8 +836,13 @@ const coneTex = (() => {
 })();
 function coneGeo(x, z, top, radius){ const g = new THREE.ConeGeometry(radius, top - 0.2, 20, 1, true); g.translate(x, (top + 0.2) / 2, z); return g; }
 function lightCones(list, opacity){
-  return new THREE.Mesh(mergeGeos(list), new THREE.MeshBasicMaterial({ map: coneTex, color: 0xffd9a8, transparent: true, opacity: opacity || 0.09, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  return new THREE.Mesh(mergeGeos(list), new THREE.MeshBasicMaterial({ map: coneTex, color: 0xffd9a8, transparent: true, opacity: opacity || 0.05, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
 }
+// ### Street lamps: a soft halo around each lamp head and a faint pool on the road. They are kept dim on purpose: bright
+// ### additive dots set off the bloom and dot the whole city like confetti, and a bright pool hides the road under it.
+const LAMP_HALO = 0.5, LAMP_POOL = 0.2;
+const lampHalo = (size, color) => new THREE.PointsMaterial({ map: glowTexture, color: color || 0xffd79a, size, sizeAttenuation: true, transparent: true, opacity: LAMP_HALO, depthWrite: false, blending: THREE.AdditiveBlending });
+const lampPool = () => new THREE.MeshBasicMaterial({ map: glowTexture, vertexColors: true, transparent: true, opacity: LAMP_POOL, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
 const BEAM_GEO = new THREE.ConeGeometry(2.4, 14, 20, 1, true).rotateX(-Math.PI / 2).translate(0, 0, 7);
 const BEAM_MAT = new THREE.MeshBasicMaterial({ map: coneTex, color: 0xe8f0ff, transparent: true, opacity: 0.055, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
 
@@ -1434,7 +1448,7 @@ function buildCity(){
       if (Math.max(Math.abs(x), Math.abs(z)) >= 200 && z <= 145 && hillKind(x, y, z) === 'street' && lr() < 0.3) lights.push(x, y + 4.5, z);
     }
     const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lights, 3));
-    grp.add(new THREE.Points(lg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffcf8c, size: 2.4, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
+    grp.add(new THREE.Points(lg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffcf8c, size: 2.0, sizeAttenuation: true, transparent: true, opacity: LAMP_HALO, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
   }
   for (let n = 0; n < 240; n++){
     const a = rng() * Math.PI * 2, r = 205 + rng() * 240, x = Math.cos(a) * r, z = Math.sin(a) * r;
@@ -1534,7 +1548,7 @@ function buildCity(){
     const lamps = [];
     for (let x = -345; x <= 345; x += 12) lamps.push(x, 43.5, 0);
     const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lamps, 3));
-    bridge.add(new THREE.Points(lg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffcf8c, size: 7, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
+    bridge.add(new THREE.Points(lg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffcf8c, size: 5, sizeAttenuation: true, transparent: true, opacity: LAMP_HALO, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
     const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute([-150, 114, 0, 150, 114, 0], 3));
     bridge.add(new THREE.Points(rg, new THREE.PointsMaterial({ map: glowTexture, color: 0xff3344, size: 15, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
     bridge.position.set(-400, 0, 410); bridge.rotation.y = -1.2;
@@ -1542,7 +1556,7 @@ function buildCity(){
   const bl = [];
   for (let n = 0; n < 260; n++){ const x = (rng() - 0.5) * 1700, k = rng(); bl.push(x, 5 + k * 28, 655 + k * 55); }
   const blg = new THREE.BufferGeometry(); blg.setAttribute('position', new THREE.Float32BufferAttribute(bl, 3));
-  grp.add(bank, cristo, bridge, new THREE.Points(blg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffd9a0, size: 3.4, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
+  grp.add(bank, cristo, bridge, new THREE.Points(blg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffd9a0, size: 2.8, sizeAttenuation: true, transparent: true, opacity: LAMP_HALO, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
 
   // Road markings, crosswalks and stop lines
   const wht = C(0xd8dbe4);
@@ -1652,7 +1666,7 @@ function buildCity(){
   add(neon.mesh(new THREE.MeshBasicMaterial({ vertexColors: true })), false, false);
   add(poles.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.5 })), true, false);
   add(housings.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.3 })), true, false);
-  add(pools.mesh(new THREE.MeshBasicMaterial({ map: glowTexture, vertexColors: true, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 })), false, false);
+  add(pools.mesh(lampPool()), false, false);
   for (const key of Object.keys(lampB)){
     const mat = new THREE.MeshBasicMaterial({ color: 0x000000 });
     SIGNAL.mats[key] = mat;
@@ -1663,7 +1677,7 @@ function buildCity(){
   }
   grp.add(lightCones(cones));
   const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(glowPts, 3));
-  grp.add(new THREE.Points(pg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffd79a, size: 2.8, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
+  grp.add(new THREE.Points(pg, lampHalo(1.8)));
 
   const tTrunk = treeTrunk(3.0, 0.24, 3, 11), tCrown = treeCrown(7, 1, 1.45, 3.9, 12);
   // ### Places one tree, unless it would stand on a road or in a building.
@@ -1888,9 +1902,9 @@ function buildHighway(){
       pools.top(hx - 9, hx + 9, 0.03, z - 9, z + 9, C(0xffc98a));
     }
   }
-  grp.add(lightCones(cones, 0.07));
+  grp.add(lightCones(cones, 0.04));
   const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(glow, 3));
-  grp.add(new THREE.Points(pg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffd79a, size: 4.6, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })));
+  grp.add(new THREE.Points(pg, lampHalo(2.8)));
   for (let z = 400; z < HW.LEN; z += 800){
     for (const s of [-1, 1]){ const x = s * 16.9; metal.box(x - 0.25, x + 0.25, 0, 7.6, z - 0.25, z + 0.25, C(0x7d8594)); }
     metal.box(-17.2, 17.2, 7.0, 7.55, z - 0.3, z + 0.3, C(0x7d8594));
@@ -1935,7 +1949,7 @@ function buildHighway(){
   add(conc.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 })), true, true);
   add(metal.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.6 })), true, true);
   add(neon.mesh(new THREE.MeshBasicMaterial({ vertexColors: true })), false, false);
-  add(pools.mesh(new THREE.MeshBasicMaterial({ map: glowTexture, vertexColors: true, transparent: true, opacity: 0.38, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 })), false, false);
+  add(pools.mesh(lampPool()), false, false);
   add(FB.office.mesh(MAT.office), false, false);
   add(FB.glass.mesh(MAT.glass), false, false);
   add(roofs.mesh(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })), false, false);
@@ -2528,7 +2542,7 @@ const reverseLights = { mat: new THREE.MeshBasicMaterial({ color: 0x4a4e55 }), g
     const damageParts = [];
     hinged(damageParts, 2, boxG(0.38, 0.19, 0.07, -0.72, 0.8, -2.545), SHARED.trim, g);
     hinged(damageParts, 2, boxG(1.42, 0.05, 0.74, 0, 0, -0.37), pm, g, [0, 1.03, -1.6], [0.16, 0, 0]);
-    hinged(damageParts, 2, boxG(1.6, 0.16, 0.2, -0.8, 0, 0), pm, g, [0.8, 0.4, -2.56], [0, 0, 0.17]);
+    hinged(damageParts, 2, boxG(1.6, 0.16, 0.2, -0.8, 0, 0), pm, g, [0.8, 0.4, -2.56], [0, 0, 0.1]);
     hinged(damageParts, 3, boxG(1.62, 0.05, 1.4, 0, 0, 0.7), pm, g, [0, 1.0, 0.66], [-0.5, 0, 0]);
     hinged(damageParts, 3, boxG(0.5, 0.13, 0.06, -0.66, 0.69, 2.51), SHARED.trim, g);
     hinged(damageParts, 3, boxG(0.05, 0.5, 1.15, 0, 0, -0.57), pm, g, [-1.0, 0.66, 0.42], [0, -0.3, 0]);
@@ -3102,10 +3116,19 @@ const heli = (() => {
   add(mergeGeos([ball([-1.0, 2.04, -5.32], 0.045)]), new THREE.MeshBasicMaterial({ color: 0xff3040 }), g);
   g.scale.setScalar(1.25);
   g.visible = false; scene.add(g);
+  // The searchlight is a faint shaft and an even circle of light with a soft rim. It used to be a near-white glow with a hot
+  // centre that the bloom blew up, which hid the road under it; now the road, its lines and the cars stay readable inside.
   const beam = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 24, 1, true).rotateX(-Math.PI / 2).translate(0, 0, 0.5), BEAM_MAT.clone());
-  beam.material.opacity = 0.22; beam.visible = false; scene.add(beam);
-  const pool = new THREE.Mesh(new THREE.CircleGeometry(1, 28).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: glowTexture, color: 0xdfe9ff, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false }));
-  pool.scale.setScalar(Core.SPOT_RADIUS * 1.5); pool.visible = false; scene.add(pool);
+  beam.material.opacity = 0.07; beam.visible = false; scene.add(beam);
+  const spotTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    gr.addColorStop(0, 'rgba(255,255,255,.8)'); gr.addColorStop(0.5, 'rgba(255,255,255,.7)'); gr.addColorStop(0.68, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+    return new THREE.CanvasTexture(c);
+  })();
+  const pool = new THREE.Mesh(new THREE.CircleGeometry(1, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: spotTex, color: 0xdfe9ff, transparent: true, opacity: 0.24, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+  pool.scale.setScalar(Core.SPOT_RADIUS * 1.35); pool.visible = false; scene.add(pool);
   return { g, rotor, tail, beam, pool, strobeR, strobeB, on: false, spotted: false, runTime: 0, closing: 0, x: 0, z: 0, sx: 0, sz: 0, h: 0, tilt: 0, roll: 0 };
 })();
 // ### Flies the helicopter ahead of the player and moves its searchlight after them. In the light the police know where you are.
@@ -3287,17 +3310,38 @@ function updateParticles(dt){
     if (p.life <= 0){ scene.remove(p.mesh); particles.splice(i, 1); if (--p.grp.left === 0) p.mat.dispose(); }
   }
 }
+// ### Smoke puffs are soft, lumpy clouds, not round glows: a few textures painted from many overlapping blobs, so no two
+// ### puffs look alike. Each puff starts small and dense at the engine, swells quickly and then more slowly, turns while it
+// ### drifts, slows as it rises, is carried off by a light wind and thins out and turns paler as it spreads.
+const SMOKE_TEX = [11, 23, 37].map(seed => {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d'), r = mulberry32(seed);
+  for (let k = 0; k < 22; k++){
+    const a = r() * Math.PI * 2, d = Math.sqrt(r()) * 30, x = 64 + Math.cos(a) * d, y = 64 + Math.sin(a) * d, rad = 14 + r() * 22;
+    const gr = g.createRadialGradient(x, y, 0, x, y, rad);
+    gr.addColorStop(0, 'rgba(255,255,255,' + (0.18 + r() * 0.16) + ')'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  }
+  // fade the edge, so the square of the sprite never shows
+  g.globalCompositeOperation = 'destination-in';
+  const edge = g.createRadialGradient(64, 64, 20, 64, 64, 64);
+  edge.addColorStop(0, 'rgba(0,0,0,1)'); edge.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = edge; g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+});
+const SMOKE_PALE = C(0x77777d), SMOKE_WIND = [0.9, 0.5];
 const smoke = [], flames = [];
-for (let i = 0; i < 70; i++){
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color: 0x4a4a50, transparent: true, depthWrite: false, opacity: 0 }));
+for (let i = 0; i < 140; i++){
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: SMOKE_TEX[i % SMOKE_TEX.length], color: 0x4a4a50, transparent: true, depthWrite: false, opacity: 0 }));
   s.visible = false; scene.add(s);
-  smoke.push({ s, life: 0, vx: 0, vy: 0, vz: 0, peak: 0.5, grow: 5 });
+  smoke.push({ s, life: 0, vx: 0, vy: 0, vz: 0, peak: 0.5, grow: 5, size: 0.5, decay: 0.3, spin: 0, phase: 0, c0: new THREE.Color(), c1: new THREE.Color() });
 }
 for (let i = 0; i < 14; i++){
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color: 0xff7a1e, transparent: true, depthWrite: false, opacity: 0, blending: THREE.AdditiveBlending }));
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: SMOKE_TEX[i % SMOKE_TEX.length], color: 0xff7a1e, transparent: true, depthWrite: false, opacity: 0, blending: THREE.AdditiveBlending }));
   s.visible = false; scene.add(s);
   flames.push({ s, life: 0, vx: 0, vy: 0, vz: 0 });
 }
+const FLAME_HOT = C(0xffd27a), FLAME_COOL = C(0xff4a12);
 let smokeAcc = 0, smokeIdx = 0, flameAcc = 0, flameIdx = 0;
 // ### Removes all sparks, smoke and flames, so that a new run does not start next to the smoke of the last one.
 function clearEffects(){
@@ -3316,10 +3360,14 @@ function updateSmoke(dt){
     while (smokeAcc >= 1){
       smokeAcc -= 1;
       const p = smoke[smokeIdx++ % smoke.length];
-      p.life = 1; p.s.visible = true; p.peak = P.opacity; p.grow = 5;
-      p.s.position.set(ox + (Math.random() - 0.5) * 0.6, oy, oz + (Math.random() - 0.5) * 0.6);
-      p.vx = (Math.random() - 0.5) * 1.1 - fx * car.speed * 0.2; p.vy = P.rise + Math.random() * 1.2; p.vz = (Math.random() - 0.5) * 1.1 - fz * car.speed * 0.2;
-      p.s.material.color.set(P.color);
+      // thicker smoke billows into bigger clouds and hangs in the air longer
+      p.life = 1; p.s.visible = true; p.peak = P.opacity * (0.7 + Math.random() * 0.25);
+      p.size = 0.3 + Math.random() * 0.3; p.grow = 1.6 + P.rate * 0.07 + Math.random() * 1.2; p.decay = 0.46 - P.rate * 0.004 + Math.random() * 0.1;
+      p.s.material.rotation = Math.random() * Math.PI * 2; p.spin = (Math.random() - 0.5) * 0.9; p.phase = Math.random() * 6.28;
+      p.s.position.set(ox + (Math.random() - 0.5) * 0.5, oy, oz + (Math.random() - 0.5) * 0.5);
+      p.vx = (Math.random() - 0.5) * 0.9 - fx * car.speed * 0.2; p.vy = P.rise * (0.7 + Math.random() * 0.5); p.vz = (Math.random() - 0.5) * 0.9 - fz * car.speed * 0.2;
+      p.c0.set(P.color); p.c1.copy(p.c0).lerp(SMOKE_PALE, 0.55);
+      p.s.material.color.copy(p.c0);
     }
     if (P.fire){
       flameAcc += dt * 26;
@@ -3334,19 +3382,28 @@ function updateSmoke(dt){
   }
   for (const p of smoke){
     if (p.life <= 0) continue;
-    p.life -= dt * 0.42;
-    p.s.position.x += p.vx * dt; p.s.position.y += p.vy * dt; p.s.position.z += p.vz * dt;
-    p.vx *= 1 - dt * 0.6; p.vz *= 1 - dt * 0.6;
-    p.s.scale.setScalar(1.0 + (1 - p.life) * p.grow);
-    p.s.material.opacity = Math.min(1, (1 - p.life) * 8) * Math.max(0, p.life) * p.peak;
+    p.life -= dt * p.decay;
+    const age = 1 - Math.max(0, p.life);
+    // the air drags the puff towards the wind; the hot smoke slows as it rises and cools, and it wobbles a little
+    p.vx += (SMOKE_WIND[0] - p.vx) * Math.min(1, dt * 0.7); p.vz += (SMOKE_WIND[1] - p.vz) * Math.min(1, dt * 0.7);
+    p.vy *= 1 - Math.min(1, dt * 0.35);
+    const wob = Math.sin(clock * 1.7 + p.phase) * 0.35;
+    p.s.position.x += (p.vx + wob) * dt; p.s.position.y += p.vy * dt; p.s.position.z += (p.vz - wob * 0.6) * dt;
+    p.s.material.rotation += p.spin * dt * (1 - age * 0.6);
+    p.s.scale.setScalar(p.size + p.grow * Math.sqrt(age));
+    p.s.material.color.copy(p.c0).lerp(p.c1, age);
+    // quick to appear, then it fades as it spreads
+    p.s.material.opacity = Math.min(1, age * 7) * Math.pow(Math.max(0, p.life), 1.4) * p.peak;
     if (p.life <= 0) p.s.visible = false;
   }
   for (const p of flames){
     if (p.life <= 0) continue;
     p.life -= dt * 2.6;
     p.s.position.x += p.vx * dt; p.s.position.y += p.vy * dt; p.s.position.z += p.vz * dt;
-    p.s.scale.setScalar(0.5 + p.life * 1.3);
-    p.s.material.opacity = Math.max(0, p.life) * 0.95;
+    p.s.scale.setScalar(0.35 + p.life * 1.0);
+    p.s.material.color.copy(FLAME_COOL).lerp(FLAME_HOT, Math.max(0, p.life));
+    p.s.material.rotation += dt * 2;
+    p.s.material.opacity = Math.max(0, p.life) * 0.85;
     if (p.life <= 0) p.s.visible = false;
   }
 }
@@ -4610,6 +4667,10 @@ function applyCarMesh(dt){
     md.rider.rotation.x = 0.07 * Math.min(1, sp / 28);
     md.rider.rotation.z = car.lean * 0.22; md.rider.position.x = car.lean * 0.1;
   } else carTilt.rotation.z = car.roll + car.steer * Math.min(1, sp / 34) * (V.key === 'truck' ? 0.04 : 0.07) + (md.stage === 3 ? 0.022 : 0);
+  // The body leans in turns, dips when braking and sags when wrecked, but it turns about the middle of the vehicle at road
+  // level, so a wheel on the low side would sink into the road. Lift it by as much as that lowest wheel would sink.
+  const lean = V.key === 'bike' ? 0 : carTilt.rotation.z - car.roll, track = Math.max(...md.skid.x.map(Math.abs)) + md.skid.w / 2;
+  carTilt.position.y = track * Math.abs(Math.sin(lean)) + Math.abs(md.skid.z) * Math.abs(Math.sin(car.bodyPitch));
   md.wheels.forEach(w => w.rotation.x = car.wheelRot / md.r);
   md.pivots.forEach(p => p.rotation.y = car.steer * 0.45);
   md.paint.color.copy(md.base).lerp(PAINT_DEAD, damage / 100 * 0.65);
