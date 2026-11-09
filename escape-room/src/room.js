@@ -219,7 +219,9 @@ function wall(len, x, z, ry){
 }
 plane(W, D, M.ceiling, 0, H, 0, 0, Math.PI / 2);
 wall(W, 0, -D / 2, 0);            // north
-wall(W, 0, D / 2, Math.PI);       // south (door wall)
+// south (door wall), built around the doorway so the open door shows the corridor in the briefing
+wall(3.45, -2.275, D / 2, Math.PI); wall(3.45, 2.275, D / 2, Math.PI);
+{ const p = plane(1.1, H - 2.14, M.paint, 0, 2.14 + (H - 2.14) / 2, D / 2, Math.PI); p.material = M.paint.clone(); p.material.map = paintTex.clone(); p.material.map.needsUpdate = true; p.material.map.repeat.set(1.1 / 2.6, .3); }
 wall(D, -W / 2, 0, Math.PI / 2);  // west (sinks)
 wall(D, W / 2, 0, -Math.PI / 2);  // east
 // skirting drain channel and floor drain
@@ -250,17 +252,68 @@ const stallTube = box(.6, .05, .1, M.tube.clone(), 2.75, 2.94, -1.8); stallTube.
 stallTube.material.emissive.set(0xffe6c4); stallTube.material.emissiveIntensity = 1.8;
 plane(1.9, .7, M.sign, 3.995, 1.6, 1.3, -Math.PI / 2);
 
-// The door with its barred window; Officer Hale's silhouette appears in it
-box(1.04, 2.14, .1, M.door, 0, 1.07, 2.95);
+// The door with its barred window; Officer Hale's silhouette appears in it. It hangs on hinges on the west side (x -0.52)
+// and swings into the room; doorPivot turns it. Closed (rotation 0) it is exactly where it always was.
+const doorPivot = new THREE.Group(), doorLeaf = new THREE.Group();
+doorPivot.position.set(-.52, 0, 2.95); doorLeaf.position.set(.52, 0, -2.95); doorPivot.add(doorLeaf); room.add(doorPivot);
+const onDoor = (...ms) => ms.forEach(m => doorLeaf.add(m));
+onDoor(box(1.04, 2.14, .1, M.door, 0, 1.07, 2.95));
 box(1.16, .06, .14, M.dullSteel, 0, 2.17, 2.95); box(.06, 2.17, .14, M.dullSteel, -.55, 1.08, 2.95); box(.06, 2.17, .14, M.dullSteel, .55, 1.08, 2.95);
-plane(.3, .34, M.corridor, 0, 1.68, 2.895, Math.PI);
-const guard = plane(.3, .34, M.guard, 0, 1.66, 2.89, Math.PI);
-for (let i = -1; i <= 1; i++) cyl(.008, .008, .34, M.steel, i * .075, 1.68, 2.885, 8);
-for (const [w, h, x, y] of [[.36, .03, 0, 1.865], [.36, .03, 0, 1.495], [.03, .4, -.165, 1.68], [.03, .4, .165, 1.68]]) box(w, h, .03, M.dullSteel, x, y, 2.885);
-const handle = cyl(.022, .022, .16, M.steel, .38, 1.02, 2.86, 10); handle.rotation.z = Math.PI / 2;
-box(.06, .14, .04, M.steel, .44, 1.02, 2.89);
-for (const y of [.35, 1.07, 1.8]) box(.04, .14, .05, M.steel, -.5, y, 2.88);
+onDoor(plane(.3, .34, M.corridor, 0, 1.68, 2.895, Math.PI));
+const guard = plane(.3, .34, M.guard, 0, 1.66, 2.89, Math.PI); onDoor(guard);
+for (let i = -1; i <= 1; i++) onDoor(cyl(.008, .008, .34, M.steel, i * .075, 1.68, 2.885, 8));
+for (const [w, h, x, y] of [[.36, .03, 0, 1.865], [.36, .03, 0, 1.495], [.03, .4, -.165, 1.68], [.03, .4, .165, 1.68]]) onDoor(box(w, h, .03, M.dullSteel, x, y, 2.885));
+const handle = cyl(.022, .022, .16, M.steel, .38, 1.02, 2.86, 10); handle.rotation.z = Math.PI / 2; onDoor(handle);
+onDoor(box(.06, .14, .04, M.steel, .44, 1.02, 2.89));
+for (const y of [.35, 1.07, 1.8]) onDoor(box(.04, .14, .05, M.steel, -.5, y, 2.88));
 hot('wedge', handle);
+
+// The corridor outside and Officer Hale in the doorway. Only seen in the briefing, while he shuts the door on you.
+const hallTex = canvasTex(1024, 384, (g, w, h) => {
+  g.fillStyle = '#c9d5dc'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#5f7383'; g.fillRect(0, h * .55, w, h * .45);
+  g.fillStyle = '#e8b13a'; g.fillRect(0, h * .55 - 8, w, 8);
+  g.fillStyle = '#26303a'; g.font = '800 54px "Arial Narrow", Arial, sans-serif'; g.fillText('CELL BLOCK D', 40, 120); g.fillText('D-01 → D-24', 640, 120);
+  grime(g, w, h, 14, 'rgba(60,70,70,.25)', 90, true);
+});
+const hallFloorTex = canvasTex(256, 256, (g, w, h) => {
+  const gr = g.createRadialGradient(w / 2, h * .3, 4, w / 2, h * .3, w * .7); gr.addColorStop(0, '#b7c3cb'); gr.addColorStop(1, '#4c5962');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+});
+// Hale, backlit: a dark figure with a peaked cap, one arm out to pull the door shut, keys on his belt
+const haleTex = canvasTex(256, 512, (g, w, h) => {
+  g.fillStyle = '#06080b'; g.shadowColor = 'rgba(175,210,255,.75)'; g.shadowBlur = 10;
+  g.beginPath(); g.arc(122, 96, 30, 0, 7); g.fill();                                   // head
+  g.beginPath(); g.ellipse(122, 70, 44, 10, 0, 0, 7); g.fill();                         // cap brim
+  g.beginPath(); g.moveTo(86, 68); g.lineTo(92, 36); g.quadraticCurveTo(122, 24, 154, 36); g.lineTo(160, 68); g.fill(); // cap
+  g.fillRect(108, 118, 30, 26);                                                          // neck
+  g.beginPath(); g.moveTo(60, 168); g.quadraticCurveTo(64, 140, 122, 138); g.quadraticCurveTo(182, 140, 188, 168);
+  g.lineTo(178, 300); g.lineTo(68, 300); g.closePath(); g.fill();                        // torso
+  g.beginPath(); g.moveTo(62, 160); g.lineTo(44, 300); g.lineTo(60, 304); g.lineTo(84, 190); g.fill(); // left arm, hanging
+  g.beginPath(); g.moveTo(176, 156); g.quadraticCurveTo(222, 196, 246, 238); g.lineTo(234, 252); g.quadraticCurveTo(206, 214, 170, 200); g.fill(); // right arm, to the door
+  g.fillRect(66, 292, 116, 18);                                                          // belt
+  g.beginPath(); g.moveTo(70, 306); g.lineTo(118, 306); g.lineTo(114, 508); g.lineTo(78, 508); g.fill();   // legs
+  g.beginPath(); g.moveTo(128, 306); g.lineTo(178, 306); g.lineTo(170, 508); g.lineTo(134, 508); g.fill();
+  g.shadowBlur = 0; g.strokeStyle = 'rgba(190,200,210,.55)'; g.lineWidth = 2;
+  for (const [x, y] of [[164, 322], [172, 328], [158, 330]]){ g.beginPath(); g.arc(x, y, 5, 0, 7); g.stroke(); } // keys
+});
+const shadowTex = canvasTex(128, 256, (g, w, h) => {
+  const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, 'rgba(0,0,0,.85)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.beginPath(); g.moveTo(w * .3, 0); g.lineTo(w * .7, 0); g.lineTo(w, h); g.lineTo(0, h); g.fill();
+});
+const hall = new THREE.Group(); room.add(hall);
+{ const m = new THREE.Mesh(new THREE.PlaneGeometry(8, 3), new THREE.MeshBasicMaterial({ map: hallTex })); m.position.set(0, 1.5, 4.6); m.rotation.y = Math.PI; hall.add(m);
+  const f = new THREE.Mesh(new THREE.PlaneGeometry(8, 1.6), new THREE.MeshBasicMaterial({ map: hallFloorTex })); f.position.set(0, .002, 3.8); f.rotation.x = -Math.PI / 2; hall.add(f);
+  const c = new THREE.Mesh(new THREE.PlaneGeometry(8, 1.6), new THREE.MeshBasicMaterial({ color: 0x39434b })); c.position.set(0, 3, 3.8); c.rotation.x = Math.PI / 2; hall.add(c);
+  const t = new THREE.Mesh(new THREE.BoxGeometry(1.4, .05, .12), new THREE.MeshBasicMaterial({ color: 0xf2f8ff })); t.position.set(0, 2.97, 3.7); hall.add(t); }
+const hale = new THREE.Mesh(new THREE.PlaneGeometry(.92, 1.84), new THREE.MeshBasicMaterial({ map: haleTex, transparent: true, opacity: 0, depthWrite: false }));
+hall.visible = false;
+hale.position.set(.14, .93, 3.42); hale.rotation.y = Math.PI; room.add(hale);
+const haleShadow = new THREE.Mesh(new THREE.PlaneGeometry(.7, 1.9), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, opacity: 0, depthWrite: false }));
+haleShadow.position.set(.12, .004, 2.05); haleShadow.rotation.set(-Math.PI / 2, 0, Math.PI); room.add(haleShadow);
+// the cold light that falls in through the open door
+const doorLight = new THREE.SpotLight(0xd4e6ff, 0, 9, .62, .55, 1.3);
+doorLight.position.set(0, 2.3, 4.1); doorLight.target.position.set(0, 0, .3); room.add(doorLight, doorLight.target);
 
 // Sinks with a polished steel mirror, the soap dish with the spoon and the hot tap
 box(.5, .06, 2.6, M.steel, -3.75, .86, 0);
@@ -360,7 +413,8 @@ const VIEWS = {
   stall: { pos: [2.75, 1.62, .15], look: [2.7, .72, -3] },
   hatch: { pos: [2.3, 1.02, -.86], look: [2.22, .05, -1.55] },
   tunnel: { pos: [2.2, -2.6, -1.6], look: [2.2, -3.9, -1.95] },
-  cell: { pos: [0, 1.62, 1.1], look: [0, 1.45, 3] }
+  cell: { pos: [0, 1.62, 1.1], look: [0, 1.45, 3] },
+  closing: { pos: [.5, 1.5, -.3], look: [-.05, 1.05, 3] }
 };
 const cam = { pos: new THREE.Vector3(...VIEWS.intro.pos), yaw: 0, pitch: 0, from: null, t: 1, dur: 1, yawOff: 0, pitchOff: 0, idle: 0 };
 // ### The camera angles that look at a point.
@@ -549,10 +603,11 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 
 // ### The briefing: five short cards so a first-time player knows what happened, who they are, where, why and how to play.
 // ### The first card is a newspaper clipping (the paper style of the clue cards): the theft at the Museu de Marinha in Lisbon.
+// ### The third is not a card but a short scene in the room (see "Briefing scene" below): Hale shuts and locks the door.
 const BRIEF = [
   ['Lisbon · 16 April 2012', 'The <em>Theft</em>', '<div class="paper"><small>Front page</small><b>Titanic necklace vanishes from naval museum</b><br>BELÉM. The Starfall necklace, lent by the Ashford family to the Museu de Marinha for a limited exhibition marking 100 years since the sinking of the Titanic, disappeared from its glass case on the night of the centenary. No alarm sounded. The museum has closed the exhibition. A detective has been put on the case.</div>'],
   ['Cell Block D · 02:14', 'Plot <em>Twist</em>', 'Three weeks ago you were that detective. You followed the trail from the empty case at the Museu de Marinha, and it ended at your own door: the necklace’s velvet box, hidden in your car. Tonight you are <b>inmate 4471</b>, convicted of stealing it. Someone framed you.'],
-  ['The washroom', 'Ten <em>minutes</em>', '<b>Officer Hale</b> walks you to washroom 2, locks the door behind you and says: “Ten minutes. Not a second more.” Then he waits outside.'],
+  ['The washroom · 02:16', 'Ten <em>minutes</em>', 'cine'],
   ['The rumour', 'A way <em>down</em>', 'Inmates whisper about a <b>hatch in the floor</b> of this washroom, locked with a four-digit code. The code is hidden somewhere in the room. Find it, open the hatch, get out before Hale comes back.'],
   ['How to play', 'Your <em>moves</em>', null]
 ];
@@ -561,6 +616,15 @@ let briefStep = 0;
 function showBrief(i){
   briefStep = i;
   const [eye, title, text] = BRIEF[i], last = i === BRIEF.length - 1;
+  if (text === 'cine'){
+    showCard(`<div class="steps">${BRIEF.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</div>
+      <div class="eyebrow">${eye}</div><p class="cine-line" id="cineLine" aria-live="polite"></p>
+      <div class="actions"><button class="btn" data-do="next">Next <small>Enter</small></button><button class="btn ghost" data-do="back">Back</button>
+      <div class="cine-clock" id="cineClock" aria-hidden="true">10:00</div></div>`, 'cine');
+    startCine();
+    return;
+  }
+  stopCine();
   const body = text ? (text.startsWith('<div') ? text : `<p>${text}</p>`) : `<div class="howto">
       <b>Drag</b><span>Look around (or use the arrow keys)</span>
       <b>Markers</b><span>Click a pulsing marker or the object itself to use it</span>
@@ -748,6 +812,49 @@ function cue(name){
   }
 }
 
+// ---------- Briefing scene ----------
+// ### Briefing card 3 as a short scene in the room: you turn round to the open door, Officer Hale stands in the corridor
+// ### light, swings the door shut, locks it and tells you through it that your ten minutes have begun. Next skips it; Back
+// ### from card 4 plays it again. With reduced motion it starts at the end: the door shut and his words on the card.
+const DOOR_OPEN = 1.35, CINE_END = 5;
+let cineT = -1, shake = 0;
+const LINES = [
+  [0, '<span class="narr">Officer Hale walks you to washroom 2 and holds the door open.</span>'],
+  [.9, '<b>Hale:</b> “Inside, 4471.”'],
+  [3.4, '<b>Hale</b>, through the door: “Your ten minutes have begun. Not a second more.”']
+];
+function cineLine(html){ const el = card.querySelector('#cineLine'); if (el) el.innerHTML = html; }
+function startCine(){
+  hall.visible = true; cineT = REDUCED ? CINE_END : 0;
+  overlay.classList.add('cine'); $('lookHint').classList.add('hush'); goView('closing', 1.2);
+  if (REDUCED){ cineLine(LINES[2][1]); card.querySelector('#cineClock').classList.add('on'); guardShow = 5; }
+  else cineLine(LINES[0][1]);
+  updateCine(0);
+}
+function stopCine(){
+  overlay.classList.remove('cine'); $('lookHint').classList.remove('hush');
+  if (cineT < 0) return;
+  cineT = -1; hall.visible = false; doorPivot.rotation.y = 0; hale.material.opacity = haleShadow.material.opacity = 0; doorLight.intensity = 0; shake = 0;
+  if (S.scene === 'intro') goView('intro', .9);
+}
+// ### One step of the scene: the door, the light and Hale follow the time; the sounds and words come once each.
+function updateCine(dt){
+  if (cineT < 0) return;
+  const t0 = cineT, t = cineT = Math.min(CINE_END + 1, cineT + dt), at = s => t0 < s && t >= s;
+  const k = clamp((t - 1.7) / .95, 0, 1), open = 1 - k * k;   // held open, then swung shut, faster and faster
+  doorPivot.rotation.y = DOOR_OPEN * open;
+  doorLight.intensity = 4 * open;
+  hale.material.opacity = Math.min(1, t * 2.5) * (open > .02 ? 1 : 0);
+  hale.position.z = 3.42 + k * .12;
+  haleShadow.material.opacity = .5 * open * Math.min(1, t * 2.5);
+  for (const [s, html] of LINES) if (s > 0 && at(s)) cineLine(html);
+  if (at(1.7)) cue('open');
+  if (at(2.65)){ cue('bang'); shake = .45; hall.visible = false; }
+  if (at(3.05)){ cue('clunk'); guardShow = 5; }
+  if (at(3.25)) cue('rattle');
+  if (at(3.4)){ const c = card.querySelector('#cineClock'); if (c) c.classList.add('on'); }
+}
+
 // ---------- Endings ----------
 // ### Ending A: the lid swings up, warm light comes from below and the camera climbs down the ladder, then the ending
 // ### card. Ending B: the door is flung open, white corridor light floods in, then the card.
@@ -774,6 +881,8 @@ function frame(now){
     }
   }
   updateCamera(dt);
+  updateCine(dt);
+  if (shake > 0 && !REDUCED){ shake = Math.max(0, shake - dt); camera.position.x += (Math.random() - .5) * shake * .05; camera.position.y += (Math.random() - .5) * shake * .05; }
   // fluorescent flicker
   flicker -= dt;
   let li = 1;

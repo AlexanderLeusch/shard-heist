@@ -9,7 +9,7 @@ Open the hatch in the floor of the toilet stall and climb out **before the clock
 ## Story
 
 1. **Briefing.** You were the detective on the Ashford necklace case. Tonight you are inmate 4471, convicted of stealing the necklace: someone framed you.
-2. Officer Hale walks you to washroom 2, locks the door and says: "Ten minutes. Not a second more." He waits outside.
+2. Officer Hale walks you to washroom 2. In a short scene in the room you turn round to the open door, see him in the corridor light, and watch him swing the door shut and lock it. Through the door he says: "Your ten minutes have begun. Not a second more." He waits outside.
 3. Inmates whisper about a hatch in the floor of this washroom, locked with a four-digit code that is hidden somewhere in the room.
 
 The clock only starts when the player presses **Start the clock** after the briefing.
