@@ -103,16 +103,16 @@ pre .c{ color:#7fd4e2; }
   <h2>The game at a glance</h2>
   <p><b>Shard Heist</b> is a 3D police-chase game that runs entirely in the browser as a static website: one page, one stylesheet and three scripts. The player picks a map (Lisbon's Baixa, Highway or Countryside) and a getaway vehicle (Car, Motorcycle or Truck), collects glowing star shards, escapes up to four police cars and a helicopter, and reaches a finish gate before the clock runs out. Five wanted stars make the chase harder over time. All three maps have hills that slow the player down or speed them up. Crashes cause visible damage; repair kits remove it; police can bust the player when they box the vehicle in. Seven radio stations play while driving, all synthesised by the game. The story mode <b>The Necklace Job</b> is an option in the same main menu (section 10).</p>
   <div class="kpis">
-    <div class="kpi"><b>6,374</b><span>lines of game code</span></div>
+    <div class="kpi"><b>6,375</b><span>lines of game code</span></div>
     <div class="kpi"><b>5,806</b><span>lines of JavaScript</span></div>
     <div class="kpi"><b>224</b><span>named functions</span></div>
     <div class="kpi"><b>25</b><span>code sections</span></div>
     <div class="kpi"><b>132</b><span>automated tests</span></div>
     <div class="kpi"><b>0</b><span>npm dependencies</span></div>
     <div class="kpi"><b>0</b><span>image / sound files</span></div>
-    <div class="kpi"><b>433 KB</b><span>game code size</span></div>
+    <div class="kpi"><b>434 KB</b><span>game code size</span></div>
   </div>
-  <p class="mono" style="color:var(--muted)">Figures for room 2 (index.html, styles.css, src/). Room 1 is described in section 14. The test count covers both rooms: 114 unit and page tests and 18 browser tests. Tests add 1,733 lines.</p>
+  <p class="mono" style="color:var(--muted)">Figures for room 2 (index.html, styles.css, src/). Room 1 is described in section 14. The test count covers both rooms: 114 unit and page tests and 18 browser tests. Tests add 1,741 lines.</p>
   <h3>The three maps</h3>
   <table>
     <tr><th>Map</th><th>Layout</th><th>Goal</th><th class="num">Car top speed</th><th class="num">Police</th><th class="num">Time</th></tr>
@@ -149,20 +149,20 @@ pre .c{ color:#7fd4e2; }
   </div>
   <table>
     <tr><th>Language</th><th class="num">Lines</th><th class="num">Share</th><th class="num">Characters</th><th class="num">Share</th><th>Role in the game</th></tr>
-    <tr><td>JavaScript</td><td class="num">5,806</td><td class="num">91.1 %</td><td class="num">390,815</td><td class="num">88.1 %</td><td>All logic: rules (core.js), worlds, vehicles, AI, physics, audio, HUD, menus, error screen</td></tr>
-    <tr><td>CSS</td><td class="num">394</td><td class="num">6.2 %</td><td class="num">33,473</td><td class="num">7.5 %</td><td>Look of the HUD, cockpit, menus, warnings, error screen</td></tr>
-    <tr><td>HTML</td><td class="num">142</td><td class="num">2.2 %</td><td class="num">10,742</td><td class="num">2.4 %</td><td>Page skeleton, HUD panels, gauge and icons (inline SVG), script order, security policy</td></tr>
+    <tr><td>JavaScript</td><td class="num">5,806</td><td class="num">91.1 %</td><td class="num">390,815</td><td class="num">88.0 %</td><td>All logic: rules (core.js), worlds, vehicles, AI, physics, audio, HUD, menus, error screen</td></tr>
+    <tr><td>CSS</td><td class="num">398</td><td class="num">6.2 %</td><td class="num">34,033</td><td class="num">7.7 %</td><td>Look of the HUD, cockpit, menus, warnings, error screen</td></tr>
+    <tr><td>HTML</td><td class="num">139</td><td class="num">2.2 %</td><td class="num">10,406</td><td class="num">2.3 %</td><td>Page skeleton, HUD panels, gauge and icons (inline SVG), script order, security policy</td></tr>
     <tr><td>GLSL</td><td class="num">26</td><td class="num">0.4 %</td><td class="num">2,482</td><td class="num">0.6 %</td><td>Sky gradient, force field and the damage dents (run on the GPU)</td></tr>
     <tr><td>SVG in JS strings</td><td class="num">6</td><td class="num">0.1 %</td><td class="num">6,203</td><td class="num">1.4 %</td><td>Map pictures and fallback vehicle icons in the start menu</td></tr>
     <tr><td><b>Python</b></td><td class="num"><b>0</b></td><td class="num"><b>0 %</b></td><td class="num"><b>0</b></td><td class="num"><b>0 %</b></td><td>Not used</td></tr>
   </table>
-  <p class="mono" style="color:var(--muted)">Game code: 6,374 lines, 443,715 characters. The tests (1,733 lines), the dev server and SRI checker are JavaScript too; the CI pipeline is YAML. About 570 of the JavaScript lines are comments, including the “###” explanations.</p>
+  <p class="mono" style="color:var(--muted)">Game code: 6,375 lines, 443,939 characters. The tests (1,741 lines), the dev server and SRI checker are JavaScript too; the CI pipeline is YAML. About 570 of the JavaScript lines are comments, including the “###” explanations.</p>
   <h3>External code that is loaded, not written</h3>
   <table>
     <tr><th>Library</th><th>Language</th><th>Purpose</th></tr>
     <tr><td>three.js r128</td><td>JavaScript (+ GLSL inside)</td><td>3D engine: scene, materials, shadows, geometry</td></tr>
     <tr><td>three.js examples: EffectComposer, RenderPass, ShaderPass, UnrealBloomPass, CopyShader, LuminosityHighPassShader, GammaCorrectionShader, FXAAShader</td><td>JavaScript + GLSL</td><td>Post-processing: bloom, gamma, anti-aliasing</td></tr>
-    <tr><td>Google Fonts</td><td>CSS</td><td>Big Shoulders Display and JetBrains Mono typefaces</td></tr>
+    <tr><td>Fonts (in <code>fonts/</code>)</td><td>CSS</td><td>Big Shoulders Display and JetBrains Mono, shipped with the game under the SIL Open Font License</td></tr>
   </table>
   <div class="note"><b>Why no Python?</b> Python cannot run in a browser page without a server or a large WebAssembly runtime such as Pyodide (several megabytes). A single-file browser game is therefore written in JavaScript. The tests, the dev server and the helper scripts are also JavaScript, run with Node.js. This PDF was rendered from HTML by the Chrome browser, also without Python.</div>
 </section>

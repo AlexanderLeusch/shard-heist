@@ -2,6 +2,10 @@
    ### the accent here is orange, in room 2 it is cyan.
    ### STYLES for room 1: design tokens on :root, then the HUD, the hotspot markers, the overlay cards (briefing, lock,
    ### clues, endings) and the error screen. Prison look: cold concrete, fluorescent green-grey, jumpsuit orange. */
+/* ### FONTS: both typefaces ship with the game (fonts/, SIL Open Font License, see the OFL files there), so no font service is
+   ### asked and nobody outside learns who plays. Both are variable fonts that cover every weight the pages use. */
+@font-face{font-family:"Big Shoulders Display";src:url("fonts/big-shoulders-display.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}
+@font-face{font-family:"JetBrains Mono";src:url("fonts/jetbrains-mono.woff2") format("woff2");font-weight:100 800;font-style:normal;font-display:swap}
 :root{
   --bg:#0b0e10;
   --ink:#f0f2ee;

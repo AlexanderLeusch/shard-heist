@@ -3,6 +3,10 @@
 /* Shared design system with room 1 (escape-room/styles.css): same tokens for background, glass, lines and fonts,
    same buttons, cards and error screen. Each room keeps its own accent: orange in the prison, cyan on the run.
    Layout: full-bleed 3D world at night, glass HUD in the corners, pursuit panel under the clock, cockpit bottom-right, one centered card for menus. Single dark look by choice. */
+/* ### FONTS: both typefaces ship with the game (fonts/, SIL Open Font License, see the OFL files there), so no font service is
+   ### asked and nobody outside learns who plays. Both are variable fonts that cover every weight the pages use. */
+@font-face{font-family:"Big Shoulders Display";src:url("fonts/big-shoulders-display.woff2") format("woff2");font-weight:100 900;font-style:normal;font-display:swap}
+@font-face{font-family:"JetBrains Mono";src:url("fonts/jetbrains-mono.woff2") format("woff2");font-weight:100 800;font-style:normal;font-display:swap}
 :root{
   --bg:#0b0e10;
   --ink:#f0f2ee;

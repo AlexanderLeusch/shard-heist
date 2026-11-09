@@ -68,12 +68,14 @@ escape-room/      ROOM 1, self-contained (it shares no files with room 2):
   src/boot.js       error screen (a copy of room 2's, so the room works on its own)
   src/rules.js      the story and rules as pure functions: scenes, items, clues, lock, clock, saved games
   src/room.js       the 3D washroom, camera, markers, lock and clue cards, sound
+  fonts/            its copy of the two fonts, with their licences
 
 index.html        ROOM 2 page structure: HUD, cockpit, menu overlay, error screen; loads the scripts in order
 styles.css        all styling (glass HUD, cockpit, showroom menu, error screen)
 src/boot.js       error screen: catches load failures, missing WebGL and unexpected errors
 src/core.js       the rules: tuning tables, driving, damage, police pressure, scoring, story, input validation
 src/game.js       everything visual and real-time: 3D worlds, vehicles, traffic and police AI, sound, HUD, story scenes
+fonts/            the two fonts (woff2) and their SIL Open Font Licences
 tests/            Node tests for both rooms' rules and pages, plus a headless-browser test of both rooms
 scripts/          dev server (serve.js) and the SRI checker (check-sri.js)
 .github/workflows CI: JavaScript tests, SRI check, browser tests, Python tests and dependency audit on every push to main
@@ -120,21 +122,20 @@ Writing the tests found two real bugs. Both are fixed:
 
 ## Security
 
-- **No accounts, no server, no personal data.** The only data the game stores is your last map and vehicle, best times, the radio station, the graphics setting, the steering choice, the volumes and the saved escape-room game, all in your browser's `localStorage` (the full list is in [rules/settings.md](rules/settings.md)). The game has no server of its own, but your browser asks Google Fonts, cdnjs and jsDelivr for the fonts and libraries, so those services see your IP address. There are no credentials anywhere in the repository; a test scans every file for keys and tokens.
+- **No accounts, no server, no personal data.** The only data the game stores is your last map and vehicle, best times, the radio station, the graphics setting, the steering choice, the volumes and the saved escape-room game, all in your browser's `localStorage` (the full list is in [rules/settings.md](rules/settings.md)). The game has no server of its own. The fonts ship with the game; only the three.js library comes from cdnjs and jsDelivr, so those two services see your IP address. There are no credentials anywhere in the repository; a test scans every file for keys and tokens.
 - **Input validation.** Everything read back from `localStorage` is checked (`parsePick`, `parseBest`, `parseRadio`, `parseSteer`, `parseVolume`, and `restore` and `parseVolume` in room 1) and replaced by defaults when it is invalid. Menu picks and actions are checked against fixed lists using own properties only. Error messages are inserted as text, never as HTML.
 - **Access control.** Nothing on the site needs a login. Cards accept only the actions allowed in the current state, and the dev server only serves known file types from the project folder (no `.git`, no path traversal, GET and HEAD only).
-- **Dependencies.** No npm packages at all. The Python project pins every package in `uv.lock`, and CI audits them with `pip-audit` (0 known vulnerabilities on 3 November 2026). The only runtime library is three.js 0.128.0 (9 files), pinned by exact URL, checked by SRI hashes (`npm run test:sri`) and loaded with `crossorigin="anonymous"`. `npm audit` reports 0 known vulnerabilities for `three@0.128.0` (checked 3 November 2026). GitHub Actions are pinned to commit hashes.
+- **Dependencies.** No npm packages at all. The two fonts ship in `fonts/` with their licences, so no font service is needed. The Python project pins every package in `uv.lock`, and CI audits them with `pip-audit` on every push; a known vulnerability fails the build and stops the deploy. GitHub's Dependabot alerts are on for the repository, so a newly published vulnerability in a pinned version is reported even when nobody pushes. The only runtime library is three.js 0.128.0 (9 files), pinned by exact URL, checked by SRI hashes (`npm run test:sri`) and loaded with `crossorigin="anonymous"`. `npm audit` reports 0 known vulnerabilities for `three@0.128.0` (checked 3 November 2026). GitHub Actions are pinned to commit hashes.
 - **Content Security Policy.** Scripts may only come from this site and the two pinned CDNs; there are no inline scripts, plugins, forms or foreign base URLs.
 
 ## When something is unavailable
 
-The game needs no server of its own and calls no API. It depends on three outside things, and each has a defined behaviour:
+The game needs no server of its own and calls no API. The only outside service is the CDN for three.js. Each thing that can be missing has a defined behaviour:
 
 | Missing | What happens |
 |---|---|
 | three.js or one of its effect files (cdnjs, jsDelivr), offline or blocked, or a file that fails its integrity check | The error screen in `src/boot.js` says which file could not load and offers *Reload*, instead of a black page. A browser test blocks the library on purpose and checks this card |
 | WebGL (old or locked-down browser) | The same error screen explains how to turn on hardware acceleration. A browser test removes WebGL and checks it |
-| Google Fonts | The pages fall back to the system fonts listed in the CSS; nothing else changes |
 | `localStorage` (private mode, blocked storage) | Every read and write is wrapped, so the game runs with the defaults and simply does not remember settings, best times or the escape-room save |
 | The motion sensor on a phone (missing or refused) | Steering stays on the buttons |
 
@@ -165,4 +166,4 @@ The street names and their order were checked against [OpenStreetMap](https://ww
 All radio music is composed and synthesised by the game at run time, so there are no music files or licences. The tunes are generated from seeded random walks. The classical station plays J. S. Bach's Prelude in C (BWV 846) and the Ode to Joy from Beethoven's Ninth Symphony, both in the public domain.
 
 
-Built with three.js r128 (MIT licence). Fonts: Big Shoulders Display and JetBrains Mono (Google Fonts, SIL Open Font License). Code written with the help of Claude (Anthropic).
+Built with three.js r128 (MIT licence). Fonts: Big Shoulders Display and JetBrains Mono (SIL Open Font License 1.1; the font files and their licences are in `fonts/` and `escape-room/fonts/`). Code written with the help of Claude (Anthropic).

@@ -178,8 +178,16 @@ test('both rooms share one design system: the same tokens and the same fonts', (
   const a = tokens(read('styles.css')), b = tokens(read('escape-room/styles.css'));
   for (const k of ['bg', 'ink', 'muted', 'glass', 'glass-strong', 'line', 'f-display', 'f-body', 'f-mono']) assert.equal(a[k], b[k], `--${k} differs between the rooms`);
   assert.ok(a.spark && b.orange, 'each room keeps its own accent (cyan in room 2, orange in room 1)');
-  const font = h => h.match(/href="(https:\/\/fonts\.googleapis\.com\/css2[^"]+)"/)[1];
-  assert.equal(font(html), font(escHtml));
+  // the same two typefaces ship with each room, with their licence, and no page asks a font service
+  for (const [page, css, dir] of [[html, read('styles.css'), 'fonts'], [escHtml, read('escape-room/styles.css'), 'escape-room/fonts']]){
+    assert.doesNotMatch(page, /fonts\.(googleapis|gstatic)\.com/, 'no font service');
+    for (const [file, licence] of [['big-shoulders-display.woff2', 'OFL-BigShouldersDisplay.txt'], ['jetbrains-mono.woff2', 'OFL-JetBrainsMono.txt']]){
+      assert.ok(css.includes('url("fonts/' + file + '")'), dir + ': ' + file + ' is used');
+      assert.equal(fs.readFileSync(path.join(ROOT, dir, file)).subarray(0, 4).toString('latin1'), 'wOF2', dir + ': ' + file + ' is a real woff2 font');
+      assert.match(read(dir + '/' + licence), /SIL Open Font License, Version 1\.1/, dir + ': the licence ships with the font');
+    }
+  }
+  assert.deepEqual(fs.readFileSync(path.join(ROOT, 'fonts/big-shoulders-display.woff2')), fs.readFileSync(path.join(ROOT, 'escape-room/fonts/big-shoulders-display.woff2')), 'both rooms use the very same file');
 });
 
 test('the story runs on from room 1 into room 2', () => {
