@@ -547,9 +547,11 @@ function showCard(html, cls){
 function hideCard(){ overlay.hidden = true; }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-// ### The briefing: four short cards so a first-time player knows who they are, where, why and how to play.
+// ### The briefing: five short cards so a first-time player knows what happened, who they are, where, why and how to play.
+// ### The first card is a newspaper clipping (the paper style of the clue cards): the theft at the Museu de Marinha in Lisbon.
 const BRIEF = [
-  ['Cell Block D · 02:14', 'Plot <em>Twist</em>', 'Three weeks ago you were the detective on the Ashford necklace case. Tonight you are <b>inmate 4471</b>, convicted of stealing it. Someone framed you.'],
+  ['Lisbon · 16 April 2012', 'The <em>Theft</em>', '<div class="paper"><small>Front page</small><b>Titanic necklace vanishes from naval museum</b><br>BELÉM. The Starfall necklace, lent by the Ashford family to the Museu de Marinha for a limited exhibition marking 100 years since the sinking of the Titanic, disappeared from its glass case on the night of the centenary. No alarm sounded. The museum has closed the exhibition. A detective has been put on the case.</div>'],
+  ['Cell Block D · 02:14', 'Plot <em>Twist</em>', 'Three weeks ago you were that detective. You followed the trail from the empty case at the Museu de Marinha, and it ended at your own door: the necklace’s velvet box, hidden in your car. Tonight you are <b>inmate 4471</b>, convicted of stealing it. Someone framed you.'],
   ['The washroom', 'Ten <em>minutes</em>', '<b>Officer Hale</b> walks you to washroom 2, locks the door behind you and says: “Ten minutes. Not a second more.” Then he waits outside.'],
   ['The rumour', 'A way <em>down</em>', 'Inmates whisper about a <b>hatch in the floor</b> of this washroom, locked with a four-digit code. The code is hidden somewhere in the room. Find it, open the hatch, get out before Hale comes back.'],
   ['How to play', 'Your <em>moves</em>', null]
@@ -559,7 +561,7 @@ let briefStep = 0;
 function showBrief(i){
   briefStep = i;
   const [eye, title, text] = BRIEF[i], last = i === BRIEF.length - 1;
-  const body = text ? `<p>${text}</p>` : `<div class="howto">
+  const body = text ? (text.startsWith('<div') ? text : `<p>${text}</p>`) : `<div class="howto">
       <b>Drag</b><span>Look around (or use the arrow keys)</span>
       <b>Markers</b><span>Click a pulsing marker or the object itself to use it</span>
       <b>Walk to</b><span>Buttons bottom right take you to another part of the room</span>
