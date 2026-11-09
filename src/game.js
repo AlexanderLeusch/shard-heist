@@ -1769,7 +1769,7 @@ function initCityTraffic(){
     const suv = i >= N_NPC - NPC_SUV;
     add(suv ? 'suv' : 'sedan', suv ? i - (N_NPC - NPC_SUV) : i);
   }
-  for (let i = 0; i < N_TRAM; i++) add('tram', i, { tram: true, dx: 1, dz: 0, cruise: 8 });
+  for (let i = 0; i < N_TRAM; i++) add('tram', i, { fleet: 'tram', tram: true, dx: 1, dz: 0, cruise: 8 });
   for (let i = 0; i < N_BUS; i++) add('bus', i, { bus: true });
   for (let i = 0; i < N_MOTO; i++) add('moto', i, { moto: true });
 }
