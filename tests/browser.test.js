@@ -253,8 +253,10 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       errors.length = 0;
       await send('Page.navigate', { url: base + 'escape-room/' });
       await waitFor("!!document.querySelector('#card h1')", LOAD_MS, 'briefing');
-      assert.match(await text('#card'), /inmate 4471/);
+      assert.match(await text('#card'), /Museu de Marinha/);
       assert.equal(await evaluate("getComputedStyle(document.getElementById('btnNotes')).visibility"), 'hidden', 'rejected: the clue button cannot be reached during the briefing');
+      await click('[data-do="next"]');
+      assert.match(await text('#card'), /inmate 4471/);
       for (let i = 0; i < 3; i++) await click('[data-do="next"]');
       assert.match(await text('#card'), /Drag/);
       await click('[data-do="start"]');
