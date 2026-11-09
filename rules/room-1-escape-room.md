@@ -29,7 +29,7 @@ The clock only starts when the player presses **Start the clock** after the brie
 
 | Scene | What is there | You can walk to |
 |---|---|---|
-| **The Door** (start) | Steel door with a barred window, Hale outside; mop in a bucket | Sinks, Stall |
+| **The Door** (start) | Steel door with a barred window, Hale outside; scratches in the wall beside it; mop in a bucket | Sinks, Stall |
 | **The Sinks** | Two steel sinks, a polished metal mirror, a soap dish, a hot tap | Door, Stall |
 | **The Stall** | Steel toilet, scratches on the wall, a crooked tile, the hatch in the floor | Door, Sinks, Hatch |
 | **The Hatch** | The trapdoor with a four-wheel combination lock (you kneel down) | Stall |
@@ -37,12 +37,13 @@ The clock only starts when the player presses **Start the clock** after the brie
 
 Walking anywhere else is refused: "You cannot get there from here."
 
-## Items (you can carry two)
+## Items (you can carry three)
 
 | Item | Where | What it does |
 |---|---|---|
 | **Spoon** | Soap dish at the sinks | Needed to pry the crooked tile off the wall |
 | **Mop** | Bucket by the door | Optional. Used at the door ("Jam the door with the mop") it is placed under the door handle and leaves your inventory. This buys the extra minute. |
+| **Car key** | In a hollow behind the crooked tile, once the spoon has pried it off | A car key on a worn leather fob. Someone hid it there for you. |
 
 ## Clues and the code
 
@@ -50,7 +51,7 @@ Walking anywhere else is refused: "You cannot get there from here."
 |---|---|---|
 | **Mirror** | Turn on the hot tap first. Then the steam shows letters someone traced. Without steam you only see your face. | "UNSINKABLE?" |
 | **Graffiti** | Read the scratches on the stall wall | "She was unsinkable. She sailed only once. The year opens the floor." |
-| **Newspaper scrap** | Pry the tile off with the spoon, then read the paper behind it | "...the 'unsinkable' liner went down on her first voyage. 15 April 19▒2..." |
+| **Scratches by the door** | Read the words scratched into the wall beside the door | "The 'unsinkable' went down on her first voyage. 15 April 19▒2. More than 1,500 lost." |
 
 - The code is **1912**, the year the Titanic sank. It is the **same in every game** (open: should it change between games?).
 - Players who do not know the history can still solve it: "sailed only once" gives the missing digit 1.
@@ -84,7 +85,7 @@ After an ending, every action is refused except **Play again / Try again**, whic
 | take an item that is not here, or twice | "There is no ... here." / "You already have the ..." |
 | pry the tile without the spoon | "...your fingers cannot get behind it. Something thin and hard would do." |
 | jam the door without the mop, or a second time | "You need something long and solid..." / "The door is already jammed." |
-| read the scrap while the tile is still on | "The tile is still in place." |
+| take the car key while the tile is still on | "The tile is still in place." |
 | use the tap away from the sinks, the lock away from the hatch | "There is no tap here." / "Kneel down at the hatch to reach the lock." |
 | turn a wheel that does not exist | "The lock only has four wheels." |
 | do anything after an ending | "The story is over. Start a new game to play again." |
