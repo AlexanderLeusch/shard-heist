@@ -311,9 +311,11 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
     });
 
     await t.test('escape room: a wrong code costs 30 s, the right one (1912) is Ending A', async () => {
-      await hs('go:stall'); await hs('pry'); await hs('read:scrap');
+      await hs('go:door'); await hs('read:scratches');
       assert.match(await text('#card .paper'), /19▒2/);
       await click('[data-do="close"]');
+      await hs('go:stall'); await hs('pry'); await hs('take:carkey');
+      assert.match(await text('#slots'), /Car key/);
       await hs('go:hatch');
       await hs('lock');
       await waitFor("!!document.getElementById('lockUi')", 5000, 'lock card');

@@ -125,6 +125,27 @@ const graffitiTex = canvasTex(1024, 640, (g, w, h) => {
   g.strokeStyle = 'rgba(230,232,225,.35)'; g.lineWidth = 1;
   for (let i = 0; i < 40; i++){ const x = rnd() * w, y = rnd() * h; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - .5) * 120, y + (rnd() - .5) * 30); g.stroke(); }
 });
+// Scratches in the tiles beside the door: the date the "unsinkable" ship went down, one digit gouged out
+const scratchesTex = canvasTex(1024, 640, (g, w, h) => {
+  g.clearRect(0, 0, w, h);
+  const scratch = (text, x, y, size, rot, alpha) => {
+    g.save(); g.translate(x, y); g.rotate(rot); g.font = `700 ${size}px "Arial Narrow", Arial, sans-serif`;
+    // on the pale tiles a scratch shows as a dark groove full of grime, with a bright chipped edge beside it
+    for (let k = 0; k < 3; k++){ g.strokeStyle = `rgba(38,40,36,${alpha * (1 - k * .2)})`; g.lineWidth = 2.6; g.strokeText(text, (rnd() - .5) * 2.5, (rnd() - .5) * 2.5); }
+    g.strokeStyle = `rgba(255,255,250,${alpha * .5})`; g.lineWidth = 1; g.strokeText(text, 1.5, 1.5);
+    g.restore();
+  };
+  scratch('THE UNSINKABLE', 60, 130, 76, -.025, .85);
+  scratch('WENT DOWN ON HER FIRST VOYAGE', 50, 230, 52, .015, .85);
+  scratch('15 APRIL 19   2', 70, 360, 82, -.02, .9);
+  // the third digit is scratched over until nothing can be read
+  g.strokeStyle = 'rgba(38,40,36,.85)'; g.lineWidth = 3;
+  for (let i = 0; i < 26; i++){ const x = 520 + rnd() * 50, y = 290 + rnd() * 70; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - .5) * 60, y + (rnd() - .5) * 60); g.stroke(); }
+  scratch('1500 LOST', 90, 470, 60, .03, .8);
+  scratch('IIII IIII', 700, 560, 40, 0, .45);
+  g.strokeStyle = 'rgba(38,40,36,.3)'; g.lineWidth = 1.2;
+  for (let i = 0; i < 30; i++){ const x = rnd() * w, y = rnd() * h; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - .5) * 120, y + (rnd() - .5) * 30); g.stroke(); }
+});
 // Steam on the mirror, with the letters someone traced into it left clear
 const steamTex = canvasTex(1024, 512, (g, w, h) => {
   const gr = g.createLinearGradient(0, h, 0, 0); gr.addColorStop(0, 'rgba(225,232,232,.95)'); gr.addColorStop(1, 'rgba(225,232,232,.72)');
@@ -187,6 +208,7 @@ const M = {
   corridor: new THREE.MeshBasicMaterial({ map: corridorTex }),
   guard: new THREE.MeshBasicMaterial({ map: guardTex, transparent: true, opacity: 0, depthWrite: false }),
   graffiti: new THREE.MeshStandardMaterial({ map: graffitiTex, transparent: true, roughness: .8, depthWrite: false }),
+  scratches: new THREE.MeshStandardMaterial({ map: scratchesTex, transparent: true, roughness: .8, depthWrite: false }),
   steam: new THREE.MeshStandardMaterial({ map: steamTex, transparent: true, opacity: 0, roughness: 1, depthWrite: false }),
   sign: new THREE.MeshStandardMaterial({ map: signTex, roughness: .8 }),
   rubber: new THREE.MeshStandardMaterial({ color: 0x1c1d1e, roughness: .9 })
@@ -352,6 +374,9 @@ mop.add(mopStick, mopFringe); room.add(mop);
 const MOP_CORNER = { p: new THREE.Vector3(3.35, .24, 2.45), r: new THREE.Euler(.18, 0, -.16) };
 const MOP_DOOR = { p: new THREE.Vector3(.58, 0, 2.15), r: new THREE.Euler(.36, 0, .14) };
 hot('take:mop', mopStick, mopFringe);
+// The scratches in the tiles beside the door (east of the door frame, facing into the room)
+const scratches = plane(1.0, .62, M.scratches, 1.75, 1.3, D / 2 - .006, Math.PI);
+hot('read:scratches', scratches);
 
 // The toilet stall: partitions, steel toilet, graffiti, the crooked tile and the hatch in the floor
 const SX0 = 1.5, SZ1 = -.7;
@@ -367,13 +392,19 @@ box(.08, .06, .04, M.dullSteel, 3.25, .86, -2.75);
 const roll = cyl(.055, .055, .1, M.paper, 3.75, .7, -2.0, 14); roll.rotation.z = Math.PI / 2;
 const graffiti = plane(1.05, .66, M.graffiti, SX0 + .025, 1.32, -1.9, Math.PI / 2);
 hot('read:graffiti', graffiti);
-// The crooked tile, the dark hole behind it and the newspaper scrap
+// The crooked tile, the dark hole behind it and the car key hidden there
 const TILE_POS = new THREE.Vector3(2.62, .58, -2.988);
 plane(.15, .15, M.dark, TILE_POS.x, TILE_POS.y, -2.996);
 const tile = box(.15, .15, .018, new THREE.MeshStandardMaterial({ map: tileTex(1), roughness: .3 }), TILE_POS.x, TILE_POS.y, TILE_POS.z);
 tile.material.map.repeat.set(1 / 8, 1 / 8); tile.rotation.z = .07;
-const scrap = plane(.11, .08, M.paper, TILE_POS.x, TILE_POS.y, -2.99); scrap.rotation.z = -.15; scrap.visible = false;
-hot('pry', tile); hot('read:scrap', scrap);
+// the car key: a brass blade, a black plastic head and a worn leather fob, lying in the hollow
+const carKey = new THREE.Group();
+const keyHead = new THREE.Mesh(new THREE.BoxGeometry(.03, .022, .008), new THREE.MeshStandardMaterial({ color: 0x1b1c1e, roughness: .5 }));
+const keyBlade = new THREE.Mesh(new THREE.BoxGeometry(.045, .009, .003), new THREE.MeshStandardMaterial({ color: 0xc8a24a, metalness: .85, roughness: .3 })); keyBlade.position.x = .036;
+const keyRing = new THREE.Mesh(new THREE.TorusGeometry(.01, .002, 6, 14), M.steel); keyRing.position.x = -.022;
+const keyFob = new THREE.Mesh(new THREE.BoxGeometry(.028, .04, .004), new THREE.MeshStandardMaterial({ color: 0x5a3820, roughness: .85 })); keyFob.position.set(-.036, -.016, 0); keyFob.rotation.z = .4;
+carKey.add(keyHead, keyBlade, keyRing, keyFob); carKey.position.set(TILE_POS.x + .005, TILE_POS.y - .01, -2.99); carKey.rotation.z = -.2; carKey.scale.setScalar(1.5); carKey.visible = false; room.add(carKey);
+hot('pry', tile); hot('take:carkey', keyHead, keyBlade, keyFob);
 // The hatch: frame, diamond-plate lid on a hinge, padlock with four number wheels, a shaft with a ladder below
 const HATCH = new THREE.Vector3(2.2, 0, -1.75), HS = .74;
 for (const [w, d, x, z] of [[HS + .08, .05, 0, -HS / 2], [HS + .08, .05, 0, HS / 2], [.05, HS, -HS / 2, 0], [.05, HS, HS / 2, 0]]) box(w, .03, d, M.dullSteel, HATCH.x + x, .015, HATCH.z + z);
@@ -462,7 +493,7 @@ canvas.addEventListener('pointercancel', () => { drag = null; canvas.classList.r
 // ### 3D view does the same as its marker.
 const ANCHORS = {
   'take:mop': [3.35, .9, 2.45], 'wedge': [.38, 1.02, 2.86], 'take:spoon': [-3.85, .95, 0], 'tap': [-3.94, 1.08, -.53],
-  'read:mirror': [-3.97, 1.75, .45], 'read:graffiti': [1.53, 1.5, -1.9], 'pry': [2.62, .58, -2.97], 'read:scrap': [2.62, .58, -2.97],
+  'read:mirror': [-3.97, 1.75, .45], 'read:graffiti': [1.53, 1.5, -1.9], 'pry': [2.62, .58, -2.97], 'take:carkey': [2.62, .58, -2.97], 'read:scratches': [1.75, 1.3, 2.95],
   'lock': [2.2, .1, -1.1]
 };
 const keyOf = h => h.target ? `${h.action}:${h.target}` : h.action;
@@ -547,7 +578,7 @@ function act(action, target){
 }
 
 // ### syncWorld puts every object where the state says it is: spoon in the dish or gone, mop in the bucket or jammed
-// ### against the door, the tile on the wall or on the floor, the scrap visible, the lock wheels, the steam.
+// ### against the door, the tile on the wall or on the floor, the car key in its hollow, the lock wheels, the steam.
 function syncWorld(){
   spoon.visible = !S.inventory.includes('spoon');
   const mp = S.wedged ? MOP_DOOR : S.inventory.includes('mop') ? null : MOP_CORNER;
@@ -555,7 +586,7 @@ function syncWorld(){
   if (mp){ mop.position.copy(mp.p); mop.rotation.copy(mp.r); }
   if (S.tileOpen && tile.userData.fall === undefined) tile.userData.fall = 0;
   if (!S.tileOpen){ tile.position.copy(TILE_POS); tile.rotation.set(0, 0, .07); delete tile.userData.fall; }
-  scrap.visible = S.tileOpen && !S.clues.includes('scrap');
+  carKey.visible = S.tileOpen && !S.inventory.includes('carkey');
   S.lock.forEach((d, i) => { if (wheelTex[i].userData !== d){ drawDigit(wheelTex[i], d); wheelTex[i].userData = d; } });
   if (!S.ending){ lidPivot.rotation.x = 0; tunnelLight.intensity = 0; }
 }
@@ -565,13 +596,14 @@ function syncWorld(){
 const overlay = $('overlay'), card = $('card'), hud = $('hud');
 const ICON = {
   spoon: '<svg viewBox="0 0 40 24" aria-hidden="true"><ellipse cx="10" cy="12" rx="8" ry="5" fill="#cfd6d9"/><rect x="16" y="10.5" width="22" height="3" rx="1.5" fill="#cfd6d9"/></svg>',
-  mop: '<svg viewBox="0 0 40 24" aria-hidden="true"><rect x="2" y="10.5" width="28" height="3" rx="1.5" fill="#c49a64"/><path d="M28 6h10v12H28z" fill="#d8d2bf"/></svg>'
+  mop: '<svg viewBox="0 0 40 24" aria-hidden="true"><rect x="2" y="10.5" width="28" height="3" rx="1.5" fill="#c49a64"/><path d="M28 6h10v12H28z" fill="#d8d2bf"/></svg>',
+  carkey: '<svg viewBox="0 0 40 24" aria-hidden="true"><rect x="6" y="7" width="12" height="10" rx="3" fill="#7d8489"/><path d="M18 10.5h16l2 1.5-2 1.5h-3l-1 1.5-1-1.5H18z" fill="#d6b25a"/><circle cx="5" cy="12" r="3" fill="none" stroke="#cfd6d9" stroke-width="1.5"/></svg>'
 };
 // ### Updates the clock, inventory and journal from the current state.
 function renderHud(){
   $('place').textContent = (R.SCENES[S.scene] || { title: S.scene === 'cell' ? 'The Cell' : 'Cell Block D' }).title;
   const slots = $('slots'); slots.textContent = '';
-  for (let i = 0; i < 2; i++){
+  for (let i = 0; i < 3; i++){
     const it = S.inventory[i], d = document.createElement('div');
     d.className = 'slot' + (it ? ' full' : '');
     if (it){ d.innerHTML = ICON[it]; d.append(R.ITEMS[it]); } else d.textContent = 'Empty';

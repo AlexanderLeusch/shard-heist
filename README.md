@@ -20,8 +20,8 @@ You were the detective on the Ashford necklace case; now you are inmate 4471, co
 | | |
 |---|---|
 | Scenes (5) | The door, the sinks, the toilet stall, the hatch, the tunnel |
-| Items (2) | A spoon (pries the crooked tile off the wall) and a mop (optional: jams the door) |
-| Clues (3) | Steam on the mirror, graffiti in the stall, a newspaper scrap behind the tile. Together they give the year the "unsinkable" ship sank. The code is always the same |
+| Items (3) | A spoon (pries the crooked tile off the wall), the car key hidden behind that tile, and a mop (optional: jams the door) |
+| Clues (3) | Steam on the mirror, graffiti in the stall, scratches in the wall beside the door. Together they give the year the "unsinkable" ship sank. The code is always the same |
 | Endings (2) | **A:** the hatch opens in time and you climb down into the tunnel. **B:** time runs out and Hale takes you back to your cell. The earlier choice to jam the door buys one extra minute before Ending B |
 | Pressure | 10:00 clock, warnings at 5:00, 2:00, 1:00 and 0:30; every wrong code makes noise and costs 30 seconds |
 | Controls | Drag (or arrow keys) to look around, click the pulsing markers or the objects, "Walk to" buttons to move, `P` / `Esc` pause, `M` sound, a volume slider on the pause card |
