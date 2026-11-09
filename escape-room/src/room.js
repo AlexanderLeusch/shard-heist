@@ -602,10 +602,11 @@ function hideCard(){ overlay.hidden = true; }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ### The briefing: five short cards so a first-time player knows what happened, who they are, where, why and how to play.
-// ### The first card is a newspaper clipping (the paper style of the clue cards): the theft at the Museu de Marinha in Lisbon.
+// ### The first card is the front page of an old newspaper (.news in styles.css): the theft at the Museu de Marinha in Lisbon.
+// ### It has no eyebrow or title of its own: the newspaper headline is the card's h1.
 // ### The third is not a card but a short scene in the room (see "Briefing scene" below): Hale shuts and locks the door.
 const BRIEF = [
-  ['Lisbon · 16 April 2012', 'The <em>Theft</em>', '<div class="paper"><small>Front page</small><b>Titanic necklace vanishes from naval museum</b><br>BELÉM. The Starfall necklace, lent by the Ashford family to the Museu de Marinha for a limited exhibition marking 100 years since the sinking of the Titanic, disappeared from its glass case on the night of the centenary. No alarm sounded. The museum has closed the exhibition. A detective has been put on the case.</div>'],
+  [null, null, '<div class="news-wrap"><article class="news" aria-label="Front page of The Lisbon Times"><div class="mast-top"><span>Front page</span><span>Magazine</span></div><div class="mast">The Lisbon Times</div><div class="dateline"><span>Vol. CXXI · No. 107</span><span>Lisbon, Monday 16 April 2012</span><span>€1.20</span></div><h1>Titanic necklace vanishes from naval museum</h1><div class="deck">The Starfall necklace disappears on the night of the centenary. No alarm sounded.</div><div class="cols"><div class="by">By our crime correspondent</div><p>BELÉM — The Starfall necklace, lent by the Ashford family to the Museu de Marinha for a limited exhibition marking 100 years since the sinking of the Titanic, disappeared from its glass case on the night of the centenary.</p><figure><div class="photo"><i></i><b></b></div><figcaption>The empty case at the Museu de Marinha.</figcaption></figure><p>No alarm sounded. The museum has closed the exhibition.</p><p>A detective has been put on the case.</p></div></article></div>'],
   ['Cell Block D · 02:14', 'Plot <em>Twist</em>', 'Three weeks ago you were that detective. You followed the trail from the empty case at the Museu de Marinha, and it ended at your own door: the necklace’s velvet box, hidden in your car. Tonight you are <b>inmate 4471</b>, convicted of stealing it. Someone framed you.</p><p>Not everyone believed it. <b>Your oldest friend on the force</b> stood by you through the trial and kept digging until he found the proof that clears your name. But the people who framed you found out and came after him. Before he disappeared from Lisbon, he <b>hid the evidence across the city</b>, in places only you would know to look.'],
   ['The washroom · 02:16', 'Ten <em>minutes</em>', 'cine'],
   ['The rumour', 'A way <em>down</em>', 'Inmates whisper about a <b>hatch in the floor</b> of this washroom, locked with a four-digit code. The code is hidden somewhere in the room. Find it, open the hatch, get out before Hale comes back.'],
@@ -634,7 +635,7 @@ function showBrief(i){
       <b>P / Esc</b><span>Pause. The clock keeps running while you read and try the lock</span>
     </div><p>Wrong codes make noise. Each one costs <b>${R.WRONG_CODE_PENALTY} seconds</b>.</p>`;
   showCard(`<div class="steps">${BRIEF.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</div>
-    <div class="eyebrow">${eye}</div><h1>${title}</h1>${body}
+    ${eye ? `<div class="eyebrow">${eye}</div><h1>${title}</h1>` : ''}${body}
     <div class="actions">${last ? '<button class="btn" data-do="start">Start the clock <small>Enter</small></button>' : '<button class="btn" data-do="next">Next <small>Enter</small></button>'}
     ${i > 0 ? '<button class="btn ghost" data-do="back">Back</button>' : ''}</div>`);
 }
