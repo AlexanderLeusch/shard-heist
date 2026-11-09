@@ -358,7 +358,55 @@ function makeTramParts(){
     tail: mergeGeos([boxG(0.3, 0.16, 0.06, 0.7, 1.3, -4.23), boxG(0.3, 0.16, 0.06, -0.7, 1.3, -4.23)])
   };
 }
-const PARTS = { sedan: makeCarParts(false), suv: makeCarParts(true), truck: makeTruckParts(), tram: makeTramParts() };
+// ### A 12 m bus with a low floor: a long window band over a painted lower body, skirts between the wheel arches, a big
+// ### windscreen, a lit destination sign and the air-conditioning box on the roof. coach: a taller touring coach.
+function makeBusParts(coach){
+  const top = coach ? 3.4 : 3.05, belt = coach ? 1.75 : 1.45, H = 5.95;
+  const pillars = [];
+  for (let z = -4.6; z <= 4.61; z += 1.84) pillars.push(boxG(2.52, top - 0.3 - belt, 0.14, 0, (belt + top - 0.3) / 2, z));
+  const wheels = wheelSet(coach ? [[1.1, 3.9], [-1.1, 3.9], [1.1, -2.6], [-1.1, -2.6], [1.1, -3.85], [-1.1, -3.85]] : [[1.1, 3.6], [-1.1, 3.6], [1.1, -2.6], [-1.1, -2.6]], 0.5, 0.3);
+  const skirtY = 0.68, skirt = (z0, z1) => boxG(2.5, 0.46, z1 - z0, 0, skirtY, (z0 + z1) / 2);
+  const skirts = coach ? [skirt(4.55, H), skirt(-1.95, 3.25), skirt(-H, -4.5)] : [skirt(4.25, H), skirt(-1.95, 2.95), skirt(-H, -3.25)];
+  return {
+    body: mergeGeos([boxG(2.5, belt - 0.9, 2 * H, 0, (0.9 + belt) / 2, 0), ...skirts, boxG(2.5, 0.32, 2 * H - 0.1, 0, top - 0.14, 0), ...pillars,
+      boxG(2.5, top - 0.3 - belt, 0.12, 0, (belt + top - 0.3) / 2, -H + 0.06)]),
+    glass: mergeGeos([boxG(2.44, top - 0.3 - belt, 2 * H - 0.3, 0, (belt + top - 0.3) / 2, -0.05), boxG(2.3, top - 0.55 - 0.95 * (coach ? 1.2 : 1), 0.06, 0, (top - 0.3 + 0.95 * (coach ? 1.2 : 1)) / 2, H - 0.02)]),
+    lit: boxG(1.7, 0.26, 0.04, 0, top - 0.3, H + 0.02),
+    trim: mergeGeos([boxG(2.54, 0.34, 0.18, 0, 0.55, H), boxG(2.54, 0.34, 0.18, 0, 0.55, -H), boxG(2.52, 0.08, 2 * H, 0, belt + 0.02, 0)]),
+    cargo: boxG(1.5, 0.3, coach ? 1.8 : 2.6, 0, top + 0.12, -1.2),
+    chrome: wheels.rim, tire: wheels.tire,
+    head: mergeGeos([boxG(0.42, 0.18, 0.05, 0.86, 0.85, H + 0.04), boxG(0.42, 0.18, 0.05, -0.86, 0.85, H + 0.04)]),
+    tail: mergeGeos([boxG(0.22, 0.42, 0.05, 1.05, 1.1, -H - 0.04), boxG(0.22, 0.42, 0.05, -1.05, 1.1, -H - 0.04)]),
+    reach: 4.5
+  };
+}
+// ### A motorcycle with its rider tucked in: tank, fairing and tail in the paint colour (the helmet matches), engine, fork and
+// ### rider in dark leathers. Upright: it does not tilt with the road across.
+function makeMotoParts(){
+  const cyl = (r0, r1, len, x, y, z, rx) => { const g = new THREE.CylinderGeometry(r1, r0, len, 10); if (rx) g.rotateX(rx); g.translate(x, y, z); return g; };
+  const wheels = wheelSet([[0, 0.74], [0, -0.7]], 0.32, 0.15);
+  const rider = [];
+  for (const sd of [-1, 1]){
+    rider.push(boxG(0.13, 0.13, 0.5, sd * 0.17, 1.0, 0.02, -0.15));   // thigh
+    rider.push(boxG(0.11, 0.46, 0.11, sd * 0.21, 0.76, 0.2, 0.45));  // shin
+    rider.push(boxG(0.09, 0.09, 0.55, sd * 0.24, 1.32, 0.24, -0.62)); // arm to the bar
+  }
+  rider.push(boxG(0.38, 0.6, 0.27, 0, 1.36, -0.14, 0.55));            // torso, leaning forward
+  return {
+    body: mergeGeos([boxG(0.34, 0.26, 0.55, 0, 0.98, 0.14), boxG(0.44, 0.42, 0.36, 0, 0.98, 0.6, -0.25), boxG(0.26, 0.18, 0.55, 0, 0.98, -0.46, -0.12),
+      new THREE.SphereGeometry(0.15, 12, 9).scale(1, 1.05, 1.15).translate(0, 1.74, 0.08)]),
+    trim: mergeGeos([boxG(0.36, 0.34, 0.46, 0, 0.56, 0.04), boxG(0.08, 0.86, 0.08, 0.1, 0.7, 0.62, -0.32), boxG(0.08, 0.86, 0.08, -0.1, 0.7, 0.62, -0.32),
+      boxG(0.62, 0.05, 0.05, 0, 1.14, 0.46), boxG(0.06, 0.06, 0.8, 0.14, 0.62, -0.38, 0.22), boxG(0.06, 0.06, 0.8, -0.14, 0.62, -0.38, 0.22), ...rider]),
+    glass: mergeGeos([boxG(0.3, 0.22, 0.03, 0, 1.24, 0.78, -0.65), boxG(0.2, 0.08, 0.03, 0, 1.75, 0.24)]),
+    chrome: mergeGeos([wheels.rim, cyl(0.06, 0.05, 0.62, 0.2, 0.46, -0.52, Math.PI / 2 - 0.12)]),
+    tire: wheels.tire,
+    head: boxG(0.17, 0.1, 0.04, 0, 1.02, 0.8),
+    tail: boxG(0.14, 0.06, 0.04, 0, 1.02, -0.75),
+    upright: true, reach: 0.72
+  };
+}
+const PARTS = { sedan: makeCarParts(false), suv: makeCarParts(true), truck: Object.assign(makeTruckParts(), { reach: 3.5 }), tram: makeTramParts(), bus: makeBusParts(false), coach: makeBusParts(true), moto: makeMotoParts() };
+const BUS_COL = 0xeceee9, COACH_COL = 0xd8dee6;
 const SHARED = {
   glass: (() => { const m = new THREE.MeshStandardMaterial({ color: 0x1c2533, roughness: 0.08, metalness: 0.85 }); m.userData.env = 1.3; return m; })(),
   trim: new THREE.MeshStandardMaterial({ color: 0x15171d, roughness: 0.75 }),
@@ -376,7 +424,7 @@ const CAR_COLS = [0xe8e8ec, 0x2b2f3a, 0x9c2d3a, 0x2f5d8c, 0xc9a24a, 0x5b6b5e, 0x
 // Instanced fleet of identical vehicles; each part one InstancedMesh
 class Fleet {
   constructor(group, parts, n, rnd, color){
-    this.meshes = [];
+    this.meshes = []; this.reach = parts.reach || 2; this.upright = !!parts.upright;
     for (const k of ['body', 'glass', 'cargo', 'lit', 'trim', 'chrome', 'tire', 'head', 'tail', 'lens']){
       if (!parts[k]) continue;
       const m = new THREE.InstancedMesh(parts[k], k === 'body' ? SHARED.paint : SHARED[k], n);
@@ -393,9 +441,10 @@ class Fleet {
     const fx = Math.sin(h), fz = Math.cos(h);
     let pitch = 0, roll = 0, ground = hill(x, z);
     if (on){
-      const hF = hill(x + fx * 2, z + fz * 2), hB = hill(x - fx * 2, z - fz * 2);
+      // reach: from the middle to the axles, so a long bus or lorry follows the slope under its own wheels
+      const r = this.reach, hF = hill(x + fx * r, z + fz * r), hB = hill(x - fx * r, z - fz * r);
       const hL = hill(x + fz * 0.9, z - fx * 0.9), hR = hill(x - fz * 0.9, z + fx * 0.9);
-      pitch = -Math.atan2(hF - hB, 4); roll = Math.atan2(hL - hR, 1.8);
+      pitch = -Math.atan2(hF - hB, 2 * r); roll = this.upright ? 0 : Math.atan2(hL - hR, 1.8);
       // the hill is made of flat triangles; where the car straddles a crease, it rests on the higher side
       ground = Math.max(ground, (hF + hB + hL + hR) / 4);
     }
@@ -1695,7 +1744,10 @@ function buildCity(){
 // ### Trams use the same logic, but Core.tramNext keeps them on the loop, which is where buildCity lays the tracks.
 const npcs = [];
 let npcFleets = null, npcHead = null, npcTail = null;
-const N_NPC = 26, NPC_SUV = 8, N_TRAM = 3;
+const N_NPC = 26, NPC_SUV = 8, N_TRAM = 3, N_BUS = 2, N_MOTO = 4;
+// half the length of each kind of city vehicle, and where its lights sit: [front, back, height, half the gap between the pair]
+const NPC_KIND = { sedan: { half: 2.3, glow: [2.3, 2.3, 0.75, 0.62] }, suv: { half: 2.3, glow: [2.3, 2.3, 0.75, 0.62] }, tram: { half: 4.25, glow: [4.25, 4.25, 1.3, 0.1] },
+  bus: { half: 6, glow: [6, 6, 0.85, 0.86] }, moto: { half: 1.05, glow: [0.8, 0.75, 1.02, 0.01] } };
 const { TRAM_LOOP } = Core;
 const TRAM_SEGS = (() => {
   const T = TRAM_LOOP, out = [];
@@ -1708,21 +1760,28 @@ const inGrid = (x, z) => Math.abs(x) <= 3 * PITCH + 1 && Math.abs(z) <= 3 * PITC
 // ### Creates the city traffic and the trams, and places them at crossings.
 function initCityTraffic(){
   const grp = CITY.group, rnd = mulberry32(99);
-  npcFleets = { sedan: new Fleet(grp, PARTS.sedan, N_NPC - NPC_SUV, rnd), suv: new Fleet(grp, PARTS.suv, NPC_SUV, rnd), tram: new Fleet(grp, PARTS.tram, N_TRAM, rnd, 0xf2bd1c) };
-  npcHead = new GlowPts(grp, (N_NPC + N_TRAM) * 2, 0xfff1cc, 1.5); npcTail = new GlowPts(grp, (N_NPC + N_TRAM) * 2, 0xff3344, 1.1);
+  npcFleets = { sedan: new Fleet(grp, PARTS.sedan, N_NPC - NPC_SUV, rnd), suv: new Fleet(grp, PARTS.suv, NPC_SUV, rnd), tram: new Fleet(grp, PARTS.tram, N_TRAM, rnd, 0xf2bd1c),
+    bus: new Fleet(grp, PARTS.bus, N_BUS, rnd, BUS_COL), moto: new Fleet(grp, PARTS.moto, N_MOTO, rnd) };
+  const all = N_NPC + N_TRAM + N_BUS + N_MOTO;
+  npcHead = new GlowPts(grp, all * 2, 0xfff1cc, 1.5); npcTail = new GlowPts(grp, all * 2, 0xff3344, 1.1);
+  const add = (fleet, fi, extra) => npcs.push(Object.assign({ fleet, fi, half: NPC_KIND[fleet].half, x: 0, z: 0, dx: 0, dz: 1, node: null, next: 's', speed: 0, cruise: 10, turn: null, stun: 0, on: false, h: 0 }, extra));
   for (let i = 0; i < N_NPC; i++){
     const suv = i >= N_NPC - NPC_SUV;
-    npcs.push({ fleet: suv ? 'suv' : 'sedan', fi: suv ? i - (N_NPC - NPC_SUV) : i, x: 0, z: 0, dx: 0, dz: 1, node: null, next: 's', speed: 0, cruise: 10, turn: null, stun: 0, on: false, h: 0 });
+    add(suv ? 'suv' : 'sedan', suv ? i - (N_NPC - NPC_SUV) : i);
   }
-  for (let i = 0; i < N_TRAM; i++) npcs.push({ fleet: 'tram', tram: true, fi: i, x: 0, z: 0, dx: 1, dz: 0, node: null, next: 's', speed: 0, cruise: 8, turn: null, stun: 0, on: false, h: 0 });
+  for (let i = 0; i < N_TRAM; i++) add('tram', i, { tram: true, dx: 1, dz: 0, cruise: 8 });
+  for (let i = 0; i < N_BUS; i++) add('bus', i, { bus: true });
+  for (let i = 0; i < N_MOTO; i++) add('moto', i, { moto: true });
 }
 // ### Decides where a city car goes at the next crossing. Trams ask Core.tramNext, so they stay on their rails.
 function chooseNext(n){
   if (n.tram) return Core.tramNext(n.node.x, n.node.z, n.dx, n.dz);
   const [rx, rz] = rightOf(n.dx, n.dz), opts = [];
   if (inGrid(n.node.x + n.dx * PITCH, n.node.z + n.dz * PITCH)) opts.push(['s', 0.55]);
-  if (inGrid(n.node.x + rx * PITCH, n.node.z + rz * PITCH)) opts.push(['r', 0.25]);
+  // a 12 m bus cannot take the tight right-hand corner, so it goes straight on or turns left in the wide arc
+  if (!n.bus && inGrid(n.node.x + rx * PITCH, n.node.z + rz * PITCH)) opts.push(['r', 0.25]);
   if (inGrid(n.node.x - rx * PITCH, n.node.z - rz * PITCH)) opts.push(['l', 0.2]);
+  if (!opts.length) opts.push(['r', 1]); // a corner of the grid where only a right turn is left
   let tot = opts.reduce((s, o) => s + o[1], 0), r = Math.random() * tot;
   for (const [k, w] of opts){ r -= w; if (r <= 0) return k; }
   return opts[0][0];
@@ -1744,11 +1803,11 @@ function spawnNpc(n, minDist){
     const [rx, rz] = rightOf(dx, dz);
     const x = sx + dx * along + rx * 3.5, z = sz + dz * along + rz * 3.5;
     if (Math.hypot(x - car.x, z - car.z) < minDist + (n.tram ? 4 : 0)) continue;
-    if (npcs.some(o => o !== n && o.on && Math.hypot(o.x - x, o.z - z) < (n.tram || o.tram ? 16 : 12))) continue;
+    if (npcs.some(o => o !== n && o.on && Math.hypot(o.x - x, o.z - z) < n.half + o.half + 8)) continue;
     n.x = x; n.z = z; n.dx = dx; n.dz = dz;
     n.node = { x: sx + dx * PITCH, z: sz + dz * PITCH };
     n.next = chooseNext(n); n.turn = null; n.stun = 0; n.on = true;
-    n.cruise = n.tram ? 8 : 9 + Math.random() * 4; n.speed = n.cruise * 0.6;
+    n.cruise = n.tram ? 8 : n.bus ? 8 + Math.random() * 2 : n.moto ? 11 + Math.random() * 4 : 9 + Math.random() * 4; n.speed = n.cruise * 0.6;
     return;
   }
   n.on = false;
@@ -1768,18 +1827,19 @@ function startTurn(n, kind, over){
   n.x = Cx + R * Math.cos(a); n.z = Cz + R * Math.sin(a);
   n.turn = { Cx, Cz, R, a0, delta, t, len, d2x, d2z, P1x, P1z };
 }
-// ### Measures the free road ahead of a city car, so it keeps its distance and stops behind others.
+// ### Measures the free road ahead of a city car, so it keeps its distance and stops behind others. The gap is from the middle
+// ### of this vehicle to the back of the one ahead, so nobody drives into the long tail of a bus or a tram.
 function npcGap(n, fx, fz){
   const rx = -fz, rz = fx;
   let gap = Infinity;
-  const test = (x, z, lat) => {
+  const test = (x, z, lat, half) => {
     const rel = (x - n.x) * fx + (z - n.z) * fz;
-    if (rel <= 0 || rel > 40) return;
-    if (Math.abs((x - n.x) * rx + (z - n.z) * rz) < lat && rel < gap) gap = rel;
+    if (rel <= 0 || rel > 46) return;
+    if (Math.abs((x - n.x) * rx + (z - n.z) * rz) < lat && rel - half < gap) gap = rel - half;
   };
-  for (const o of npcs) if (o !== n && o.on) test(o.x, o.z, o.tram ? 2.6 : 2.2);
-  test(car.x, car.z, 2.6);
-  for (const p of police) if (p.active) test(p.x, p.z, 2.4);
+  for (const o of npcs) if (o !== n && o.on) test(o.x, o.z, o.tram || o.bus ? 2.6 : 2.2, o.half);
+  test(car.x, car.z, 2.6, 2.3);
+  for (const p of police) if (p.active) test(p.x, p.z, 2.4, 2.3);
   return gap;
 }
 // ### Moves the city traffic each frame: follows lanes, turns on arcs, obeys signals, and keeps its distance.
@@ -1791,7 +1851,7 @@ function updateNpcs(dt){
       const T = n.turn;
       const fx0 = -Math.sin(T.a0 + T.delta * T.t) * Math.sign(T.delta), fz0 = Math.cos(T.a0 + T.delta * T.t) * Math.sign(T.delta);
       const gap = npcGap(n, fx0, fz0);
-      const desired = n.stun > 0 ? 0 : Math.min(n.tram ? 4 : 6.5, Math.max(0, (gap - (n.tram ? 8.5 : 6)) * 1.0));
+      const desired = n.stun > 0 ? 0 : Math.min(n.tram ? 4 : n.bus ? 4.5 : 6.5, Math.max(0, (gap - n.half - 1.8) * 1.0));
       n.speed += clamp((desired - n.speed) * Math.min(1, dt * 3), -14 * dt, 4 * dt);
       const tNext = T.t + Math.max(0, n.speed) * dt / T.len;
       if (tNext >= 1){
@@ -1813,7 +1873,7 @@ function updateNpcs(dt){
       if (toNode > 11.6 && toNode < 45 && st !== 'g' && !(st === 'y' && toNode < 17)) desired = Math.min(desired, Math.max(0, (toNode - 12.2) * 0.8));
       if (n.next !== 's' && toNode < 22) desired = Math.min(desired, 7);
       const gap = npcGap(n, n.dx, n.dz);
-      desired = Math.min(desired, Math.max(0, (gap - (n.tram ? 8.5 : 6.5)) * 1.0));
+      desired = Math.min(desired, Math.max(0, (gap - n.half - 2.2) * 1.0));
       n.speed += clamp((desired - n.speed) * Math.min(1, dt * 3), -14 * dt, 4 * dt);
       n.x += n.dx * n.speed * dt; n.z += n.dz * n.speed * dt;
       n.h = Math.atan2(n.dx, n.dz);
@@ -1824,11 +1884,12 @@ function updateNpcs(dt){
       }
     }
   }
-  for (const n of npcs){
+  npcs.forEach((n, i) => {
+    const g = NPC_KIND[n.fleet].glow;
     npcFleets[n.fleet].set(n.fi, n.x, 0, n.z, n.h, n.on);
-    vehicleGlow(npcHead, npcTail, npcs.indexOf(n), n.x, n.z, n.h, n.tram ? 4.25 : 2.3, n.tram ? 4.25 : 2.3, n.tram ? 1.3 : 0.75, n.tram ? 0.1 : 0.62, n.on);
-  }
-  npcFleets.sedan.commit(); npcFleets.suv.commit(); npcFleets.tram.commit(); npcHead.commit(); npcTail.commit();
+    vehicleGlow(npcHead, npcTail, i, n.x, n.z, n.h, g[0], g[1], g[2], g[3], n.on);
+  });
+  Object.values(npcFleets).forEach(f => f.commit()); npcHead.commit(); npcTail.commit();
   if (CITY.water) CITY.water.material.normalMap.offset.x += dt * 0.012;
 }
 // ### Returns the city traffic to its starting places for a new run.
@@ -1963,15 +2024,21 @@ function buildHighway(){
 // ### (including the player and police) and is recycled ahead of or behind the player when it leaves the visible window.
 const traffic = [];
 let hwFleets = null, headPts = null, tailPts = null;
-const HW_FLEET = { sedan: 30, suv: 14, truck: 10 };
-const VDIM = { sedan: { len: 4.6, hw: 0.95, front: 2.3, back: 2.3, y: 0.75, off: 0.62 }, suv: { len: 4.6, hw: 1.0, front: 2.3, back: 2.3, y: 0.86, off: 0.62 }, truck: { len: 9.7, hw: 1.3, front: 4.35, back: 5.35, y: 1.05, off: 0.9 } };
+const HW_FLEET = { sedan: 30, suv: 14, truck: 10, coach: 3, moto: 6 };
+const VDIM = { sedan: { len: 4.6, hw: 0.95, front: 2.3, back: 2.3, y: 0.75, off: 0.62 }, suv: { len: 4.6, hw: 1.0, front: 2.3, back: 2.3, y: 0.86, off: 0.62 }, truck: { len: 9.7, hw: 1.3, front: 4.35, back: 5.35, y: 1.05, off: 0.9 },
+  coach: { len: 12, hw: 1.27, front: 6, back: 6, y: 0.85, off: 0.86 }, moto: { len: 2.1, hw: 0.45, front: 0.8, back: 0.75, y: 1.02, off: 0.01 } };
+// the coloured body of each kind: the coaches are all in one livery, everything else gets a random paint
+const FLEET_COL = { coach: COACH_COL };
+// lorries and coaches keep to the middle and slow lanes, and drive slower
+const HEAVY = { truck: true, coach: true };
 // ### Creates the highway traffic in both directions.
 function initTraffic(){
   const grp = HWY.group, rnd = mulberry32(5);
-  hwFleets = { sedan: new Fleet(grp, PARTS.sedan, HW_FLEET.sedan, rnd), suv: new Fleet(grp, PARTS.suv, HW_FLEET.suv, rnd), truck: new Fleet(grp, PARTS.truck, HW_FLEET.truck, rnd) };
-  const total = HW_FLEET.sedan + HW_FLEET.suv + HW_FLEET.truck;
+  hwFleets = {};
+  for (const type of Object.keys(HW_FLEET)) hwFleets[type] = new Fleet(grp, PARTS[type], HW_FLEET[type], rnd, FLEET_COL[type]);
+  const total = Object.values(HW_FLEET).reduce((a, b) => a + b, 0);
   headPts = new GlowPts(grp, total * 2, 0xfff1cc, 1.8); tailPts = new GlowPts(grp, total * 2, 0xff3344, 1.3);
-  for (const type of ['sedan', 'suv', 'truck']) for (let i = 0; i < HW_FLEET[type]; i++){
+  for (const type of Object.keys(HW_FLEET)) for (let i = 0; i < HW_FLEET[type]; i++){
     const d = VDIM[type];
     traffic.push({ type, mi: i, len: d.len, hw: d.hw, dir: i < HW_FLEET[type] * 0.6 ? 1 : -1, x: 0, z: 0, speed: 0, cruise: 30, on: false });
   }
@@ -1980,13 +2047,13 @@ function laneSet(t){ return t.dir > 0 ? HW.our : HW.opp; }
 function spawnVehicle(t, zMin, zMax){
   const lanes = laneSet(t);
   for (let k = 0; k < 24; k++){
-    const li = t.type === 'truck' ? 1 + Math.floor(Math.random() * 2) : Math.floor(Math.random() * 3);
+    const li = HEAVY[t.type] ? 1 + Math.floor(Math.random() * 2) : Math.floor(Math.random() * 3);
     const x = lanes[li], z = zMin + Math.random() * (zMax - zMin);
     if (z < HW.Z0 + 20 || z > HW.Z1 - 30) continue;
     if (traffic.some(o => o !== t && o.on && o.dir === t.dir && Math.abs(o.x - x) < 1 && Math.abs(o.z - z) < 30 + (o.len + t.len) / 2)) continue;
     if (Math.abs(car.x - x) < 2.6 && Math.abs(car.z - z) < 40) continue;
     t.x = x; t.z = z; t.on = true;
-    t.cruise = t.type === 'truck' ? 22 + Math.random() * 3 : [34, 29, 24][li] + Math.random() * 5;
+    t.cruise = t.type === 'truck' ? 22 + Math.random() * 3 : t.type === 'coach' ? 25 + Math.random() * 2 : [34, 29, 24][li] + Math.random() * (t.type === 'moto' ? 8 : 5);
     t.speed = t.cruise;
     return;
   }
@@ -2295,9 +2362,11 @@ function buildCountry(){
 
   // Country traffic: cars, SUVs and lorries in both directions
   const rnd = mulberry32(17);
-  ctryFleets = { sedan: new Fleet(grp, PARTS.sedan, 10, rnd), suv: new Fleet(grp, PARTS.suv, 5, rnd), truck: new Fleet(grp, PARTS.truck, 3, rnd) };
-  ctryHead = new GlowPts(grp, 36, 0xfff1cc, 1.8); ctryTail = new GlowPts(grp, 36, 0xff3344, 1.3);
-  for (const type of ['sedan', 'suv', 'truck']) for (let i = 0; i < ctryFleets[type].meshes[0].count; i++)
+  const CTRY_FLEET = { sedan: 10, suv: 5, truck: 3, coach: 1, moto: 3 }, nTraffic = Object.values(CTRY_FLEET).reduce((a, b) => a + b, 0);
+  ctryFleets = {};
+  for (const type of Object.keys(CTRY_FLEET)) ctryFleets[type] = new Fleet(grp, PARTS[type], CTRY_FLEET[type], rnd, FLEET_COL[type]);
+  ctryHead = new GlowPts(grp, nTraffic * 2, 0xfff1cc, 1.8); ctryTail = new GlowPts(grp, nTraffic * 2, 0xff3344, 1.3);
+  for (const type of Object.keys(CTRY_FLEET)) for (let i = 0; i < CTRY_FLEET[type]; i++)
     ctraffic.push({ type, mi: i, s: 0, dir: 1, lat: ROAD.lane, speed: 0, cruise: 22, on: false, stun: 0, x: 0, z: 0, h: 0 });
   tuneEnv(grp);
   CTRY.built = true;
@@ -2310,7 +2379,7 @@ function spawnCountryVehicle(t, sMin, sMax){
     const dir = Math.random() < 0.5 ? 1 : -1, lat = dir * ROAD.lane;
     if (ctraffic.some(o => o !== t && o.on && o.dir === dir && Math.abs(o.s - s) < 45)) continue;
     if (Math.abs(s - roadPos.s) < 60 && Math.abs(lat - roadPos.lat) < 3) continue;
-    Object.assign(t, { s, dir, lat, on: true, stun: 0, cruise: t.type === 'truck' ? 19 + Math.random() * 3 : 22 + Math.random() * 6 });
+    Object.assign(t, { s, dir, lat, on: true, stun: 0, cruise: HEAVY[t.type] ? 19 + Math.random() * 3 : t.type === 'moto' ? 24 + Math.random() * 6 : 22 + Math.random() * 6 });
     t.speed = t.cruise;
     const pt = roadPoint(s, lat); t.x = pt.x; t.z = pt.z;
     return;
@@ -3175,13 +3244,15 @@ function vehicleObstacles(){
   return (obsCache = buildObstacles());
 }
 // ### Lists the moving vehicles near the player as circles, for collisions.
+// circles along each kind of vehicle: where they sit from the middle, and their radius
+const OBST = { truck: [[-4.2, -1.5, 1.2, 3.6], 1.35], tram: [[-2.9, 0, 2.9], 1.3], bus: [[-4.6, -1.55, 1.55, 4.6], 1.3], coach: [[-4.6, -1.55, 1.55, 4.6], 1.3], moto: [[-0.45, 0.45], 0.55], car: [[-1.2, 1.2], 1.05] };
 function buildObstacles(){
   const out = [];
   if (mode === 'country'){
     for (const t of ctraffic){
       if (!t.on) continue;
       const fx = Math.sin(t.h), fz = Math.cos(t.h), v = t.speed;
-      const offs = t.type === 'truck' ? [-4.2, -1.5, 1.2, 3.6] : [-1.2, 1.2], r = t.type === 'truck' ? 1.35 : 1.05;
+      const [offs, r] = OBST[t.type] || OBST.car;
       for (const o of offs) out.push({ x: t.x + fx * o, z: t.z + fz * o, r, npc: t, vx: fx * v, vz: fz * v });
     }
     return out;
@@ -3190,8 +3261,8 @@ function buildObstacles(){
   for (const n of npcs){
     if (!n.on) continue;
     const fx = Math.sin(n.h), fz = Math.cos(n.h);
-    if (n.tram){
-      for (const o of [-2.9, 0, 2.9]) out.push({ x: n.x + fx * o, z: n.z + fz * o, r: 1.3, npc: n, vx: fx * n.speed, vz: fz * n.speed });
+    if (OBST[n.fleet]){
+      for (const o of OBST[n.fleet][0]) out.push({ x: n.x + fx * o, z: n.z + fz * o, r: OBST[n.fleet][1], npc: n, vx: fx * n.speed, vz: fz * n.speed });
       continue;
     }
     out.push({ x: n.x + fx * 1.15, z: n.z + fz * 1.15, r: 1.05, npc: n, vx: fx * n.speed, vz: fz * n.speed });
@@ -3495,10 +3566,25 @@ function initAudio(){
     gameVol.gain.value = Core.volumeGain(volume.game); musicVol.gain.value = Core.volumeGain(volume.music);
     comp.connect(gameVol).connect(master); musicVol.connect(master); master.connect(ctx.destination);
     const gain = v => { const g = ctx.createGain(); g.gain.value = v; return g; };
-    const bus = gain(0); bus.connect(comp);
     const noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
     const nd = noiseBuf.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
     const noise = () => { const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true; s.start(); return s; };
+    // ### The engine bus. Pitched loops alone are too even, which makes an engine hum like a drone. So after the loops:
+    // ### grit, a level that wobbles with slow random noise, as no two firings are equally strong; a little more low end and
+    // ### less of the thin, buzzing band around 2.5 kHz; and a soft saturation, as a real exhaust distorts at full throttle.
+    // ### Beside the loops runs the exhaust roar, broadband noise around the firing frequency that grows with throttle and rpm.
+    const bus = gain(0), grit = gain(1);
+    const gritF = ctx.createBiquadFilter(); gritF.type = 'lowpass'; gritF.frequency.value = 26;
+    const gritDepth = gain(0); noise().connect(gritF).connect(gritDepth).connect(grit.gain);
+    const lowShelf = ctx.createBiquadFilter(); lowShelf.type = 'lowshelf'; lowShelf.frequency.value = 120; lowShelf.gain.value = 3;
+    const buzzCut = ctx.createBiquadFilter(); buzzCut.type = 'peaking'; buzzCut.frequency.value = 2500; buzzCut.Q.value = 0.8; buzzCut.gain.value = -6;
+    // makeup brings quiet sounds back to their old level (drive x the slope of the curve at zero), so only loud ones are squeezed
+    const drive = gain(2.2), shaper = ctx.createWaveShaper(), makeup = gain(Math.tanh(1.6) / (2.2 * 1.6));
+    shaper.curve = (() => { const c = new Float32Array(1024); for (let i = 0; i < c.length; i++){ const x = i / (c.length - 1) * 2 - 1; c[i] = Math.tanh(1.6 * x) / Math.tanh(1.6); } return c; })();
+    shaper.oversample = '2x';
+    bus.connect(grit).connect(lowShelf).connect(buzzCut).connect(drive).connect(shaper).connect(makeup).connect(comp);
+    const roarF = ctx.createBiquadFilter(); roarF.type = 'bandpass'; roarF.Q.value = 0.7; roarF.frequency.value = 160;
+    const roar = gain(0); noise().connect(roarF).connect(roar).connect(bus);
     const roadF = ctx.createBiquadFilter(); roadF.type = 'lowpass'; roadF.frequency.value = 240;
     const road = gain(0); noise().connect(roadF).connect(road).connect(comp);
     const windF = ctx.createBiquadFilter(); windF.type = 'highpass'; windF.frequency.value = 700;
@@ -3514,7 +3600,7 @@ function initAudio(){
     const rotorF = ctx.createBiquadFilter(); rotorF.type = 'lowpass'; rotorF.frequency.value = 900;
     const rotor = gain(0); rotorSrc.connect(rotorF).connect(rotor).connect(comp);
     const radioBus = gain(0), radioComp = ctx.createDynamicsCompressor(); radioComp.threshold.value = -14; radioComp.ratio.value = 6; radioBus.connect(radioComp).connect(musicVol);
-    const whine = ctx.createOscillator(); whine.type = 'triangle';
+    const whine = ctx.createOscillator(); whine.type = 'sine';
     const whineG = gain(0); whine.connect(whineG).connect(comp);
     const turbo = ctx.createOscillator(); turbo.type = 'sine'; turbo.frequency.value = 1800;
     const turboG = gain(0); turbo.connect(turboG).connect(comp);
@@ -3523,7 +3609,7 @@ function initAudio(){
     const sirenDepth = gain(330); sirenLfo.connect(sirenDepth).connect(siren.frequency);
     const sirenGain = gain(0); siren.connect(sirenGain).connect(comp);
     [turbo, whine, siren, sirenLfo].forEach(o => o.start());
-    audio = { ctx, master, gameVol, musicVol, comp, bus, layers: [], voice: null, bufs: {}, noiseBuf, radioBus, road, rotor, rotorF, rotorSrc, wind, tire, popF, airF, turbo, turboG, whine, whineG, sirenGain, sirenLfo };
+    audio = { ctx, master, gameVol, musicVol, comp, bus, gritDepth, roar, roarF, layers: [], voice: null, bufs: {}, noiseBuf, radioBus, road, rotor, rotorF, rotorSrc, wind, tire, popF, airF, turbo, turboG, whine, whineG, sirenGain, sirenLfo };
     setEngineVoice();
   } catch (e) { audio = null; }
 }
@@ -3693,7 +3779,15 @@ function updateEngine(dt){
   else { let i = 0; while (rpm > refs[i + 1]) i++; const f = Math.log(rpm / refs[i]) / Math.log(refs[i + 1] / refs[i]); w[i] = Math.cos(f * Math.PI / 2); w[i + 1] = Math.sin(f * Math.PI / 2); }
   const fuel = throttle && rpm > E.max * 0.995 && Math.sin(clock * 55) < 0 ? 0 : eng.load, onW = Math.sin(fuel * Math.PI / 2), offW = Math.cos(fuel * Math.PI / 2);
   const hunt = w[0] * offW * (0.012 * Math.sin(clock * 2.1) + 0.007 * Math.sin(clock * 5.3 + 1));
-  a.layers.forEach((l, i) => { const r = i >> 1; l.src.playbackRate.setTargetAtTime(clamp(rpm / l.ref + hunt, 0.4, 2.5), t, 0.02); l.g.gain.setTargetAtTime(w[r] * (i & 1 ? offW * (r ? 1 : E.idling.gain) : onW), t, 0.03); });
+  // the revs are never perfectly steady: a small random drift, wider at low rpm and under load
+  eng.flutter = clamp((eng.flutter || 0) * Math.exp(-dt * 6) + (Math.random() - 0.5) * dt * (0.25 + 0.35 * eng.load), -0.012, 0.012);
+  a.layers.forEach((l, i) => { const r = i >> 1; l.src.playbackRate.setTargetAtTime(clamp(rpm / l.ref * (1 + eng.flutter) + hunt, 0.4, 2.5), t, 0.02); l.g.gain.setTargetAtTime(w[r] * (i & 1 ? offW * (r ? 1 : E.idling.gain) : onW), t, 0.03); });
+  // grit and exhaust roar (see initAudio): rougher and louder the harder the engine works
+  const firing = rpm / 60 * E.cyl / 2;
+  // the 26 Hz noise is weak (about 2.4 % of full scale), so this gives a wobble of about 4 % at idle and 12 % flat out
+  a.gritDepth.gain.setTargetAtTime(1.6 + 3.4 * eng.load * (0.4 + 0.6 * norm), t, 0.05);
+  a.roarF.frequency.setTargetAtTime(80 + firing * 1.8, t, 0.03);
+  a.roar.gain.setTargetAtTime(0.55 * (0.2 + 0.8 * eng.load) * (0.3 + 0.7 * norm), t, 0.05);
   const on = live && !muted;
   // the engine is quieter than the music, and drops further under it while the radio plays
   const under = radio.key !== 'off' && volume.music > 0.05 ? 0.55 : 1;
@@ -3711,13 +3805,14 @@ function updateEngine(dt){
     const want = eng.load * norm;
     eng.boost += (want - eng.boost) * Math.min(1, dt * (want > eng.boost ? 1.3 : 4));
     a.turbo.frequency.setTargetAtTime(1400 + 4200 * eng.boost, t, 0.1);
-    a.turboG.gain.setTargetAtTime(on ? E.turbo * eng.boost : 0, t, 0.1);
+    a.turboG.gain.setTargetAtTime(on ? E.turbo * 0.6 * eng.boost : 0, t, 0.1);
     if (on && eng.prevPedal && !pedal && eng.boost > 0.25) noiseBurst(t, a.airF, 0.1, 0.45);
   } else a.turboG.gain.setTargetAtTime(0, t, 0.1);
   if (on && E.air && eng.prevBrake && !braking && sp > 2) noiseBurst(t, a.airF, 0.16, 0.55);
   eng.prevPedal = pedal; eng.prevBrake = braking;
   a.whine.frequency.setTargetAtTime(Math.max(60, sp * E.whine[0] * (car.speed < 0 ? 1.8 : 1)), t, 0.05);
-  a.whineG.gain.setTargetAtTime(on ? E.whine[1] * Math.min(1, sp / 12) * (car.speed < -0.3 ? 3 : 0.4 + 0.6 * eng.load) : 0, t, 0.08);
+  // the gearbox whine is a faint tone under the engine; louder, it is the drone-like hum that real cars do not have
+  a.whineG.gain.setTargetAtTime(on ? E.whine[1] * 0.3 * Math.min(1, sp / 12) * (car.speed < -0.3 ? 3 : 0.4 + 0.6 * eng.load) : 0, t, 0.08);
   const rough = mode === 'country' && Math.abs(roadPos.lat) > 5.4 ? 2.2 : 1;
   a.road.gain.setTargetAtTime(on ? Math.pow(sp / 55, 1.4) * 0.1 * E.road * rough * under : 0, t, 0.15);
   const rotorDist = heli.on ? Math.hypot(heli.x - car.x, heli.z - car.z) : 300, rotorNear = clamp(1 - rotorDist / 240, 0.2, 1);
