@@ -27,7 +27,7 @@ Percentages are relative to the map's top speed and to the car. The menu shows t
 
 | Map | Goal | Time | Car top speed | Police top speed | Shards | Repair kits |
 |---|---|---|---|---|---|---|
-| **Lisbon · Baixa** | Collect **all 6 pieces of evidence**, then drive through the golden gate that appears under the Arco da Rua Augusta | 3:00 | 122 km/h | 119 km/h | 6 pieces of evidence | 3 |
+| **Lisbon · Baixa** | Collect **all 6 pieces of evidence**, pick up the **witness**, then drive through the golden gate that appears under the Arco da Rua Augusta | 3:00 | 122 km/h | 119 km/h | 6 pieces of evidence | 3 |
 | **Highway** | Reach the finish **4 km** ahead. Shards are optional: **+4 s** each | 1:50 | 200 km/h | 187 km/h | 12 | 2 |
 | **Countryside** | Reach the village at the end of the road. Shards: **+4 s** each | 2:30 | 158 km/h | 148 km/h | 10 | 3 |
 
@@ -49,9 +49,13 @@ In Lisbon you do not collect star shards. Your oldest friend on the force found 
 | **Clothes** | The dark clothes from the photos, with glass splinters from the display case in the seams |
 | **Balaclava** | The balaclava from the photos, with hairs inside that are not yours |
 
-**Before you drive** a map of the Baixa shows where the six pieces lie, with their names, the repair kits, your start and the gate. The clock waits until you press **Start driving**. **While you drive** an arrow on the screen (at the bottom in the middle; on an upright phone under the pursuit panel) points to the nearest piece still out there, with its name and distance; once all six are found it turns gold and points to the gate. (The story's sealed letter is on neither.)
+**Before you drive** a map of the Baixa shows where the six pieces lie, with their names, the repair kits, your start and the gate. The clock waits until you press **Start driving**. **While you drive** an arrow on the screen (at the bottom in the middle; on an upright phone under the pursuit panel) points to the nearest piece still out there, with its name and distance; once all six are found it turns gold and points to the witness, and once she is in the car, to the gate. (The story's sealed letter is on neither.)
 
-With all six in the car, the gate under the Arco da Rua Augusta opens. The highway and the countryside keep their **bonus shards** (+4 s each).
+**The witness.** With all six pieces in the car, one thing is still missing: a person. **Marta Silva**, a night-shift nurse, saw the real thief climb out of the museum window, and she will say so in court. She waits on a pavement somewhere in the Baixa, 70 to 200 m from where you are, waving, with a golden light over her head. The radar shows her in gold (an arrow at the rim while she is out of range), the signal bars point to her, and a seventh icon appears in the panel. Stop next to her, closer than 7 m and slower than about 11 km/h, and she walks to the passenger door and gets in. Drive off before she reaches the car (more than 12 m away) and she goes back to wait. With her on board, the gate under the Arco da Rua Augusta opens. The police keep chasing you while you wait for her.
+
+**The finale.** Drive through the gate and the picture fades: you are on the **25 de Abril bridge** with Marta beside you, driving south over the Tejo at about 86 km/h while the first light of the morning comes up in the east. There is nothing more to do: no police, no helicopter, heroic music (brass, strings and timpani, about 14 seconds, on the music volume). Then the result card. The drive over the bridge does not count towards your time. In the story, it ends act 1.
+
+The highway and the countryside keep their **bonus shards** (+4 s each).
 
 ## The city map: Lisbon's Baixa
 
@@ -65,7 +69,7 @@ The Baixa is the centre of Lisbon, rebuilt as a street grid after the 1755 earth
 - In free ride, the panel at the top left shows the street or square you are on. In story mode it shows the act instead.
 - You start on Rua Augusta, facing south towards the Arco da Rua Augusta.
 - **Squares:** the Rossio and the Praça da Figueira in the north, the Praça do Comércio by the river in the south. The statue on the Praça do Comércio stands in the middle of the road, so traffic passes on both sides.
-- **Landmarks you can see but not reach:** the river Tejo, the 25 de Abril bridge, Cristo Rei and the castle hill. The Santa Justa lift stands on the map, and you can crash into it.
+- **Landmarks you can see but not reach:** the river Tejo, the 25 de Abril bridge (you only cross it in the finale), Cristo Rei and the castle hill. The river moves: long swells and fine ripples, it mirrors the sky towards the horizon, and the lights of the far bank tremble on it as long streaks. The Santa Justa lift stands on the map, and you can crash into it.
 - **Parks:** there are three, which the real Baixa does not have. The story needs them for the sealed letter.
 - **Houses:** closed blocks of Pombaline houses, wall to wall, as the Baixa was rebuilt after 1755: a ground floor plus 3 to 5 floors (OpenStreetMap gives most buildings 5 levels), arched stone ground floors with old shop fronts, the tallest windows and the balconies on the first floor, limewash colours, and tile roofs with dormers. Tiled fronts are the exception, as they are in the real Baixa.
 - **Real buildings in their place:** the National Theatre and Rossio station north of the Rossio, the yellow arcades and corner towers of the Praça do Comércio, and the Sé, seen at the end of Rua da Conceição. Their position is simplified, and they are modelled freely, not measured.
@@ -135,7 +139,7 @@ All of it is composed and synthesised by the game, with no music files. The tune
 
 | Result | When |
 |---|---|
-| **Clean getaway** | Lisbon: reach the gate under the arch. Highway: pass the 4 km mark. Countryside: reach the village |
+| **Clean getaway** | Lisbon: reach the gate under the arch, with the six pieces of evidence and the witness; the drive over the bridge follows. Highway: pass the 4 km mark. Countryside: reach the village |
 | **Busted** | the bust meter is full |
 | **Wrecked** | damage reaches 100 % |
 | **Time's up** | the clock reaches 0:00 |
@@ -159,7 +163,7 @@ All of it is composed and synthesised by the game, with no music files. The tune
 
 | Act | Map | Goal | Special rule |
 |---|---|---|---|
-| **1 · The Evidence** | Lisbon | Recover the 6 pieces of evidence, then the gate | An optional **sealed letter** is hidden in a park. It is **not shown on the radar**. |
+| **1 · The Evidence** | Lisbon | Recover the 6 pieces of evidence, pick up the witness, then the gate and the bridge | An optional **sealed letter** is hidden in a park. It is **not shown on the radar**. |
 | **2 · The Courier** | Highway | Catch the gold-marked courier lorry (get within 9 m) to take the **clasp**, then the finish | The **toll at the finish only opens with the clasp**: without it you stop there |
 | **3 · Homecoming** | Countryside | Drive back to the Ashford mansion | Officer Hale waits on the right verge 70 m before the finish and calls out when you are close. The confrontation decides the ending |
 
