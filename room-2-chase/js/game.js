@@ -1716,32 +1716,73 @@ function buildCity(){
   const farMat = c => new THREE.MeshBasicMaterial({ color: c, fog: false });
   const bank = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 12).scale(1200, 46, 130).translate(0, 0, 770), farMat(0x070a18));
   const cristo = new THREE.Mesh(mergeGeos([boxG(9, 42, 9, -170, 62, 690), boxG(5.5, 19, 4, -170, 92, 690), boxG(22, 2.8, 3, -170, 98, 690), boxG(3, 3.4, 3, -170, 103, 690)]), farMat(0xa9aec4));
+  // ### The 25 de Abril bridge, after the real one (a suspension bridge built in 1966, painted red): two towers on concrete
+  // ### foundations in the river, each with two legs joined by cross beams at four heights; two main cables, one over each edge
+  // ### of the deck, hanging between the towers and running down to the anchor blocks at both ends; a hanger every 10 m from
+  // ### each cable to the deck; under the six-lane road a deep steel truss (top and bottom chords, posts and diagonals) with the
+  // ### lower deck of the railway inside it; concrete piers under the side spans; lamps on both sides and red warning lights on
+  // ### the towers. The steel is lit like everything else (it catches the morning light in the finale), with a faint glow of its
+  // ### own so the night does not swallow it from the city. Shorter than the real one (main span 300 m instead of 1013 m), so it
+  // ### fits the view. x runs along the bridge, z across it, y is up; the road surface is at y = 42.12.
   const bridge = new THREE.Group();
   {
-    const seg = (x0, y0, x1, y1, t) => { const l = Math.hypot(x1 - x0, y1 - y0), g = new THREE.BoxGeometry(l, t, t); g.rotateZ(Math.atan2(y1 - y0, x1 - x0)); g.translate((x0 + x1) / 2, (y0 + y1) / 2, 0); return g; };
-    const steel = [new THREE.BoxGeometry(700, 4, 9).translate(0, 40, 0)];
-    for (const tx of [-150, 150]) steel.push(new THREE.BoxGeometry(7, 112, 5).translate(tx, 56, -6), new THREE.BoxGeometry(7, 112, 5).translate(tx, 56, 6), new THREE.BoxGeometry(7, 5, 16).translate(tx, 108, 0), new THREE.BoxGeometry(7, 5, 16).translate(tx, 72, 0));
-    const main = x => 46 + 62 * (x / 150) ** 2;
-    for (let x = -150; x < 150; x += 12.5){ steel.push(seg(x, main(x), x + 12.5, main(x + 12.5), 1.4)); steel.push(new THREE.BoxGeometry(0.5, main(x) - 42, 0.5).translate(x, (main(x) + 42) / 2, 0)); }
-    for (const sx of [-1, 1]) steel.push(seg(sx * 150, 108, sx * 350, 42, 1.4));
-    bridge.add(new THREE.Mesh(mergeGeos(steel), farMat(0x93422c)));
-    // the road on the deck, seen up close in the finale: asphalt, white lane lines and a steel railing on each side
-    const deckRoad = new THREE.Mesh(new THREE.BoxGeometry(700, 0.12, 8.6).translate(0, 42.06, 0), new THREE.MeshStandardMaterial({ color: 0x2a2c31, roughness: 0.9 }));
+    const TX = 150, HALF = 350, CZ = 9.5, ROAD = 42.12, TOP = 41.6, BOT = 35.6, TRUSS_Z = 8;
+    const steelMat = new THREE.MeshStandardMaterial({ color: 0xb4422a, roughness: 0.55, metalness: 0.35, emissive: 0x2a0b05, fog: false });
+    const concreteMat = new THREE.MeshStandardMaterial({ color: 0x8d8a84, roughness: 0.9, emissive: 0x101010, fog: false });
+    const bar = (a, b, r) => limb(a, b, r, r, 6);
+    // the main cable: a parabola from tower top (112 m) down to 4 m above the road in the middle; then straight-ish to the anchors
+    const cableY = x => Math.abs(x) <= TX ? 46.5 + 65.5 * (x / TX) ** 2 : 112 - (Math.abs(x) - TX) / (HALF - TX) * 66 - Math.sin(Math.PI * (Math.abs(x) - TX) / (HALF - TX)) * 5;
+    const steel = [], concrete = [];
+    for (const tx of [-TX, TX]){
+      for (const z of [-CZ, CZ]) steel.push(limb([tx, 0, z], [tx, 116, z], 3.0, 2.2, 8));
+      for (const [y, h] of [[29, 4], [70, 3.5], [92, 3.5], [113, 3]]) steel.push(boxG(4.5, h, 2 * CZ + 3, tx, y, 0));
+      concrete.push(boxG(16, 7, 2 * CZ + 10, tx, 1.5, 0));
+    }
+    for (const z of [-CZ, CZ]){
+      for (let x = -HALF; x < HALF; x += 10) steel.push(bar([x, cableY(x), z], [x + 10, cableY(x + 10), z], 0.55));
+      for (let x = -HALF + 10; x < HALF; x += 10) if (Math.abs(Math.abs(x) - TX) > 3) steel.push(bar([x, cableY(x), z], [x, TOP + 0.6, z > 0 ? TRUSS_Z : -TRUSS_Z], 0.09));
+    }
+    // the truss girder: chords along both edges, a post every 10 m and a diagonal in between, cross beams and the railway deck
+    for (const z of [-TRUSS_Z, TRUSS_Z]){
+      steel.push(boxG(2 * HALF, 0.7, 0.7, 0, TOP, z), boxG(2 * HALF, 0.7, 0.7, 0, BOT, z));
+      for (let x = -HALF; x < HALF; x += 10){
+        steel.push(boxG(0.45, TOP - BOT, 0.45, x, (TOP + BOT) / 2, z));
+        steel.push(bar([x, BOT, z], [x + 5, TOP, z], 0.18), bar([x + 5, TOP, z], [x + 10, BOT, z], 0.18));
+      }
+    }
+    for (let x = -HALF; x <= HALF; x += 10) steel.push(boxG(0.5, 0.5, 2 * TRUSS_Z, x, BOT, 0));
+    steel.push(boxG(2 * HALF, 0.4, 2 * TRUSS_Z - 4, 0, BOT + 0.6, 0));
+    // concrete piers under the side spans and the anchor blocks that hold the cables at the ends
+    for (const sx of [-1, 1]){
+      for (const px of [215, 280]) concrete.push(boxG(5, BOT, 2 * TRUSS_Z + 2, sx * px, BOT / 2, 0));
+      concrete.push(boxG(22, 46, 2 * CZ + 8, sx * (HALF + 8), 23, 0));
+    }
+    bridge.add(new THREE.Mesh(mergeGeos(steel), steelMat), new THREE.Mesh(mergeGeos(concrete), concreteMat));
+    // the road: six lanes on a deck slab, dashed lane lines, a solid edge line, a concrete barrier in the middle, steel railings
+    const deckRoad = new THREE.Mesh(new THREE.BoxGeometry(2 * HALF, 0.5, 2 * TRUSS_Z + 1).translate(0, ROAD - 0.25, 0), new THREE.MeshStandardMaterial({ color: 0x2a2c31, roughness: 0.9 }));
     const lines = [];
-    for (let x = -345; x < 345; x += 9) lines.push(boxG(4.5, 0.02, 0.14, x, 42.13, 0), boxG(4.5, 0.02, 0.14, x, 42.13, 1.45), boxG(4.5, 0.02, 0.14, x, 42.13, -1.45));
-    lines.push(boxG(700, 0.02, 0.14, 0, 42.13, 3.9), boxG(700, 0.02, 0.14, 0, 42.13, -3.9));
+    for (let x = -HALF + 5; x < HALF; x += 9) for (const z of [-5.27, -2.93, 2.93, 5.27]) lines.push(boxG(4.5, 0.02, 0.14, x, ROAD + 0.01, z));
+    for (const z of [-7.6, -0.6, 0.6, 7.6]) lines.push(boxG(2 * HALF, 0.02, 0.14, 0, ROAD + 0.01, z));
     const deckLines = new THREE.Mesh(mergeGeos(lines), new THREE.MeshStandardMaterial({ color: 0xd8dbe4, roughness: 0.7 }));
-    const rails = [boxG(700, 0.08, 0.1, 0, 43.1, 4.25), boxG(700, 0.08, 0.1, 0, 43.1, -4.25), boxG(700, 0.06, 0.08, 0, 42.6, 4.25), boxG(700, 0.06, 0.08, 0, 42.6, -4.25)];
-    for (let x = -345; x <= 345; x += 3) rails.push(boxG(0.08, 1.0, 0.08, x, 42.6, 4.25), boxG(0.08, 1.0, 0.08, x, 42.6, -4.25));
-    const deckRails = new THREE.Mesh(mergeGeos(rails), new THREE.MeshStandardMaterial({ color: 0x8e3a26, roughness: 0.5, metalness: 0.4 }));
-    bridge.add(deckRoad, deckLines, deckRails);
+    const barrier = new THREE.Mesh(mergeGeos([boxG(2 * HALF, 0.8, 0.5, 0, ROAD + 0.4, 0), boxG(2 * HALF, 0.12, 0.8, 0, ROAD + 0.06, 0)]), new THREE.MeshStandardMaterial({ color: 0x9a978f, roughness: 0.85 }));
+    const rails = [];
+    for (const z of [-8.3, 8.3]){
+      rails.push(boxG(2 * HALF, 0.08, 0.1, 0, ROAD + 1.0, z), boxG(2 * HALF, 0.06, 0.08, 0, ROAD + 0.5, z));
+      for (let x = -HALF + 1; x <= HALF; x += 3) rails.push(boxG(0.08, 1.0, 0.08, x, ROAD + 0.5, z));
+    }
+    // a lamp every 30 m on each side: a post with an arm over the road
+    const posts = [], lamps = [];
+    for (let x = -HALF + 15; x < HALF; x += 30) for (const s of [-1, 1]){
+      posts.push(boxG(0.2, 8, 0.2, x, ROAD + 4, s * 8.6), boxG(0.14, 0.14, 1.6, x, ROAD + 7.9, s * 7.9));
+      lamps.push(x, ROAD + 7.7, s * 7.2);
+    }
+    const deckRails = new THREE.Mesh(mergeGeos(rails.concat(posts)), new THREE.MeshStandardMaterial({ color: 0x8e3a26, roughness: 0.5, metalness: 0.4 }));
+    bridge.add(deckRoad, deckLines, barrier, deckRails);
     CITY.bridge = bridge;
-    const lamps = [];
-    for (let x = -345; x <= 345; x += 12) lamps.push(x, 43.5, 0);
     const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lamps, 3));
     bridge.add(new THREE.Points(lg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffcf8c, size: 5, sizeAttenuation: true, transparent: true, opacity: LAMP_HALO, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
-    const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute([-150, 114, 0, 150, 114, 0], 3));
-    bridge.add(new THREE.Points(rg, new THREE.PointsMaterial({ map: glowTexture, color: 0xff3344, size: 15, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
+    const rg = new THREE.BufferGeometry(); rg.setAttribute('position', new THREE.Float32BufferAttribute([-TX, 116.5, -CZ, -TX, 116.5, CZ, TX, 116.5, -CZ, TX, 116.5, CZ, -TX, 70, -CZ - 1.6, TX, 70, CZ + 1.6], 3));
+    bridge.add(new THREE.Points(rg, new THREE.PointsMaterial({ map: glowTexture, color: 0xff3344, size: 9, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
     bridge.position.set(-400, 0, 410); bridge.rotation.y = -1.2;
   }
   const bl = [];
@@ -4887,7 +4928,7 @@ function updateWitness(dt, live){
 // ### over the Tejo as the first light comes up behind the towers. The road is yours: no police, no helicopter, heroic music. Then
 // ### the result card. A black plane in front of the camera does the fades. In the story, this ends act 1 (the bridge leads out of
 // ### the city towards the highway); in a free ride it is the end of the run.
-const FINALE = Object.freeze({ fade: 0.8, start: -270, speed: 24, lane: 2.2, end: 14.2, dawnFrom: 1.2, dawnTo: 11.5, shot: 5 });
+const FINALE = Object.freeze({ fade: 0.8, start: -270, speed: 24, lane: 4.1, end: 14.2, dawnFrom: 1.2, dawnTo: 11.5, shot: 5 });
 const finale = { on: false, done: false, t: 0, placed: false, deckY: 42.12 };
 const fader = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthTest: false, depthWrite: false, fog: false }));
 fader.position.z = -0.6; fader.renderOrder = 9999; fader.frustumCulled = false; camera.add(fader); scene.add(camera);
@@ -4935,7 +4976,7 @@ function updateFinale(dt){
   if (t < F.shot){
     // outside the railing, clear of the tower legs, a little above the road so the deck girder does not fill the picture
     const k = (t - F.fade) / (F.shot - F.fade);
-    camera.position.set(car.x + rx * 7.8 + fx * (6 - k * 9), car.y + 2.2 + k * 0.8, car.z + rz * 7.8 + fz * (6 - k * 9));
+    camera.position.set(car.x + rx * 10.5 + fx * (6 - k * 9), car.y + 2.6 + k * 0.8, car.z + rz * 10.5 + fz * (6 - k * 9));
     camera.lookAt(car.x + fx * 1.5, car.y + 0.9, car.z + fz * 1.5);
   } else {
     const k = Math.min(1, (t - F.shot) / (F.end - F.shot));
