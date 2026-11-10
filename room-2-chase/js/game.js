@@ -3357,15 +3357,15 @@ function updatePoliceVisuals(){
 function resetPolice(){
   police.forEach(p => { p.active = false; p.respawn = 0; p.wreck = 0; p.g.visible = false; p.light.intensity = 0; });
   spawnTimer = 4; bust = 0; copsWrecked = 0; copsWarned = false; nearestCop = Infinity; stars = 1;
-  heli.runTime = 0; heli.on = false; heli.spotted = false; heli.g.visible = false; heli.beam.visible = false; heli.pool.visible = false;
+  heli.runTime = 0; heli.on = false; heli.spotted = false; heli.g.visible = false; heli.beam.visible = false; heli.lamp.intensity = 0;
 }
 
 // ---------- Police helicopter ----------
 // ### Joins the chase after 60 seconds (or with the fifth star) and stays until the run ends. It flies ahead of the player, so its searchlight is in view from
 // ### the chase camera. The light follows the player a little slower than the police can drive: at full speed on a clear road
 // ### you stay ahead of it, but every sharp turn or crash lets it catch you. While you are in the light the police know
-// ### where you are: they drive 6 % faster and see you from further away. Its beam is a fake (a cone and a glow on the ground),
-// ### not a light source, so the scene's shaders never have to change when it arrives.
+// ### where you are: they drive 6 % faster and see you from further away. Its searchlight is a real spot light
+// ### that is there from the start with no strength, so the scene's shaders never have to change when it arrives.
 const heli = (() => {
   const g = new THREE.Group(), rotor = new THREE.Group(), tail = new THREE.Group();
   // a light twin-engine police helicopter, about 12 m long with a 10 m rotor: bubble canopy, engine hump, slim boom, skids
@@ -3428,20 +3428,15 @@ const heli = (() => {
   add(mergeGeos([ball([-1.0, 2.04, -5.32], 0.045)]), new THREE.MeshBasicMaterial({ color: 0xff3040 }), g);
   g.scale.setScalar(1.25);
   g.visible = false; scene.add(g);
-  // The searchlight is a faint shaft and an even circle of light with a soft rim. It used to be a near-white glow with a hot
-  // centre that the bloom blew up, which hid the road under it; now the road, its lines and the cars stay readable inside.
+  // The searchlight is a real spot light from the nose of the helicopter, with a faint shaft to show where it comes from. It
+  // lights the road and the cars under it as they are, from above. (It used to be a glowing disc laid 30 cm over the road, which
+  // covered the wheels and made a car look sunk into the ground.) It exists from the start with no strength, so the number of
+  // lights never changes and no shader has to be rebuilt when the helicopter arrives.
   const beam = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 24, 1, true).rotateX(-Math.PI / 2).translate(0, 0, 0.5), BEAM_MAT.clone());
   beam.material.opacity = 0.07; beam.visible = false; scene.add(beam);
-  const spotTex = (() => {
-    const c = document.createElement('canvas'); c.width = c.height = 128;
-    const g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-    gr.addColorStop(0, 'rgba(255,255,255,.8)'); gr.addColorStop(0.5, 'rgba(255,255,255,.7)'); gr.addColorStop(0.68, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
-    return new THREE.CanvasTexture(c);
-  })();
-  const pool = new THREE.Mesh(new THREE.CircleGeometry(1, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: spotTex, color: 0xdfe9ff, transparent: true, opacity: 0.24, blending: THREE.AdditiveBlending, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
-  pool.scale.setScalar(Core.SPOT_RADIUS * 1.35); pool.visible = false; scene.add(pool);
-  return { g, rotor, tail, beam, pool, strobeR, strobeB, on: false, spotted: false, runTime: 0, closing: 0, x: 0, z: 0, sx: 0, sz: 0, h: 0, tilt: 0, roll: 0 };
+  const lamp = new THREE.SpotLight(0xe6eeff, 0, 110, Math.atan(Core.SPOT_RADIUS * 1.25 / 31), 0.45, 1);
+  scene.add(lamp, lamp.target);
+  return { g, rotor, tail, beam, lamp, strobeR, strobeB, on: false, spotted: false, runTime: 0, closing: 0, x: 0, z: 0, sx: 0, sz: 0, h: 0, tilt: 0, roll: 0 };
 })();
 // ### Flies the helicopter ahead of the player and moves its searchlight after them. In the light the police know where you are.
 function updateHeli(dt){
@@ -3451,7 +3446,7 @@ function updateHeli(dt){
     toast('Police helicopter overhead! Stay out of its searchlight.', 'red', 3600);
     // it arrives from behind the player and overtakes
     H.on = true; H.x = car.x - Math.sin(car.heading) * 170; H.z = car.z - Math.cos(car.heading) * 170; H.sx = H.x; H.sz = H.z; H.h = car.heading;
-    H.g.visible = true; H.beam.visible = true; H.pool.visible = true;
+    H.g.visible = true; H.beam.visible = true;
   }
   const fx = Math.sin(car.heading), fz = Math.cos(car.heading), v = car.speed;
   const px = H.x, pz = H.z, before = Math.hypot(H.x - car.x, H.z - car.z);
@@ -3470,11 +3465,11 @@ function updateHeli(dt){
   H.g.position.set(H.x, y, H.z); H.g.rotation.set(H.tilt, H.h, -H.roll, 'YXZ');
   H.rotor.rotation.y += dt * Core.ROTOR.rps * Math.PI * 2; H.tail.rotation.x += dt * 170;
   const blink = Math.floor(clock * 4) % 2 === 0; H.strobeR.visible = blink; H.strobeB.visible = !blink;
-  const gy = groundH(H.sx, H.sz) + 0.3;
-  H.pool.position.set(H.sx, gy, H.sz);
-  H.pool.rotation.set(Math.atan(Core.gradeAt(mode, H.sx, H.sz, 0)), 0, -Math.atan(Core.gradeAt(mode, H.sx, H.sz, Math.PI / 2)));
-  H.pool.material.color.setHex(H.spotted ? 0xfff0d8 : 0xdfe9ff);
+  const gy = groundH(H.sx, H.sz);
   const lx = H.x + Math.sin(H.h) * 2.15, lz = H.z + Math.cos(H.h) * 2.15;
+  // the light, warmer while it holds the player
+  H.lamp.position.set(lx, y + 0.55, lz); H.lamp.target.position.set(H.sx, gy, H.sz);
+  H.lamp.intensity = 3.2; H.lamp.color.setHex(H.spotted ? 0xfff0d8 : 0xe6eeff);
   H.beam.position.set(lx, y + 0.55, lz); H.beam.lookAt(H.sx, gy, H.sz);
   const L = Math.hypot(H.sx - lx, gy - y - 0.55, H.sz - lz);
   H.beam.scale.set(Core.SPOT_RADIUS, Core.SPOT_RADIUS, L);
@@ -4700,7 +4695,7 @@ function resetCar(){
   Object.assign(crashGuard, Core.newCrashGuard());
   let x = mode === 'city' ? -3.5 : HW.our[1], z = mode === 'city' ? -6 : 5, heading = 0;
   if (mode === 'country'){ const pt = roadPoint(40, ROAD.lane); x = pt.x; z = pt.z; heading = pt.h; roadPos.ri = undefined; roadPos.s = 40; roadPos.lat = ROAD.lane; }
-  Object.assign(car, { x, z, y: groundH(x, z), heading, speed: 0, steer: 0, pitch: 0, roll: 0, bodyPitch: 0, shake: 0, prevSpeed: 0, lean: 0, lift: 0 });
+  Object.assign(car, { x, z, y: groundH(x, z), heading, camHeading: heading, speed: 0, steer: 0, yaw: 0, pitch: 0, roll: 0, bodyPitch: 0, shake: 0, prevSpeed: 0, lean: 0, lift: 0 });
   resetSkids();
   eng.gear = 1; eng.rpm = ENGINES[V.key].idle; eng.shift = 0; eng.boost = 0; eng.miss = 0;
   camera.position.set(x - Math.sin(heading) * V.cam[0], car.y + V.cam[1], z - Math.cos(heading) * V.cam[0]);
@@ -4767,12 +4762,104 @@ function drawOverview(cv){
   for (const kt of kits){ g.fillStyle = '#4ef0a0'; g.fillRect(X(kt.x) - 10, Y(kt.z) - 3.5, 20, 7); g.fillRect(X(kt.x) - 3.5, Y(kt.z) - 10, 7, 20); }
   items.forEach((it, i) => {
     const x = X(it.x), y = Y(it.z);
-    g.fillStyle = 'rgba(85,236,255,.22)'; g.beginPath(); g.arc(x, y, 30, 0, Math.PI * 2); g.fill();
-    g.fillStyle = '#0e1022'; g.strokeStyle = '#55ecff'; g.lineWidth = 3; g.beginPath(); g.arc(x, y, 22, 0, Math.PI * 2); g.fill(); g.stroke();
-    g.save(); g.translate(x - 14, y - 14); g.scale(28 / 16, 28 / 16); g.lineWidth = 1.3; g.lineCap = 'round'; g.lineJoin = 'round'; g.stroke(new Path2D(EV_ICON[it.ev.key])); g.restore();
-    label(`${i + 1} · ${it.ev.name}`, x, y, '#55ecff');
+    evMedal(g, x, y, it.ev.key, i + 1);
+    label(`${i + 1} · ${it.ev.name}`, x, y + 6, '#55ecff');
   });
 }
+// ### One piece of evidence on the map: a dark medallion with a cyan rim and glow, a small drawing of the piece inside, and its
+// ### number in a badge on the rim. The drawings are made with the canvas (EV_ARTS), about 36 px across.
+function evMedal(g, x, y, key, n){
+  const r = 27;
+  g.save();
+  g.shadowColor = 'rgba(85,236,255,.75)'; g.shadowBlur = 18;
+  const bg = g.createRadialGradient(x - 8, y - 10, 4, x, y, r);
+  bg.addColorStop(0, '#26304f'); bg.addColorStop(1, '#0b0e1d');
+  g.fillStyle = bg; g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+  g.shadowBlur = 0; g.strokeStyle = '#55ecff'; g.lineWidth = 3; g.stroke();
+  g.strokeStyle = 'rgba(85,236,255,.35)'; g.lineWidth = 1.5; g.beginPath(); g.arc(x, y, r - 5, 0, Math.PI * 2); g.stroke();
+  g.beginPath(); g.arc(x, y, r - 3, 0, Math.PI * 2); g.clip();
+  EV_ARTS[key](g, x, y);
+  g.restore();
+  g.save();
+  g.fillStyle = '#55ecff'; g.beginPath(); g.arc(x + r * 0.72, y - r * 0.72, 10, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#0b0e1d'; g.font = '800 14px "Segoe UI", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(String(n), x + r * 0.72, y - r * 0.72 + 1);
+  g.restore();
+}
+// the little drawings, each centred on (x, y)
+const EV_ARTS = {
+  // two polaroids, the front one with a dark figure at a lit window
+  photos(g, x, y){
+    const pol = (ax, ay, rot, front) => {
+      g.save(); g.translate(ax, ay); g.rotate(rot);
+      g.fillStyle = '#f2efe6'; g.fillRect(-12, -14, 24, 28);
+      g.fillStyle = front ? '#1b2440' : '#3a4566'; g.fillRect(-9.5, -11.5, 19, 17);
+      if (front){
+        g.fillStyle = '#ffd27a'; g.fillRect(-6, -9, 12, 10);
+        g.fillStyle = '#0b0e1d'; g.beginPath(); g.arc(0, -4.5, 2.6, 0, Math.PI * 2); g.fill(); g.fillRect(-3.4, -2, 6.8, 5);
+      }
+      g.restore();
+    };
+    pol(x - 4, y + 1, -0.28, false); pol(x + 3, y - 1, 0.12, true);
+  },
+  // the whorl of a fingertip: nested, slightly broken ellipses
+  prints(g, x, y){
+    g.strokeStyle = '#7ff3ff'; g.lineCap = 'round'; g.lineWidth = 1.7;
+    for (let k = 0; k < 6; k++){
+      const rx = 3 + k * 2.6, ry = 4.5 + k * 3.1, gap = 0.5 + (k % 2) * 0.6;
+      g.beginPath(); g.ellipse(x, y + 1, rx, ry, 0.15, -Math.PI / 2 + gap, Math.PI * 1.5 - 0.15); g.stroke();
+    }
+  },
+  // a metal torch, diagonal, throwing a warm cone of light
+  torch(g, x, y){
+    g.save(); g.translate(x, y); g.rotate(-0.6);
+    const beam = g.createLinearGradient(6, 0, 30, 0);
+    beam.addColorStop(0, 'rgba(255,214,120,.85)'); beam.addColorStop(1, 'rgba(255,214,120,0)');
+    g.fillStyle = beam; g.beginPath(); g.moveTo(6, -4); g.lineTo(30, -13); g.lineTo(30, 13); g.lineTo(6, 4); g.closePath(); g.fill();
+    const body = g.createLinearGradient(0, -5, 0, 5);
+    body.addColorStop(0, '#cfd6e2'); body.addColorStop(0.5, '#7d8698'); body.addColorStop(1, '#3f4656');
+    g.fillStyle = body; g.fillRect(-18, -3.5, 18, 7); g.fillRect(-1, -5.5, 8, 11);
+    g.fillStyle = '#fff4c9'; g.fillRect(6, -4.5, 1.6, 9);
+    g.fillStyle = '#2a3040'; g.fillRect(-12, -3.6, 2, 7.2); g.fillRect(-7, -3.6, 2, 7.2);
+    g.restore();
+  },
+  // two picks and a tension wrench on a ring
+  lockpick(g, x, y){
+    g.lineCap = 'round';
+    g.strokeStyle = '#9aa3b5'; g.lineWidth = 2; g.beginPath(); g.arc(x - 9, y + 9, 6, 0, Math.PI * 2); g.stroke();
+    const pick = (ang, len, hook) => {
+      g.save(); g.translate(x - 5, y + 5); g.rotate(ang);
+      g.strokeStyle = '#e3e8f1'; g.lineWidth = 2.2; g.beginPath(); g.moveTo(0, 0); g.lineTo(len, 0); g.stroke();
+      g.lineWidth = 1.8; g.beginPath(); g.moveTo(len, 0);
+      if (hook) g.quadraticCurveTo(len + 4, 0, len + 4, -4); else { g.lineTo(len + 2, -2); g.lineTo(len + 4, 0); g.lineTo(len + 6, -2); }
+      g.stroke(); g.restore();
+    };
+    pick(-0.75, 20, true); pick(-0.45, 22, false);
+    g.strokeStyle = '#55ecff'; g.lineWidth = 2.4; g.beginPath(); g.moveTo(x - 4, y + 8); g.lineTo(x + 13, y + 3); g.lineTo(x + 13, y - 2); g.stroke();
+  },
+  // a black hoodie with a zip, seen from the front
+  clothes(g, x, y){
+    g.fillStyle = '#1d212c'; g.strokeStyle = '#55ecff'; g.lineWidth = 1.2;
+    g.beginPath();
+    g.moveTo(x - 7, y - 13); g.quadraticCurveTo(x, y - 18, x + 7, y - 13);
+    g.lineTo(x + 15, y - 8); g.lineTo(x + 18, y + 6); g.lineTo(x + 12, y + 7); g.lineTo(x + 11, y + 15); g.lineTo(x - 11, y + 15); g.lineTo(x - 12, y + 7); g.lineTo(x - 18, y + 6); g.lineTo(x - 15, y - 8);
+    g.closePath(); g.fill(); g.stroke();
+    g.strokeStyle = '#8f99ad'; g.beginPath(); g.moveTo(x, y - 11); g.lineTo(x, y + 15); g.stroke();
+    g.beginPath(); g.moveTo(x - 7, y - 13); g.quadraticCurveTo(x, y - 6, x + 7, y - 13); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.18)'; g.fillRect(x - 9, y + 5, 7, 5); g.fillRect(x + 2, y + 5, 7, 5);
+  },
+  // a black knitted mask with the eye slit
+  balaclava(g, x, y){
+    const head = g.createRadialGradient(x - 4, y - 6, 2, x, y, 18);
+    head.addColorStop(0, '#3a3f4d'); head.addColorStop(1, '#111319');
+    g.fillStyle = head; g.beginPath(); g.ellipse(x, y + 1, 12.5, 15.5, 0, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 1;
+    for (let k = -10; k <= 10; k += 3.3){ g.beginPath(); g.moveTo(x + k, y - 13); g.lineTo(x + k * 1.05, y + 15); g.stroke(); }
+    g.fillStyle = '#d9a98a'; g.beginPath(); g.ellipse(x, y - 2, 9, 3.6, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#0b0e1d'; g.beginPath(); g.arc(x - 4, y - 2, 1.5, 0, Math.PI * 2); g.arc(x + 4, y - 2, 1.5, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#55ecff'; g.lineWidth = 1.2; g.beginPath(); g.ellipse(x, y + 1, 12.5, 15.5, 0, 0, Math.PI * 2); g.stroke();
+  }
+};
 // ### The guide arrow: points at the nearest piece of evidence still out there, then at the witness, and at the gate once she is in the car.
 function updateGuide(){
   let t = null, name = '';
@@ -4958,7 +5045,7 @@ function updateFinale(dt){
     f.placed = true;
     CITY.bridge.updateMatrixWorld(true);
     const p = onBridge(F.start, F.lane), ahead = onBridge(F.start + 10, F.lane);
-    Object.assign(car, { x: p.x, z: p.z, y: p.y, heading: Math.atan2(ahead.x - p.x, ahead.z - p.z), speed: F.speed, steer: 0, pitch: 0, roll: 0, bodyPitch: 0, lift: 0, shake: 0 });
+    Object.assign(car, { x: p.x, z: p.z, y: p.y, heading: Math.atan2(ahead.x - p.x, ahead.z - p.z), speed: F.speed, steer: 0, yaw: 0, pitch: 0, roll: 0, bodyPitch: 0, lift: 0, shake: 0 });
     resetPolice(); clearEffects(); hideWitness();
     playAnthem();
     toast(`${WITNESS.name}: “I saw him climb out of that window. I will tell them everything.”`, 'gold', 5200);
@@ -5315,11 +5402,18 @@ function updateCar(dt){
   if (offRoad && Math.abs(car.speed) > 8) car.shake = Math.max(car.shake, 0.06);
   car.speed = Core.stepSpeed(car.speed, keys, dt, maxNow, V, grade);
 
+  // ### Steering with the weight of a car: the wheel turns in over about a quarter of a second and comes back a little faster.
+  // ### How tightly the car can turn is limited by the grip of its tyres: the sideways pull (speed x turn rate) never passes
+  // ### GRIP x handling, so at walking pace it turns on the spot and at speed it draws a wide arc instead of flicking round like
+  // ### a bicycle. The turn rate itself builds up and fades smoothly (yaw), and the handbrake lets the rear step out.
   const steerIn = (keys.left ? 1 : 0) - (keys.right ? 1 : 0) || TILT.value;
-  car.steer += (steerIn - car.steer) * Math.min(1, 8 * dt);
-  const sp = Math.abs(car.speed);
-  const turn = car.steer * Math.min(1, sp / 6) * (2.5 * V.handling / (1 + sp * 0.035)) * (keys.brake ? 1.5 : 1);
-  car.heading += turn * dt * (car.speed >= 0 ? 1 : -1);
+  car.steer += (steerIn - car.steer) * Math.min(1, (steerIn ? 4.5 : 6) * dt);
+  const sp = Math.abs(car.speed), GRIP = V.key === 'bike' ? 19 : 16;
+  const ask = car.steer * Math.min(1, sp / 6) * (2.5 * V.handling / (1 + sp * 0.035));
+  const most = GRIP * V.handling * (keys.brake ? 1.5 : 1) / Math.max(sp, 1);
+  const turn = clamp(ask * (keys.brake ? 1.5 : 1), -most, most);
+  car.yaw = (car.yaw || 0) + (turn - (car.yaw || 0)) * Math.min(1, dt * (V.key === 'truck' ? 4 : 6));
+  car.heading += car.yaw * dt * (car.speed >= 0 ? 1 : -1);
 
   const fx = Math.sin(car.heading), fz = Math.cos(car.heading);
   car.x += fx * car.speed * dt;
@@ -5451,7 +5545,8 @@ function applyCarMesh(dt){
     // the rider tucks in at speed and leans further into the turn than the bike
     md.rider.rotation.x = 0.07 * Math.min(1, sp / 28);
     md.rider.rotation.z = car.lean * 0.22; md.rider.position.x = car.lean * 0.1;
-  } else carTilt.rotation.z = car.roll + car.steer * Math.min(1, sp / 34) * (V.key === 'truck' ? 0.04 : 0.07) + (md.stage === 3 ? 0.022 : 0);
+  // a car leans out of the corner by how hard it is actually cornering (sideways pull = speed x turn rate), not by the key alone
+  } else carTilt.rotation.z = car.roll + clamp(sp * (car.yaw || 0) / 16, -1, 1) * (V.key === 'truck' ? 0.035 : 0.05) * (car.speed >= 0 ? 1 : -1) + (md.stage === 3 ? 0.022 : 0);
   // The body leans in turns, dips when braking and sags when wrecked, but it turns about the middle of the vehicle at road
   // level, so a wheel on the low side would sink into the road. Lift it by as much as that lowest wheel would sink.
   const lean = V.key === 'bike' ? 0 : carTilt.rotation.z - car.roll, track = Math.max(...md.skid.x.map(Math.abs)) + md.skid.w / 2;
@@ -5487,7 +5582,10 @@ function camClip(tx, tz){
 
 // ### The chase camera: follows behind, stays out of buildings and above the ground, and widens with speed.
 function chaseCam(dt){
-  const fx = Math.sin(car.heading), fz = Math.cos(car.heading), sp = Math.abs(car.speed);
+  // the camera swings round after the car on a smoothed heading, so a quick tap of the steering does not jerk the whole view
+  if (car.camHeading === undefined || Math.abs(wrapAngle(car.heading - car.camHeading)) > 1.2) car.camHeading = car.heading;
+  car.camHeading += wrapAngle(car.heading - car.camHeading) * Math.min(1, dt * 3.5);
+  const fx = Math.sin(car.camHeading), fz = Math.cos(car.camHeading), sp = Math.abs(car.speed);
   const dist = V.cam[0] + sp * 0.07;
   let tx = car.x - fx * dist, tz = car.z - fz * dist;
   const f = camClip(tx, tz);
