@@ -8,9 +8,13 @@ Open the hatch in the floor of the toilet stall and climb out **before the clock
 
 ## Story
 
-1. **Briefing.** You were the detective on the Ashford necklace case. Tonight you are inmate 4471, convicted of stealing the necklace: someone framed you.
-2. Officer Hale walks you to washroom 2. In a short scene in the room you turn round to the open door, see him in the corridor light, and watch him swing the door shut and lock it. Through the door he says: "Your ten minutes have begun. Not a second more." He waits outside.
-3. Inmates whisper about a hatch in the floor of this washroom, locked with a four-digit code that is hidden somewhere in the room.
+The briefing is a short series of cards; **Next** and **Back** move between them.
+
+1. **The front page.** *The Lisbon Times* of Monday 16 April 2012: the **Starfall necklace**, lent by the Ashford family to the Museu de Marinha for an exhibition marking 100 years since the Titanic sank, vanished from its glass case on the night of the centenary. No alarm sounded, and a detective was put on the case.
+2. **Who you are.** Three weeks ago you were that detective. The trail ended at your own door: the necklace's velvet box was hidden in your car. Tonight you are **inmate 4471**, convicted of the theft: someone framed you. Your oldest friend on the force kept digging and found the proof that clears your name, but the people who framed you came after him. Before he disappeared from Lisbon, he hid the evidence across the city, in places only you would know to look.
+3. **The door.** Officer Hale walks you to washroom 2. In a short scene in the room you turn round to the open door, see him in the corridor light, and watch him swing the door shut and lock it. Through the door he says: "Your ten minutes have begun. Not a second more." He waits outside.
+4. **The rumour.** Inmates whisper about a hatch in the floor of this washroom, locked with a four-digit code that is hidden somewhere in the room.
+5. **How to play:** the controls.
 
 The clock only starts when the player presses **Start the clock** after the briefing.
 
@@ -43,7 +47,7 @@ Walking anywhere else is refused: "You cannot get there from here."
 |---|---|---|
 | **Spoon** | Soap dish at the sinks | Needed to pry the crooked tile off the wall |
 | **Mop** | Bucket by the door | Optional. Used at the door ("Jam the door with the mop") it is placed under the door handle and leaves your inventory. This buys the extra minute. |
-| **Car key** | In a hollow behind the crooked tile, once the spoon has pried it off | A car key on a worn leather fob. Someone hid it there for you. |
+| **Car key** | In a hollow behind the crooked tile, once the spoon has pried it off | Optional. A car key on a worn leather fob that someone hid there for you, a hint at the car waiting after Ending A. It opens nothing in this room. |
 
 ## Clues and the code
 
@@ -56,6 +60,7 @@ Walking anywhere else is refused: "You cannot get there from here."
 - The code is **1912**, the year the Titanic sank. It is the **same in every game** (open: should it change between games?).
 - Players who do not know the history can still solve it: "sailed only once" gives the missing digit 1.
 - Every clue you read is kept in your clue notes (3 at most). Reading a clue again does not count twice.
+- The spoon is still needed: the crooked tile hides the car key, not a clue.
 
 ## The lock
 

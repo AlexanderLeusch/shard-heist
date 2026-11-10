@@ -302,23 +302,54 @@ const hallFloorTex = canvasTex(256, 256, (g, w, h) => {
   const gr = g.createRadialGradient(w / 2, h * .3, 4, w / 2, h * .3, w * .7); gr.addColorStop(0, '#b7c3cb'); gr.addColorStop(1, '#4c5962');
   g.fillStyle = gr; g.fillRect(0, 0, w, h);
 });
-// Hale, backlit: a dark figure with a peaked cap, one arm out to pull the door shut, keys on his belt
-const haleTex = canvasTex(256, 512, (g, w, h) => {
-  g.fillStyle = '#06080b'; g.shadowColor = 'rgba(175,210,255,.75)'; g.shadowBlur = 10;
-  g.beginPath(); g.arc(122, 96, 30, 0, 7); g.fill();                                   // head
-  g.beginPath(); g.ellipse(122, 70, 44, 10, 0, 0, 7); g.fill();                         // cap brim
-  g.beginPath(); g.moveTo(86, 68); g.lineTo(92, 36); g.quadraticCurveTo(122, 24, 154, 36); g.lineTo(160, 68); g.fill(); // cap
-  g.fillRect(108, 118, 30, 26);                                                          // neck
-  g.beginPath(); g.moveTo(60, 168); g.quadraticCurveTo(64, 140, 122, 138); g.quadraticCurveTo(182, 140, 188, 168);
-  g.lineTo(178, 300); g.lineTo(68, 300); g.closePath(); g.fill();                        // torso
-  g.beginPath(); g.moveTo(62, 160); g.lineTo(44, 300); g.lineTo(60, 304); g.lineTo(84, 190); g.fill(); // left arm, hanging
-  g.beginPath(); g.moveTo(176, 156); g.quadraticCurveTo(222, 196, 246, 238); g.lineTo(234, 252); g.quadraticCurveTo(206, 214, 170, 200); g.fill(); // right arm, to the door
-  g.fillRect(66, 292, 116, 18);                                                          // belt
-  g.beginPath(); g.moveTo(70, 306); g.lineTo(118, 306); g.lineTo(114, 508); g.lineTo(78, 508); g.fill();   // legs
-  g.beginPath(); g.moveTo(128, 306); g.lineTo(178, 306); g.lineTo(170, 508); g.lineTo(134, 508); g.fill();
-  g.shadowBlur = 0; g.strokeStyle = 'rgba(190,200,210,.55)'; g.lineWidth = 2;
-  for (const [x, y] of [[164, 322], [172, 328], [158, 330]]){ g.beginPath(); g.arc(x, y, 5, 0, 7); g.stroke(); } // keys
-});
+// ### Officer Hale in 3D: a low-poly prison guard in a dark slate uniform with a peaked cap and badge, a moustache, a cross
+// ### belt, a ring of keys on his belt and laced boots. His left arm hangs, his right arm reaches out to pull the door shut.
+// ### Built from boxes and cylinders, one material per colour; haleFade() fades the whole figure in and out.
+function limb(a, b, r0, r1){
+  const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), d = B.clone().sub(A), len = d.length();
+  const g = new THREE.CylinderGeometry(r1, r0, len, 7);
+  g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize())));
+  g.translate((A.x + B.x) / 2, (A.y + B.y) / 2, (A.z + B.z) / 2);
+  return g;
+}
+function buildHale(){
+  const mat = (color, o) => new THREE.MeshStandardMaterial(Object.assign({ color, flatShading: true, roughness: .8, transparent: true, opacity: 0 }, o));
+  const HM = { uniform: mat(0x2c343e, { emissive: 0x0a0d12 }), shirt: mat(0x8b9097), leather: mat(0x17181b, { roughness: .5 }), metal: mat(0xb9bdc2, { roughness: .35, metalness: .8 }),
+    skin: mat(0xc89878, { roughness: .75 }), hair: mat(0x5b3b26, { roughness: .9 }), cap: mat(0x252c35, { roughness: .6 }) };
+  const g = new THREE.Group();
+  const put = (geo, m, x = 0, y = 0, z = 0) => { geo.translate(x, y, z); const mesh = new THREE.Mesh(geo, HM[m]); mesh.castShadow = true; g.add(mesh); return mesh; };
+  const bx = (w, h, d, m, x, y, z) => put(new THREE.BoxGeometry(w, h, d), m, x, y, z);
+  const cy = (rt, rb, h, m, x, y, z, n, sz) => { const geo = new THREE.CylinderGeometry(rt, rb, h, n || 8); if (sz) geo.scale(1, 1, sz); return put(geo, m, x, y, z); };
+  for (const s of [-1, 1]){
+    bx(.15, .14, .3, 'leather', s * .11, .07, .04); bx(.16, .12, .17, 'leather', s * .11, .2, -.01);           // boots
+    put(limb([s * .11, .24, 0], [s * .12, .92, 0], .095, .12), 'uniform');                                     // trouser legs
+    bx(.12, .03, .11, 'uniform', s * .24, 1.545, 0); bx(.025, .025, .02, 'metal', s * .25, 1.565, .03);         // epaulettes
+    bx(.12, .11, .025, 'uniform', s * .1, 1.36, .145); bx(.022, .022, .015, 'metal', s * .1, 1.395, .16);      // chest pockets
+  }
+  // left arm hanging, right arm reaching out for the door
+  put(limb([-.27, 1.5, 0], [-.3, 1.18, .02], .075, .065), 'uniform'); put(limb([-.3, 1.18, .02], [-.29, .92, .07], .065, .055), 'uniform');
+  bx(.08, .1, .07, 'skin', -.29, .86, .08);
+  put(limb([.27, 1.5, 0], [.37, 1.31, .27], .075, .065), 'uniform'); put(limb([.37, 1.31, .27], [.41, 1.2, .55], .065, .055), 'uniform');
+  bx(.08, .07, .1, 'skin', .42, 1.18, .61);
+  cy(.235, .215, .6, 'uniform', 0, 1.25, 0, 8, .66);                                                             // jacket
+  cy(.215, .24, .24, 'uniform', 0, .85, 0, 8, .7);                                                               // jacket skirt
+  cy(.222, .222, .07, 'leather', 0, .98, 0, 8, .72); bx(.09, .065, .02, 'metal', 0, .98, .165);                  // belt, buckle
+  const cross = new THREE.BoxGeometry(.05, .62, .02); cross.rotateZ(-.62); put(cross, 'leather', .03, 1.27, .155); // cross belt
+  for (const y of [1.18, 1.3]) bx(.025, .025, .015, 'metal', 0, y, .16);                                         // buttons
+  cy(.075, .09, .08, 'shirt', 0, 1.585, .01); bx(.045, .2, .015, 'leather', 0, 1.47, .155);                      // collar, tie
+  put(new THREE.TorusGeometry(.045, .008, 5, 12), 'metal', -.13, .91, .16);                                       // key ring
+  for (let k = 0; k < 4; k++){ bx(.014, .1, .01, 'metal', -.105 - k * .016, .83, .165); bx(.03, .014, .01, 'metal', -.112 - k * .016, .785, .165); }
+  // head
+  cy(.05, .055, .1, 'skin', 0, 1.63, 0, 6);
+  const skull = new THREE.IcosahedronGeometry(.115, 0); skull.scale(.95, 1.15, 1.05); put(skull, 'skin', 0, 1.75, .01);
+  bx(.035, .05, .04, 'skin', 0, 1.74, .12);                                                                       // nose
+  for (const s of [-1, 1]) bx(.025, .05, .035, 'skin', s * .11, 1.75, 0);                                        // ears
+  bx(.11, .028, .035, 'hair', 0, 1.7, .115); bx(.22, .09, .12, 'hair', 0, 1.79, -.05);                           // moustache, hair
+  cy(.15, .125, .08, 'cap', 0, 1.89, -.005, 10); cy(.122, .122, .04, 'leather', 0, 1.84, 0, 10);                 // cap
+  const visor = new THREE.CylinderGeometry(.12, .12, .015, 10, 1, false, -Math.PI / 2, Math.PI); visor.rotateX(.18); put(visor, 'leather', 0, 1.825, .04);
+  bx(.03, .03, .015, 'metal', 0, 1.89, .14);                                                                      // cap badge
+  return { g, mats: Object.values(HM) };
+}
 const shadowTex = canvasTex(128, 256, (g, w, h) => {
   const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, 'rgba(0,0,0,.85)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
   g.fillStyle = gr; g.beginPath(); g.moveTo(w * .3, 0); g.lineTo(w * .7, 0); g.lineTo(w, h); g.lineTo(0, h); g.fill();
@@ -328,9 +359,11 @@ const hall = new THREE.Group(); room.add(hall);
   const f = new THREE.Mesh(new THREE.PlaneGeometry(8, 1.6), new THREE.MeshBasicMaterial({ map: hallFloorTex })); f.position.set(0, .002, 3.8); f.rotation.x = -Math.PI / 2; hall.add(f);
   const c = new THREE.Mesh(new THREE.PlaneGeometry(8, 1.6), new THREE.MeshBasicMaterial({ color: 0x39434b })); c.position.set(0, 3, 3.8); c.rotation.x = Math.PI / 2; hall.add(c);
   const t = new THREE.Mesh(new THREE.BoxGeometry(1.4, .05, .12), new THREE.MeshBasicMaterial({ color: 0xf2f8ff })); t.position.set(0, 2.97, 3.7); hall.add(t); }
-const hale = new THREE.Mesh(new THREE.PlaneGeometry(.92, 1.84), new THREE.MeshBasicMaterial({ map: haleTex, transparent: true, opacity: 0, depthWrite: false }));
+const hale = buildHale();
+// Fades Hale in or out; he is only drawn while he can be seen
+function haleFade(o){ for (const m of hale.mats) m.opacity = o; hale.g.visible = o > .01; }
 hall.visible = false;
-hale.position.set(.14, .93, 3.42); hale.rotation.y = Math.PI; room.add(hale);
+hale.g.position.set(.14, 0, 3.42); hale.g.rotation.y = Math.PI; hale.g.visible = false; room.add(hale.g);
 const haleShadow = new THREE.Mesh(new THREE.PlaneGeometry(.7, 1.9), new THREE.MeshBasicMaterial({ map: shadowTex, transparent: true, opacity: 0, depthWrite: false }));
 haleShadow.position.set(.12, .004, 2.05); haleShadow.rotation.set(-Math.PI / 2, 0, Math.PI); room.add(haleShadow);
 // the cold light that falls in through the open door
@@ -867,7 +900,7 @@ function startCine(){
 function stopCine(){
   overlay.classList.remove('cine'); $('lookHint').classList.remove('hush');
   if (cineT < 0) return;
-  cineT = -1; hall.visible = false; doorPivot.rotation.y = 0; hale.material.opacity = haleShadow.material.opacity = 0; doorLight.intensity = 0; shake = 0;
+  cineT = -1; hall.visible = false; doorPivot.rotation.y = 0; haleFade(0); haleShadow.material.opacity = 0; doorLight.intensity = 0; shake = 0;
   if (S.scene === 'intro') goView('intro', .9);
 }
 // ### One step of the scene: the door, the light and Hale follow the time; the sounds and words come once each.
@@ -877,8 +910,8 @@ function updateCine(dt){
   const k = clamp((t - 1.7) / .95, 0, 1), open = 1 - k * k;   // held open, then swung shut, faster and faster
   doorPivot.rotation.y = DOOR_OPEN * open;
   doorLight.intensity = 4 * open;
-  hale.material.opacity = Math.min(1, t * 2.5) * (open > .02 ? 1 : 0);
-  hale.position.z = 3.42 + k * .12;
+  haleFade(Math.min(1, t * 2.5) * (open > .02 ? 1 : 0));
+  hale.g.position.z = 3.42 + k * .12;
   haleShadow.material.opacity = .5 * open * Math.min(1, t * 2.5);
   for (const [s, html] of LINES) if (s > 0 && at(s)) cineLine(html);
   if (at(1.7)) cue('open');

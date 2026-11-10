@@ -12,7 +12,7 @@ The game has two rooms that are played one after the other. Until the group conn
 
 ## The whole game in one paragraph
 
-You were the detective on the Ashford necklace case. Now you are inmate 4471, convicted of stealing it. **Room 1:** you have ten minutes in a prison washroom to find the code for a hatch in the floor. If you get out (Ending A), a note shows that the guard wanted you out, and a car is waiting at the end of the tunnel. **Room 2:** the police chase begins. You drive a getaway vehicle through Lisbon's Baixa, on the highway and across the countryside, collecting star shards while up to four police cars and a helicopter hunt you.
+In April 2012 the Starfall necklace, lent by the Ashford family to Lisbon's naval museum for the centenary of the Titanic, vanished from its case. You were the detective on the case, until the trail ended at your own door. Now you are inmate 4471, convicted of stealing it. **Room 1:** you have ten minutes in a prison washroom to find the code for a hatch in the floor. If you get out (Ending A), a note shows that the guard wanted you out, and a car is waiting at the end of the tunnel. **Room 2:** the police chase begins. You drive a getaway vehicle through Lisbon's Baixa, on the highway and across the countryside, collecting star shards while up to four police cars and a helicopter hunt you.
 
 ## One night, one look
 
@@ -36,7 +36,3 @@ You were the detective on the Ashford necklace case. Now you are inmate 4471, co
 | **Scene** | A place you can stand in room 1 (the door, the sinks, ...). |
 | **Hotspot** | Something you can use in a scene, shown as a pulsing marker or a "Walk to" button. |
 | **Tick** | One step of the clock, many times per second. |
-
-test sarah
-
-hallo by louisa
