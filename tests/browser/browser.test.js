@@ -295,7 +295,11 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       assert.deepEqual(errors, []);
     });
 
+    // ### Math.random is fixed for the escape room, so the mini games are dealt as battleship (the tile), spot the difference
+    // ### (the mirror) and tic-tac-toe (the scratches), and the tic-tac-toe bot always takes the last free cell.
+    let fixedRandom;
     await t.test('escape room: the briefing explains who, where and how, then the clock starts', async () => {
+      fixedRandom = (await send('Page.addScriptToEvaluateOnNewDocument', { source: 'Math.random = () => .99;' })).identifier;
       await send('Page.navigate', { url: base + 'room-1-escape/' });
       await waitFor("!!document.querySelector('#card h1')", LOAD_MS, 'briefing');
       await evaluate("localStorage.removeItem('escape-room-save'), true");
@@ -322,7 +326,15 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
     await t.test('escape room rejected: the car key cannot be taken while the tile is on, and the sinks have nothing to take', async () => {
       await hs('go:stall');
       assert.equal(await evaluate("!!document.querySelector('[data-hotspot=\"take:carkey\"]')"), false);
-      assert.equal(await evaluate("!!document.querySelector('[data-hotspot=\"pry\"]')"), true);
+      assert.equal(await evaluate("!!document.querySelector('[data-hotspot=\"play:tile\"]')"), true);
+      // the tile opens its mini game; giving it up (Esc) gives nothing
+      await hs('play:tile');
+      await waitFor("!!document.querySelector('#card .mg[data-game=\"battleship\"] .bs-grid.theirs button')", 5000, 'battleship');
+      assert.match(await text('#card'), /car key/);
+      assert.equal(await text('#card .mg-secs'), '30');
+      await key('keydown', 'Escape');
+      assert.ok(await evaluate("document.getElementById('overlay').hidden"), 'Esc closes the mini game');
+      assert.equal(await evaluate("!!document.querySelector('[data-hotspot=\"take:carkey\"]')"), false, 'rejected: no car key without winning');
       await hs('go:sinks');
       assert.equal(await evaluate("[...document.querySelectorAll('[data-hotspot^=\"take:\"]')].length"), 0);
       assert.equal(await evaluate("document.querySelectorAll('.slot.full').length"), 0);
@@ -361,12 +373,30 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       await hs('go:sinks');
     });
 
-    await t.test('escape room: a wrong code costs 30 s, the right one (1912) is Ending A', async () => {
-      await hs('go:door'); await hs('read:scratches');
-      assert.match(await text('#card .paper'), /19▒2/);
+    await t.test('escape room: the mirror plays only when steamed up, and a won mini game gives its digits', async () => {
+      assert.equal(await text('#place'), 'The Sinks');
+      await hs('play:mirror');
+      assert.ok(await evaluate("document.getElementById('overlay').hidden"), 'rejected: no mini game at the dry mirror');
+      await hs('tap'); await hs('play:mirror');
+      await waitFor("!!document.querySelector('#card .mg[data-game=\"spotdiff\"] canvas')", 5000, 'spot the difference');
       await click('[data-do="close"]');
-      await hs('go:stall'); await hs('pry'); await hs('take:carkey');
-      assert.match(await text('#slots'), /Car key/);
+      await hs('go:door'); await hs('play:scratches');
+      await waitFor("!!document.querySelector('#card .mg[data-game=\"tictactoe\"] .ttt-cell')", 5000, 'tic-tac-toe');
+      for (const c of [0, 1, 2]){
+        await waitFor(`!document.querySelector('.ttt-cell[data-cell="${c}"]').disabled`, 5000, 'the player’s turn');
+        await click(`.ttt-cell[data-cell="${c}"]`);
+      }
+      await waitFor("/Clue found/.test((document.querySelector('#card .eyebrow') || {}).textContent || '')", 10000, 'the clue card');
+      assert.match(await text('#card .paper'), /_ _ 1 2/);
+      await click('[data-do="close"]');
+      assert.equal(await text('#clueCount'), '1 / 3');
+      assert.equal(await evaluate("!!document.querySelector('[data-hotspot=\"play:scratches\"]')"), false, 'rejected: a won spot cannot be played again');
+      assert.equal(await evaluate("!!document.querySelector('[data-hotspot=\"read:scratches\"]')"), true, 'but its clue can be read again');
+      assert.deepEqual(errors, []);
+    });
+
+    await t.test('escape room: a wrong code costs 30 s, the right one (1912) is Ending A', async () => {
+      await hs('go:stall');
       await hs('go:hatch');
       await hs('lock');
       await waitFor("!!document.getElementById('lockUi')", 5000, 'lock card');
@@ -381,6 +411,7 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       assert.match(await text('#card'), /Took you long enough/);
       assert.deepEqual(errors, []);
       await evaluate("localStorage.removeItem('escape-room-save'), true");
+      await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: fixedRandom });
     });
   } finally {
     try { ws.close(); } catch (e) {}

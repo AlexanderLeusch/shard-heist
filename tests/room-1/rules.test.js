@@ -15,13 +15,14 @@ function play(steps, s = R.newState()){
 }
 const turnTo = (s, code) => { for (let i = 0; i < 4; i++) while (s.lock[i] !== Number(code[i])) s = R.perform(s, 'turn', [i, 1]).state; return s; };
 const START = [['start']];
-const TO_HATCH = [['start'], ['go', 'stall'], ['pry'], ['take', 'carkey'], ['go', 'hatch']];
+const TO_HATCH = [['start'], ['go', 'stall'], ['play', 'tile'], ['win', 'tile'], ['take', 'carkey'], ['go', 'hatch']];
 const runClock = (s, secs) => { for (let t = 0; t < secs && !s.ending; t += .5) s = R.tick(s, .5).state; return s; };
 
 test('the story has 5 scenes, 2 items, 3 clues and 2 endings', () => {
   assert.equal(Object.keys(R.SCENES).length, 5);
   assert.deepEqual(Object.keys(R.ITEMS), ['mop', 'carkey']);
-  assert.equal(Object.keys(R.CLUES).length, 3);
+  assert.deepEqual(Object.keys(R.CLUES), ['tile', 'mirror', 'scratches']);
+  assert.equal(R.GAMES.length, 6);
   assert.deepEqual(Object.keys(R.ENDINGS), ['A', 'B']);
   assert.equal(R.TIME_LIMIT, 600);
   // every exit leads to a real scene, and every "go" hotspot is a real exit
@@ -72,7 +73,7 @@ test('the earlier decision: a jammed door buys exactly one extra minute, once', 
 
 test('rejected: nothing happens before the briefing is done', () => {
   const s = R.newState();
-  for (const [a, t] of [['go', 'sinks'], ['take', 'mop'], ['try'], ['pry']]){
+  for (const [a, t] of [['go', 'sinks'], ['take', 'mop'], ['try'], ['play', 'tile'], ['win', 'tile']]){
     const r = R.perform(s, a, t);
     assert.equal(r.ok, false, a);
     assert.equal(r.state, s, 'a refused action returns the same state');
@@ -82,7 +83,7 @@ test('rejected: nothing happens before the briefing is done', () => {
 
 test('rejected: walking where there is no way, taking what is not there or twice', () => {
   const s = play(START);
-  const cases = [['go', 'hatch'], ['go', 'tunnel'], ['go', 'roof'], ['go', undefined], ['take', 'spoon'], ['take', 'key'], ['take', '__proto__'], ['take', 'carkey'], ['read', 'diary'], ['tap'], ['pry'], ['try'], ['turn', [0, 1]], ['fly'], [undefined]];
+  const cases = [['go', 'hatch'], ['go', 'tunnel'], ['go', 'roof'], ['go', undefined], ['take', 'spoon'], ['take', 'key'], ['take', '__proto__'], ['take', 'carkey'], ['read', 'diary'], ['tap'], ['play', 'tile'], ['win', 'tile'], ['play', 'mirror'], ['play', 'safe'], ['win', '__proto__'], ['read', 'scratches'], ['read', 'tile'], ['try'], ['turn', [0, 1]], ['fly'], [undefined]];
   for (const [a, t] of cases){
     const r = R.perform(s, a, t);
     assert.equal(r.ok, false, `${a} ${JSON.stringify(t)}`);
@@ -98,10 +99,16 @@ test('rejected: walking where there is no way, taking what is not there or twice
 test('rejected: the door needs the mop, the car key needs the tile off, the tile comes off only once', () => {
   const s = play([['start'], ['go', 'stall']]);
   assert.ok(!R.visibleHotspots(play([['go', 'sinks']], s)).some(h => h.action === 'take'), 'nothing to take at the sinks');
-  const pried = R.perform(s, 'pry');
-  assert.equal(pried.ok, true, 'the tile comes off by hand');
-  assert.match(pried.message, /fingers/);
-  assert.equal(R.perform(pried.state, 'pry').ok, false, 'the tile is already off');
+  const game = R.perform(s, 'play', 'tile');
+  assert.equal(game.ok, true, 'the tile opens its mini game');
+  assert.equal(game.cue, 'game');
+  assert.equal(game.state, s, 'opening a mini game changes nothing');
+  const pried = R.perform(s, 'win', 'tile');
+  assert.equal(pried.ok, true, 'winning it takes the tile off');
+  assert.equal(pried.state.tileOpen, true);
+  assert.match(pried.message, /car key/);
+  assert.equal(R.perform(pried.state, 'play', 'tile').ok, false, 'the tile is already off');
+  assert.equal(R.perform(pried.state, 'win', 'tile').ok, false, 'and is only won once');
   const key = R.perform(s, 'take', 'carkey');
   assert.equal(key.ok, false);
   assert.match(key.message, /still in place/);
@@ -115,13 +122,20 @@ test('rejected: the door needs the mop, the car key needs the tile off, the tile
   assert.equal(R.perform(twice, 'take', 'mop').ok, false, 'the mop is stuck in the door now');
 });
 
-test('the scratches by the door are a clue, and the car key waits behind the tile', () => {
+test('the scratches by the door give the last two digits after their mini game, and the car key waits behind the tile', () => {
   let s = play([['start']]);
-  assert.ok(R.visibleHotspots(s).some(h => h.action === 'read' && h.target === 'scratches'), 'the scratches can be read at the door');
-  s = play([['read', 'scratches']], s);
+  assert.ok(R.visibleHotspots(s).some(h => h.action === 'play' && h.target === 'scratches'), 'the scratches open a mini game at the door');
+  assert.ok(!R.visibleHotspots(s).some(h => h.action === 'read' && h.target === 'scratches'), 'nothing to read before it is won');
+  assert.equal(R.perform(s, 'read', 'scratches').ok, false, 'rejected: no clue before the mini game is won');
+  s = play([['win', 'scratches']], s);
   assert.deepEqual(s.clues, ['scratches']);
+  assert.match(R.CLUES.scratches.text, /_ _ 1 2/);
+  assert.ok(R.visibleHotspots(s).some(h => h.action === 'read' && h.target === 'scratches'), 'and it can be read again');
+  assert.ok(!R.visibleHotspots(s).some(h => h.action === 'play' && h.target === 'scratches'), 'but not played again');
+  assert.equal(R.perform(s, 'win', 'scratches').ok, false, 'a clue is only won once');
   assert.equal(R.perform(play([['go', 'sinks']], s), 'read', 'scratches').ok, false, 'not from the sinks');
-  s = play([['go', 'stall'], ['pry']], s);
+  assert.equal(R.perform(play([['go', 'sinks']], R.perform(R.newState(), 'start').state), 'win', 'scratches').ok, false, 'rejected: no win from the wrong place');
+  s = play([['go', 'stall'], ['win', 'tile']], s);
   assert.ok(R.visibleHotspots(s).some(h => h.target === 'carkey'));
   s = play([['take', 'carkey']], s);
   assert.deepEqual(s.inventory, ['carkey']);
@@ -129,17 +143,45 @@ test('the scratches by the door are a clue, and the car key waits behind the til
   assert.deepEqual(R.restore(JSON.stringify(s)), s);
 });
 
-test('the mirror only shows its clue while the hot tap steams it up', () => {
+test('the mirror only opens its mini game while the hot tap steams it up, and gives the first two digits', () => {
   let s = play([['start'], ['go', 'sinks']]);
-  const dry = R.perform(s, 'read', 'mirror');
+  const dry = R.perform(s, 'play', 'mirror');
   assert.ok(dry.ok);
-  assert.deepEqual(dry.state.clues, [], 'no clue without steam');
-  s = play([['tap'], ['read', 'mirror']], s);
-  assert.deepEqual(s.clues, ['mirror']);
-  s = play([['read', 'mirror']], s);
-  assert.deepEqual(s.clues, ['mirror'], 'a clue is only counted once');
+  assert.notEqual(dry.cue, 'game', 'no mini game without steam');
+  assert.equal(R.perform(s, 'win', 'mirror').ok, false, 'rejected: no win at a dry mirror');
   s = play([['tap']], s);
-  assert.equal(s.steam, false, 'the tap turns off again');
+  const wet = R.perform(s, 'play', 'mirror');
+  assert.equal(wet.cue, 'game');
+  assert.equal(wet.message, s.games[1], 'the mirror plays the second game dealt');
+  s = play([['win', 'mirror']], s);
+  assert.deepEqual(s.clues, ['mirror']);
+  assert.match(R.CLUES.mirror.text, /19 _ _/);
+  s = play([['tap'], ['read', 'mirror']], s);
+  assert.equal(s.steam, false, 'the tap turns off again, and the won clue can still be read');
+});
+
+test('each new game deals three different mini games, chosen outside the rules', () => {
+  assert.deepEqual(play(START).games, R.GAMES.slice(0, 3), 'without a deal the first three');
+  const dealt = play([['start', ['seagull', 'deckrun', 'spotdiff']]]);
+  assert.deepEqual(dealt.games, ['seagull', 'deckrun', 'spotdiff']);
+  assert.equal(R.perform(play([['go', 'stall']], dealt), 'play', 'tile').message, 'seagull');
+  assert.equal(R.perform(dealt, 'play', 'scratches').message, 'spotdiff');
+  for (const bad of [['seagull', 'seagull', 'deckrun'], ['seagull', 'deckrun'], ['chess', 'deckrun', 'spotdiff'], 'seagull', null, []]){
+    const r = R.perform(R.newState(), 'start', bad);
+    assert.equal(r.ok, false, JSON.stringify(bad));
+    assert.equal(r.state.scene, 'intro');
+  }
+  assert.equal(R.restore(JSON.stringify({ ...dealt, games: ['seagull', 'seagull', 'deckrun'] })), null, 'a save with the same game twice');
+  assert.equal(R.restore(JSON.stringify({ ...dealt, games: undefined })), null, 'a save without the games');
+});
+
+test('the graffiti in the stall is a hint, not one of the three clues', () => {
+  const s = play([['start'], ['go', 'stall']]);
+  const r = R.perform(s, 'read', 'graffiti');
+  assert.ok(r.ok);
+  assert.match(r.message, /The year opens the floor/);
+  assert.deepEqual(r.state.clues, []);
+  assert.equal(R.perform(play([['go', 'sinks']], s), 'read', 'graffiti').ok, false, 'not from the sinks');
 });
 
 test('the lock: four wheels that wrap around, only reachable at the hatch', () => {
@@ -198,7 +240,7 @@ test('accepted actions return a new state and never change the old one', () => {
 });
 
 test('saved games: a real save is restored, anything else is rejected', () => {
-  const s = play([['start'], ['take', 'mop'], ['go', 'sinks'], ['tap'], ['read', 'mirror']]);
+  const s = play([['start'], ['take', 'mop'], ['go', 'sinks'], ['tap'], ['win', 'mirror']]);
   assert.deepEqual(R.restore(JSON.stringify(s)), s);
   assert.ok(R.canContinue(R.restore(JSON.stringify(s))));
   assert.equal(R.canContinue(R.restore(JSON.stringify(R.newState()))), false, 'nothing to continue from the briefing');
@@ -207,7 +249,7 @@ test('saved games: a real save is restored, anything else is rejected', () => {
     { ...s, time: 9999 }, { ...s, time: -1 }, { ...s, time: 'soon' },
     { ...s, scene: 'roof' }, { ...s, scene: '__proto__' },
     { ...s, inventory: ['mop', 'mop'] }, { ...s, inventory: ['key'] }, { ...s, inventory: ['spoon'] }, { ...s, inventory: 'mop' },
-    { ...s, clues: ['diary'] }, { ...s, clues: ['scrap'] }, { ...s, inventory: ['carkey'], tileOpen: false },
+    { ...s, clues: ['diary'] }, { ...s, clues: ['scrap'] }, { ...s, inventory: ['carkey'], tileOpen: false }, { ...s, tileOpen: true }, { ...s, clues: ['mirror', 'tile'] },
     { ...s, lock: [1, 9, 1] }, { ...s, lock: [1, 9, 1, 12] }, { ...s, lock: [1, 9, 1, 2.5] },
     { ...s, wedged: true, inventory: ['mop'] }, { ...s, steam: 'yes' }, { ...s, ending: 'C' }, { ...s, wrongTries: -1 }, { ...s, warned: [99] }
   ];
@@ -225,10 +267,10 @@ test('audit: a hand-edited save that no game can produce is refused, and every r
   assert.equal(R.restore(save({ scene: 'door', ending: 'A' })), null, 'an ending somewhere else');
   assert.equal(R.restore(save({ clues: ['mirror', 'mirror'] })), null, 'the same clue twice');
   assert.equal(R.restore(save({ graceUsed: true, wedged: false })), null, 'grace minute without the jammed door');
-  assert.notEqual(R.restore(save({ tileOpen: true, inventory: [] })), null, 'the tile open with nothing in hand');
+  assert.notEqual(R.restore(save({ tileOpen: true, clues: ['tile'], inventory: [] })), null, 'the tile open with nothing in hand');
   // a full game: after every accepted action the save must load again
   let s = R.perform(good, 'start').state;
-  const steps = [['go', 'sinks'], ['tap', null], ['read', 'mirror'], ['tap', null], ['go', 'door'], ['take', 'mop'], ['wedge', null], ['go', 'stall'], ['read', 'graffiti'], ['pry', null], ['take', 'carkey'], ['go', 'door'], ['read', 'scratches'], ['go', 'stall'], ['go', 'hatch'], ['try', null]];
+  const steps = [['go', 'sinks'], ['tap', null], ['play', 'mirror'], ['win', 'mirror'], ['tap', null], ['read', 'mirror'], ['go', 'door'], ['take', 'mop'], ['wedge', null], ['go', 'stall'], ['read', 'graffiti'], ['play', 'tile'], ['win', 'tile'], ['take', 'carkey'], ['go', 'door'], ['win', 'scratches'], ['read', 'scratches'], ['go', 'stall'], ['go', 'hatch'], ['try', null]];
   for (const [a, b] of steps){
     const r = R.perform(s, a, b);
     assert.ok(r.ok, a + ' ' + b + ' must be accepted: ' + r.message);

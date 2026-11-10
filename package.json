@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node tools/serve.js",
-    "test": "node --test tests/room-2/rules.test.js tests/room-2/story.test.js tests/room-2/input.test.js tests/project/page.test.js tests/room-1/rules.test.js",
+    "test": "node --test tests/room-2/rules.test.js tests/room-2/story.test.js tests/room-2/input.test.js tests/project/page.test.js tests/room-1/rules.test.js tests/room-1/minigames.test.js",
     "test:browser": "node --test tests/browser/browser.test.js",
     "docs": "node tools/build-rules.js",
     "test:sri": "node tools/check-sri.js",

@@ -10,15 +10,21 @@
   'use strict';
 
   // ---------- Fixed story content ----------
-  // ### The code is a year: 1912, the year the "unsinkable" Titanic sank. Three clues in the room point to it, and one of
-  // ### them (the graffiti) also gives the missing digit to players who do not know the history.
+  // ### The code is a year: 1912, the year the "unsinkable" Titanic sank. Three spots in the room each hide one of the three
+  // ### things you need, behind a short mini game: the crooked tile (the car key), the steamed-up mirror (the first two
+  // ### digits) and the scratches by the door (the last two). A spot gives its clue only once its mini game is won.
   const TIME_LIMIT = 600, WRONG_CODE_PENALTY = 30, WEDGE_GRACE = 60, CODE = '1912', SAVE_KEY = 'escape-room-save';
   const ITEMS = { mop: 'Mop', carkey: 'Car key' };
   const CLUES = {
-    mirror: { title: 'Writing in the steam', text: 'Someone traced letters on the mirror. In the steam they read: “UNSINKABLE?”' },
-    graffiti: { title: 'Scratched into the stall wall', text: '“She was unsinkable. She sailed only once. — The year opens the floor.”' },
-    scratches: { title: 'Scratched into the wall by the door', text: '“The ‘unsinkable’ went down on her first voyage. 15 April 19▒2. More than 1,500 lost.”' }
+    tile: { title: 'Behind the crooked tile', text: 'The tile comes away. In a hollow behind it: a car key on a worn leather fob. Someone hid it here for you.' },
+    mirror: { title: 'Writing in the steam', text: 'The steam clears around figures someone traced on the mirror: “UNSINKABLE? 19 _ _”. The first two digits of the code: 1 and 9.' },
+    scratches: { title: 'Scratched into the wall by the door', text: '“The ‘unsinkable’ went down on her first voyage.” Below it, gouged deep into a tile: “_ _ 1 2”. The last two digits of the code: 1 and 2.' }
   };
+  // ### The six Titanic mini games (drawn and played by minigames.js). Each new game deals three different ones to the
+  // ### three spots; which three is chosen by room.js, because the rules have no randomness of their own.
+  const GAMES = ['battleship', 'spotdiff', 'tictactoe', 'deckrun', 'deckclimb', 'seagull'];
+  const SPOTS = { tile: 'stall', mirror: 'sinks', scratches: 'door' };
+  const GRAFFITI = '“She was unsinkable. She sailed only once. — The year opens the floor.”';
   const WARNINGS = [[300, 'Officer Hale, outside: “Five minutes!”'], [120, 'Officer Hale: “Two minutes. Hurry it up in there.”'], [60, 'Keys jingle outside the door. One minute left.'], [30, 'Hale: “Thirty seconds, 4471!”']];
 
   // ### Scenes are the five places in the washroom. Each lists where you can go (exits) and what you can do (hotspots).
@@ -26,13 +32,13 @@
   const SCENES = {
     door: { title: 'The Door', text: 'A steel door with a small barred window. Officer Hale waits on the other side. Someone has scratched words into the wall beside it. In the corner: a mop in a bucket.',
       exits: ['sinks', 'stall'],
-      hotspots: [['go', 'sinks', 'Sinks'], ['go', 'stall', 'Toilet stall'], ['read', 'scratches', 'Scratches by the door'], ['take', 'mop', 'Mop and bucket'], ['wedge', null, 'Jam the door with the mop']] },
+      hotspots: [['go', 'sinks', 'Sinks'], ['go', 'stall', 'Toilet stall'], ['play', 'scratches', 'Scratches by the door'], ['read', 'scratches', 'Scratches by the door'], ['take', 'mop', 'Mop and bucket'], ['wedge', null, 'Jam the door with the mop']] },
     sinks: { title: 'The Sinks', text: 'Two steel sinks under a polished metal mirror. An empty soap dish, a hot tap that still works.',
       exits: ['door', 'stall'],
-      hotspots: [['go', 'door', 'Back to the door'], ['go', 'stall', 'Toilet stall'], ['tap', null, 'Hot tap'], ['read', 'mirror', 'Mirror']] },
+      hotspots: [['go', 'door', 'Back to the door'], ['go', 'stall', 'Toilet stall'], ['tap', null, 'Hot tap'], ['play', 'mirror', 'Mirror'], ['read', 'mirror', 'Mirror']] },
     stall: { title: 'The Stall', text: 'A steel prison toilet. Words are scratched into the wall. One tile behind the toilet sits crooked. And in the floor: a hatch.',
       exits: ['door', 'sinks', 'hatch'],
-      hotspots: [['go', 'door', 'Back to the door'], ['go', 'sinks', 'Sinks'], ['read', 'graffiti', 'Scratches on the wall'], ['pry', null, 'Crooked tile'], ['take', 'carkey', 'Car key behind the tile'], ['go', 'hatch', 'Hatch in the floor']] },
+      hotspots: [['go', 'door', 'Back to the door'], ['go', 'sinks', 'Sinks'], ['read', 'graffiti', 'Scratches on the wall'], ['play', 'tile', 'Crooked tile'], ['take', 'carkey', 'Car key behind the tile'], ['go', 'hatch', 'Hatch in the floor']] },
     hatch: { title: 'The Hatch', text: 'A steel trapdoor, held shut by a combination lock with four wheels. Cold air seeps up through the gap.',
       exits: ['stall'],
       hotspots: [['go', 'stall', 'Stand up'], ['lock', null, 'Combination lock']] },
@@ -43,13 +49,16 @@
     B: { title: 'Ending B · Back to the cell', text: 'The door bangs open. Officer Hale and two officers drag you back to cell 4471. The hatch stays shut, and so does the case.' }
   };
 
-  const copy = s => ({ ...s, inventory: s.inventory.slice(), clues: s.clues.slice(), lock: s.lock.slice(), warned: s.warned.slice() });
+  const copy = s => ({ ...s, inventory: s.inventory.slice(), clues: s.clues.slice(), lock: s.lock.slice(), warned: s.warned.slice(), games: s.games.slice() });
+  // ### Three different mini games, one for each spot in the order tile, mirror, scratches.
+  const validGames = g => Array.isArray(g) && g.length === 3 && g.every(x => GAMES.includes(x)) && new Set(g).size === 3;
+  const spotIndex = spot => Object.keys(SPOTS).indexOf(spot);
   const result = (state, ok, message, cue) => ({ state, ok, message, cue: cue || (ok ? 'ok' : 'nope') });
   const reject = (state, message) => result(state, false, message, 'nope');
 
   function newState(){
     return { scene: 'intro', time: TIME_LIMIT, inventory: [], clues: [], tileOpen: false, steam: false, wedged: false, graceUsed: false,
-      lock: [0, 0, 0, 0], wrongTries: 0, ending: null, warned: [] };
+      lock: [0, 0, 0, 0], wrongTries: 0, ending: null, warned: [], games: GAMES.slice(0, 3) };
   }
   const has = (s, item) => s.inventory.includes(item);
   const ended = s => s.ending !== null;
@@ -62,7 +71,8 @@
     return sc.hotspots.filter(([action, target]) => {
       if (action === 'take') return !has(s, target) && !(target === 'mop' && s.wedged) && !(target === 'carkey' && !s.tileOpen);
       if (action === 'wedge') return has(s, 'mop') && !s.wedged;
-      if (action === 'pry') return !s.tileOpen;
+      if (action === 'play') return !s.clues.includes(target);
+      if (action === 'read' && target !== 'graffiti') return s.clues.includes(target);
       return true;
     }).map(([action, target, label]) => ({ action, target, label }));
   }
@@ -75,7 +85,9 @@
     if (ended(s)) return reject(s, 'The story is over. Start a new game to play again.');
     if (action === 'start'){
       if (s.scene !== 'intro') return reject(s, 'The clock is already running.');
+      if (target !== undefined && !validGames(target)) return reject(s, 'Each spot needs a different mini game.');
       const n = copy(s); n.scene = 'door';
+      if (target !== undefined) n.games = target.slice();
       return result(n, true, 'The lock clicks behind you. Ten minutes.', 'door');
     }
     if (s.scene === 'intro') return reject(s, 'Read the briefing first.');
@@ -109,17 +121,32 @@
         return result(n, true, n.steam ? 'Hot water hisses into the sink. Steam creeps up the mirror.' : 'You turn the hot tap off.', 'water');
       }
       case 'read': {
-        if (!Object.prototype.hasOwnProperty.call(CLUES, target)) return reject(s, 'There is nothing to read there.');
-        if (!here) return reject(s, 'You cannot see that from here.');
-        if (target === 'mirror' && !s.steam) return result(s, true, 'Just your own tired face in the scratched metal. The glass looks smeared, as if someone wrote on it.', 'ok');
-        const n = copy(s); if (!n.clues.includes(target)) n.clues.push(target);
-        return result(n, true, CLUES[target].text, 'paper');
+        if (target === 'graffiti'){
+          if (s.scene !== 'stall') return reject(s, 'You cannot see that from here.');
+          return result(s, true, GRAFFITI, 'paper');
+        }
+        if (!Object.prototype.hasOwnProperty.call(CLUES, target) || target === 'tile') return reject(s, 'There is nothing to read there.');
+        if (s.scene !== SPOTS[target]) return reject(s, 'You cannot see that from here.');
+        if (!s.clues.includes(target)) return reject(s, 'You have not won this clue yet. Try the mini game first.');
+        return result(s, true, CLUES[target].text, 'paper');
       }
-      case 'pry': {
-        if (s.scene !== 'stall') return reject(s, 'There is no loose tile here.');
-        if (s.tileOpen) return reject(s, 'The tile is already off.');
-        const n = copy(s); n.tileOpen = true;
-        return result(n, true, 'You work your fingers into the cracked grout. The tile comes away. Behind it, in a hollow in the wall: a car key.', 'scrape');
+      // ### play: the player wants to try the mini game behind a spot. It changes nothing; the answer's cue "game" tells
+      // ### room.js to open the game named in s.games. The mirror only has something to play for while it is steamed up.
+      // ### win: the mini game was won. The spot gives its clue (the tile also comes off the wall), once.
+      case 'play':
+      case 'win': {
+        if (!Object.prototype.hasOwnProperty.call(SPOTS, target)) return reject(s, 'There is no mini game there.');
+        if (s.scene !== SPOTS[target]) return reject(s, 'You cannot reach that from here.');
+        if (s.clues.includes(target)) return reject(s, target === 'tile' ? 'The tile is already off.' : 'You already have this clue. It is in your clue notes.');
+        if (target === 'mirror' && !s.steam){
+          if (action === 'win') return reject(s, 'The mirror is dry. Let the hot water run first.');
+          return result(s, true, 'Just your own tired face in the scratched metal. The glass looks smeared, as if someone wrote on it.', 'ok');
+        }
+        const game = s.games[spotIndex(target)];
+        if (action === 'play') return result(s, true, game, 'game');
+        const n = copy(s); n.clues.push(target);
+        if (target === 'tile') n.tileOpen = true;
+        return result(n, true, CLUES[target].text, target === 'tile' ? 'scrape' : 'paper');
       }
       case 'turn': {
         if (s.scene !== 'hatch') return reject(s, 'Kneel down at the hatch to reach the lock.');
@@ -180,6 +207,8 @@
       && Array.isArray(s.clues) && s.clues.length <= 3 && s.clues.every(c => Object.prototype.hasOwnProperty.call(CLUES, c)) && new Set(s.clues).size === s.clues.length
       && Array.isArray(s.lock) && s.lock.length === 4 && s.lock.every(d => Number.isInteger(d) && d >= 0 && d <= 9)
       && Array.isArray(s.warned) && s.warned.every(w => WARNINGS.some(([at]) => at === w))
+      && validGames(s.games)
+      && s.tileOpen === s.clues.includes('tile')
       && ['tileOpen', 'steam', 'wedged', 'graceUsed'].every(k => typeof s[k] === 'boolean')
       && Number.isInteger(s.wrongTries) && s.wrongTries >= 0
       && (s.ending === null || s.ending === 'A' || s.ending === 'B')
@@ -194,7 +223,7 @@
       && (s.graceUsed || s.warned.every(w => s.time <= w));
     if (!ok) return null;
     return { scene: s.scene, time: s.time, inventory: s.inventory.slice(), clues: s.clues.slice(), tileOpen: s.tileOpen, steam: s.steam,
-      wedged: s.wedged, graceUsed: s.graceUsed, lock: s.lock.slice(), wrongTries: s.wrongTries, ending: s.ending, warned: s.warned.slice() };
+      wedged: s.wedged, graceUsed: s.graceUsed, lock: s.lock.slice(), wrongTries: s.wrongTries, ending: s.ending, warned: s.warned.slice(), games: s.games.slice() };
   }
   const canContinue = s => !!s && s.scene !== 'intro' && !ended(s);
   // ### The player's volume, 0 to 1, stored as text. Anything else is refused and the volume stays at full.
@@ -205,7 +234,7 @@
   }
 
   return Object.freeze({
-    TIME_LIMIT, WRONG_CODE_PENALTY, WEDGE_GRACE, CODE, SAVE_KEY, ITEMS, CLUES, SCENES, ENDINGS, WARNINGS,
+    TIME_LIMIT, WRONG_CODE_PENALTY, WEDGE_GRACE, CODE, SAVE_KEY, ITEMS, CLUES, SCENES, ENDINGS, WARNINGS, GAMES, SPOTS, GRAFFITI,
     newState, visibleHotspots, perform, tick, restore, canContinue, VOLUME_KEY, parseVolume
   });
 });

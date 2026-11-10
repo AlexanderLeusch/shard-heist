@@ -135,7 +135,7 @@ const escScripts = [...escHtml.matchAll(/<script\b([^>]*)><\/script>/g)].map(m =
 
 test('escape room: scripts load in order, the library is pinned and SRI-checked, no inline scripts', () => {
   const srcs = escScripts.map(a => a.match(/src="([^"]+)"/)[1]);
-  assert.deepEqual(srcs, ['js/boot.js', 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', 'js/rules.js', 'js/room.js']);
+  assert.deepEqual(srcs, ['js/boot.js', 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', 'js/rules.js', 'js/minigames.js', 'js/room.js']);
   const lib = escScripts[1];
   assert.match(lib, /integrity="sha384-[A-Za-z0-9+/]{64}"/);
   assert.match(lib, /crossorigin="anonymous"/);

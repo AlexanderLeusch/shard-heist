@@ -62,7 +62,7 @@ a{color:var(--accent)}
 <p>Open the hatch in the floor of the toilet stall and climb out <b>before the clock reaches zero</b>.</p>
 <h2>Story</h2>
 <p>The briefing is a short series of cards; <b>Next</b> and <b>Back</b> move between them.</p>
-<ol><li><b>The front page.</b> <i>The Lisbon Times</i> of Monday 16 April 2012: the <b>Starfall necklace</b>, lent by the Ashford family to the Museu de Marinha for an exhibition marking 100 years since the Titanic sank, vanished from its glass case on the night of the centenary. No alarm sounded, and a detective was put on the case.</li><li><b>Who you are.</b> Three weeks ago you were that detective. The trail ended at your own door: the necklace's velvet box was hidden in your car. Tonight you are <b>inmate 4471</b>, convicted of the theft: someone framed you. Your oldest friend on the force kept digging and found the proof that clears your name, but the people who framed you came after him. Before he disappeared from Lisbon, he hid the evidence across the city, in places only you would know to look.</li><li><b>The door.</b> Officer Hale walks you to washroom 2. In a short scene in the room you turn round to the open door, see him in the corridor light, and watch him swing the door shut and lock it. Through the door he says: "Your ten minutes have begun. Not a second more." He waits outside.</li><li><b>The rumour.</b> Inmates whisper about a hatch in the floor of this washroom, locked with a four-digit code that is hidden somewhere in the room.</li><li><b>How to play:</b> the controls.</li></ol>
+<ol><li><b>The front page.</b> <i>The Lisbon Times</i> of Monday 16 April 2012: the <b>Starfall necklace</b>, lent by the Ashford family to the Museu de Marinha for an exhibition marking 100 years since the Titanic sank, vanished from its glass case on the night of the centenary. No alarm sounded, and a detective was put on the case.</li><li><b>Who you are.</b> Three weeks ago you were that detective. The trail ended at your own door: the necklace's velvet box was hidden in your car. Tonight you are <b>inmate 4471</b>, convicted of the theft: someone framed you. Your oldest friend on the force kept digging and found the proof that clears your name, but the people who framed you came after him. Before he disappeared from Lisbon, he hid the evidence across the city, in places only you would know to look.</li><li><b>The door.</b> Officer Hale walks you to washroom 2. In a short scene in the room you turn round to the open door, see him in the corridor light, and watch him swing the door shut and lock it. Through the door he says: "Your ten minutes have begun. Not a second more." He waits outside.</li><li><b>The rumour.</b> Inmates whisper about a hatch in the floor of this washroom, locked with a four-digit code. Three spots in the room hide a car key, the first two digits and the last two digits of the code, each behind a short Titanic mini game.</li><li><b>How to play:</b> the controls.</li></ol>
 <p>The clock only starts when the player presses <b>Start the clock</b> after the briefing.</p>
 <h2>Time</h2>
 <table><tr><th>Rule</th><th>Value</th></tr>
@@ -71,7 +71,7 @@ a{color:var(--accent)}
 <tr><td>Wrong code</td><td>costs <b>30 seconds</b> (<code>WRONG_CODE_PENALTY</code>), never below 0:00</td></tr>
 <tr><td>Jammed door</td><td>when the clock hits 0:00 the first time, you get <b>one extra minute</b> (<code>WEDGE_GRACE</code>), once only</td></tr>
 <tr><td>The clock stops</td><td>in the briefing, in the pause menu (which also opens when the browser tab is hidden or the window loses focus), and after an ending</td></tr>
-<tr><td>The clock keeps running</td><td>while reading a clue and while turning the lock</td></tr>
+<tr><td>The clock keeps running</td><td>while reading a clue, while playing a mini game and while turning the lock</td></tr>
 </table>
 <h2>Scenes and how to move</h2>
 <table><tr><th>Scene</th><th>What is there</th><th>You can walk to</th></tr>
@@ -85,15 +85,26 @@ a{color:var(--accent)}
 <h2>Items (you can carry two)</h2>
 <table><tr><th>Item</th><th>Where</th><th>What it does</th></tr>
 <tr><td><b>Mop</b></td><td>Bucket by the door</td><td>Optional. Used at the door ("Jam the door with the mop") it is placed under the door handle and leaves your inventory. This buys the extra minute.</td></tr>
-<tr><td><b>Car key</b></td><td>In a hollow behind the crooked tile, once you have pried it off with your fingers</td><td>Optional. A car key on a worn leather fob that someone hid there for you, a hint at the car waiting after Ending A. It opens nothing in this room.</td></tr>
+<tr><td><b>Car key</b></td><td>In a hollow behind the crooked tile, once you have won the tile's mini game</td><td>Optional. A car key on a worn leather fob that someone hid there for you, a hint at the car waiting after Ending A. It opens nothing in this room.</td></tr>
 </table>
 <h2>Clues and the code</h2>
-<table><tr><th>Clue</th><th>How to find it</th><th>Text</th></tr>
-<tr><td><b>Mirror</b></td><td>Turn on the hot tap first. Then the steam shows letters someone traced. Without steam you only see your face.</td><td>"UNSINKABLE?"</td></tr>
-<tr><td><b>Graffiti</b></td><td>Read the scratches on the stall wall</td><td>"She was unsinkable. She sailed only once. The year opens the floor."</td></tr>
-<tr><td><b>Scratches by the door</b></td><td>Read the words scratched into the wall beside the door</td><td>"The 'unsinkable' went down on her first voyage. 15 April 19▒2. More than 1,500 lost."</td></tr>
+<p>There are exactly <b>three clues</b>, one behind each of three spots. Clicking a spot opens a <b>mini game of at most 30 seconds</b>. Winning it gives the clue; losing it (or running out of the 30 seconds) gives nothing, and the same game can be tried again at once. Giving up (Esc or <b>Give up</b>), pausing or an ending stops the game without a result.</p>
+<table><tr><th>Spot</th><th>Where</th><th>Condition</th><th>Clue when won</th></tr>
+<tr><td><b>The crooked tile</b></td><td>The Stall</td><td>–</td><td>The tile comes off and the <b>car key</b> lies behind it (take it with "Car key behind the tile")</td></tr>
+<tr><td><b>Writing on the mirror</b></td><td>The Sinks</td><td>Only while the <b>hot tap</b> runs and steams the mirror up. Without steam you only see your face, and no game opens.</td><td>The <b>first two digits</b>: "UNSINKABLE? 19 _ _" appears in the steam</td></tr>
+<tr><td><b>Scratches by the door</b></td><td>The Door</td><td>–</td><td>The <b>last two digits</b>: "_ _ 1 2" is gouged into the wall</td></tr>
 </table>
-<ul><li>The code is <b>1912</b>, the year the Titanic sank. It is the <b>same in every game</b> (open: should it change between games?).</li><li>Players who do not know the history can still solve it: "sailed only once" gives the missing digit 1.</li><li>Every clue you read is kept in your clue notes (3 at most). Reading a clue again does not count twice.</li><li>The crooked tile comes off by hand and hides the car key, not a clue.</li></ul>
+<ul><li>The code is <b>1912</b>, the year the Titanic sank. It is the <b>same in every game</b>.</li><li>A won clue is kept in your clue notes and can be read again at its spot; its mini game cannot be played again.</li><li>The <b>graffiti</b> on the stall wall ("She was unsinkable. She sailed only once. The year opens the floor.") is a hint, not one of the three clues.</li></ul>
+<h3>The six mini games</h3>
+<p>At the start of every game, <b>three different games out of six</b> are dealt at random to the three spots (tile, mirror, scratches), so every round plays differently. The rules check that the three are different; the room deals them (<code>MiniGames.pickGames</code> in <code>room-1-escape/js/minigames.js</code>).</p>
+<table><tr><th>Game</th><th>How to win in 30 seconds</th></tr>
+<tr><td><b>Battleship</b></td><td>Two 6 × 6 grids, three ships each (3, 2 and 2 cells). Fire at the enemy waters; a hit lets you fire again. Sink all enemy ships before the bot sinks yours. The bot fires at random or, half the time, next to one of its hits.</td></tr>
+<tr><td><b>Spot the difference</b></td><td>Two pictures of the Titanic at night; the right one has 5 changes, chosen from 9. Click all five, in either picture. A wrong click costs 2 seconds.</td></tr>
+<tr><td><b>Tic-tac-toe</b></td><td>Your anchors against the bot's icebergs, you start. Three in a row wins, a draw starts a new round. The bot always takes a winning cell, blocks three times out of four, likes the centre, otherwise plays at random.</td></tr>
+<tr><td><b>Deck run</b></td><td>Run along the boat deck to the bow; jump (Space, ↑ or a click) over deck chairs, crates, barrels and coils of rope. Three knocks and you are out.</td></tr>
+<tr><td><b>Deck climb</b></td><td>Bounce up from deck to deck to the funnels; steer with ← → or the mouse. Lifebuoys bounce you higher. Falling into the sea loses.</td></tr>
+<tr><td><b>Seagull</b></td><td>Fly the seagull over the sea, the Titanic in the background; flap with Space, ↑ or a click through ten gaps between storm clouds and icebergs.</td></tr>
+</table>
 <h2>The lock</h2>
 <ul><li>Four wheels, each showing 0–9. Up after 9 is 0, down after 0 is 9.</li><li>You can only turn the wheels and try the code while kneeling at the hatch.</li><li><b>Try the code:</b></li></ul>
 <p>  - Right code: the hatch opens, Ending A.   - Wrong code: "Clunk. The lock holds." Hale hears the noise, and you lose 30 seconds. The number of wrong codes is counted.</p>
@@ -111,6 +122,9 @@ a{color:var(--accent)}
 <tr><td>take an item that is not here, or twice</td><td>"There is no ... here." / "You already have the ..."</td></tr>
 <tr><td>jam the door without the mop, or a second time</td><td>"You need something long and solid..." / "The door is already jammed."</td></tr>
 <tr><td>take the car key while the tile is still on</td><td>"The tile is still in place."</td></tr>
+<tr><td>play the mirror's mini game while it is dry</td><td>No game opens: "Just your own tired face in the scratched metal..."</td></tr>
+<tr><td>play a mini game that is already won, or from another place</td><td>"You already have this clue..." / "You cannot reach that from here."</td></tr>
+<tr><td>read a clue before its mini game is won</td><td>"You have not won this clue yet. Try the mini game first."</td></tr>
 <tr><td>use the tap away from the sinks, the lock away from the hatch</td><td>"There is no tap here." / "Kneel down at the hatch to reach the lock."</td></tr>
 <tr><td>turn a wheel that does not exist</td><td>"The lock only has four wheels."</td></tr>
 <tr><td>do anything after an ending</td><td>"The story is over. Start a new game to play again."</td></tr>
@@ -120,7 +134,8 @@ a{color:var(--accent)}
 <h2>Controls</h2>
 <table><tr><th>Input</th><th>Action</th></tr>
 <tr><td>Drag the mouse or a finger, or the arrow keys</td><td>Look around</td></tr>
-<tr><td>Click a pulsing marker or the object itself</td><td>Use it</td></tr>
+<tr><td>Click a pulsing marker or the object itself</td><td>Use it (the tile, the mirror and the scratches open their mini game)</td></tr>
+<tr><td>Space, arrow keys, mouse</td><td>Play a mini game (see each game)</td></tr>
 <tr><td>"Walk to" buttons (bottom right)</td><td>Move to another scene</td></tr>
 <tr><td>"Clues" button (bottom left)</td><td>Read your clue notes</td></tr>
 <tr><td><code>P</code> / <code>Esc</code></td><td>Pause (Esc also closes a card)</td></tr>

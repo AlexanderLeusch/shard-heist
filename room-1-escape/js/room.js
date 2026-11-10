@@ -1,7 +1,7 @@
 // Room 1: the 3D prison washroom (rendering, camera, hotspots, sound, cards). The rules it plays by live in src/rules.js.
 (() => {
 'use strict';
-if (typeof THREE === 'undefined' || typeof EscapeRules === 'undefined'){
+if (typeof THREE === 'undefined' || typeof EscapeRules === 'undefined' || typeof MiniGames === 'undefined'){
   if (window.ShardFatal) ShardFatal('The game could not load', 'The 3D engine did not arrive. Check your internet connection or turn off content blockers for this page, then reload.');
   return;
 }
@@ -131,8 +131,9 @@ const graffitiTex = canvasTex(1024, 640, (g, w, h) => {
   g.strokeStyle = 'rgba(230,232,225,.35)'; g.lineWidth = 1;
   for (let i = 0; i < 40; i++){ const x = rnd() * w, y = rnd() * h; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - .5) * 120, y + (rnd() - .5) * 30); g.stroke(); }
 });
-// Scratches in the tiles beside the door: the date the "unsinkable" ship went down, one digit gouged out
-const scratchesTex = canvasTex(1024, 640, (g, w, h) => {
+// Scratches in the tiles beside the door: the date the "unsinkable" ship went down, the year gouged out. Once its mini game
+// is won, the last two digits of the code show under it (paintScratches is called again with won = true).
+const paintScratches = (g, w, h, won) => {
   g.clearRect(0, 0, w, h);
   const scratch = (text, x, y, size, rot, alpha) => {
     g.save(); g.translate(x, y); g.rotate(rot); g.font = `700 ${size}px "Arial Narrow", Arial, sans-serif`;
@@ -143,25 +144,40 @@ const scratchesTex = canvasTex(1024, 640, (g, w, h) => {
   };
   scratch('THE UNSINKABLE', 60, 130, 76, -.025, .85);
   scratch('WENT DOWN ON HER FIRST VOYAGE', 50, 230, 52, .015, .85);
-  scratch('15 APRIL 19   2', 70, 360, 82, -.02, .9);
-  // the third digit is scratched over until nothing can be read
+  scratch('15 APRIL', 70, 360, 82, -.02, .9);
+  // the year is scratched over until nothing can be read
   g.strokeStyle = 'rgba(38,40,36,.85)'; g.lineWidth = 3;
-  for (let i = 0; i < 26; i++){ const x = 520 + rnd() * 50, y = 290 + rnd() * 70; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - .5) * 60, y + (rnd() - .5) * 60); g.stroke(); }
+  for (let i = 0; i < 60; i++){ const x = 440 + rnd() * 200, y = 290 + rnd() * 70; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - .5) * 60, y + (rnd() - .5) * 60); g.stroke(); }
   scratch('1500 LOST', 90, 470, 60, .03, .8);
+  if (won) scratch('CODE  _ _ 1 2', 420, 580, 92, -.03, 1);
   scratch('IIII IIII', 700, 560, 40, 0, .45);
   g.strokeStyle = 'rgba(38,40,36,.3)'; g.lineWidth = 1.2;
   for (let i = 0; i < 30; i++){ const x = rnd() * w, y = rnd() * h; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - .5) * 120, y + (rnd() - .5) * 30); g.stroke(); }
-});
-// Steam on the mirror, with the letters someone traced into it left clear
-const steamTex = canvasTex(1024, 512, (g, w, h) => {
+};
+const scratchesTex = canvasTex(1024, 640, (g, w, h) => paintScratches(g, w, h, false));
+// Steam on the mirror, with the letters someone traced into it left clear. Once the mirror's mini game is won, the first
+// two digits of the code show in the steam too.
+const paintSteam = (g, w, h, won) => {
+  g.clearRect(0, 0, w, h);
   const gr = g.createLinearGradient(0, h, 0, 0); gr.addColorStop(0, 'rgba(225,232,232,.95)'); gr.addColorStop(1, 'rgba(225,232,232,.72)');
   g.fillStyle = gr; g.fillRect(0, 0, w, h);
   for (let i = 0; i < 3000; i++){ g.fillStyle = `rgba(255,255,255,${rnd() * .25})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, rnd() * 3, 0, 7); g.fill(); }
   g.globalCompositeOperation = 'destination-out';
   g.font = '800 132px "Arial Narrow", Arial, sans-serif'; g.textAlign = 'center'; g.lineWidth = 16; g.lineJoin = 'round';
-  g.strokeStyle = 'rgba(0,0,0,1)'; g.strokeText('UNSINKABLE?', w / 2, h * .58);
+  g.strokeStyle = 'rgba(0,0,0,1)';
+  if (won){ g.font = '800 96px "Arial Narrow", Arial, sans-serif'; g.strokeText('UNSINKABLE?', w / 2, h * .36); g.font = '800 150px "Arial Narrow", Arial, sans-serif'; g.strokeText('1 9 _ _', w / 2, h * .8); }
+  else g.strokeText('UNSINKABLE?', w / 2, h * .58);
   for (let i = 0; i < 9; i++){ const x = 160 + rnd() * (w - 320), y = h * .6; g.fillRect(x, y, 5, 40 + rnd() * 90); }
-});
+  g.globalCompositeOperation = 'source-over';
+};
+const steamTex = canvasTex(1024, 512, (g, w, h) => paintSteam(g, w, h, false));
+// ### Paints a clue texture again (the mirror and the scratches show their digits once won).
+const painted = new Map();
+function repaint(tex, paint, won){
+  if ((painted.get(tex) || false) === won) return;
+  painted.set(tex, won);
+  const c = tex.image; paint(c.getContext('2d'), c.width, c.height, won); tex.needsUpdate = true;
+}
 const signTex = canvasTex(1024, 384, (g, w, h) => {
   g.fillStyle = '#d9cfa8'; g.fillRect(0, 0, w, h);
   g.fillStyle = '#1d1f1e'; g.fillRect(0, 0, w, 70); g.fillRect(0, h - 26, w, 26);
@@ -483,7 +499,7 @@ pipe(.8, -3.85, .4, -.65); pipe(.8, -3.85, .4, .65);
 const mirror = plane(2.2, .72, M.mirror, -3.985, 1.6, 0, Math.PI / 2);
 box(.01, .8, 2.28, M.dullSteel, -3.996, 1.6, 0);
 const steam = plane(2.2, .72, M.steam, -3.975, 1.6, 0, Math.PI / 2); steam.renderOrder = 2;
-hot('read:mirror', mirror, steam);
+hot('read:mirror', mirror, steam); hot('play:mirror', mirror, steam);
 box(.12, .025, .2, M.dullSteel, -3.85, .905, 0);
 const steamPuffs = [];
 const puffTex = canvasTex(64, 64, (g, w) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, w); });
@@ -501,7 +517,7 @@ const MOP_DOOR = { p: new THREE.Vector3(.58, 0, 2.15), r: new THREE.Euler(.36, 0
 hot('take:mop', mopStick, mopFringe);
 // The scratches in the tiles beside the door (east of the door frame, facing into the room)
 const scratches = plane(1.0, .62, M.scratches, 1.75, 1.3, D / 2 - .006, Math.PI);
-hot('read:scratches', scratches);
+hot('read:scratches', scratches); hot('play:scratches', scratches);
 
 // The toilet stall: partitions, steel toilet, graffiti, the crooked tile and the hatch in the floor
 const SX0 = 1.5, SZ1 = -.7;
@@ -587,7 +603,7 @@ const keyBlade = new THREE.Mesh(new THREE.BoxGeometry(.045, .009, .003), new THR
 const keyRing = new THREE.Mesh(new THREE.TorusGeometry(.01, .002, 6, 14), M.steel); keyRing.position.x = -.022;
 const keyFob = new THREE.Mesh(new THREE.BoxGeometry(.028, .04, .004), new THREE.MeshStandardMaterial({ color: 0x5a3820, roughness: .85 })); keyFob.position.set(-.036, -.016, 0); keyFob.rotation.z = .4;
 carKey.add(keyHead, keyBlade, keyRing, keyFob); carKey.position.set(TILE_POS.x + .005, TILE_POS.y - .01, -2.99); carKey.rotation.z = -.2; carKey.scale.setScalar(1.5); carKey.visible = false; room.add(carKey);
-hot('pry', tile); hot('take:carkey', keyHead, keyBlade, keyFob);
+hot('play:tile', tile); hot('take:carkey', keyHead, keyBlade, keyFob);
 // The hatch: frame, diamond-plate lid on a hinge, padlock with four number wheels, a shaft with a ladder below
 const HATCH = new THREE.Vector3(2.2, 0, -1.75), HS = .74;
 for (const [w, d, x, z] of [[HS + .08, .05, 0, -HS / 2], [HS + .08, .05, 0, HS / 2], [.05, HS, -HS / 2, 0], [.05, HS, HS / 2, 0]]) box(w, .03, d, M.dullSteel, HATCH.x + x, .015, HATCH.z + z);
@@ -771,7 +787,8 @@ canvas.addEventListener('pointercancel', () => { drag = null; canvas.classList.r
 // ### 3D view does the same as its marker.
 const ANCHORS = {
   'take:mop': [3.35, .9, 2.45], 'wedge': [.38, 1.02, 2.86], 'tap': [-3.94, 1.08, -.53],
-  'read:mirror': [-3.97, 1.75, .45], 'read:graffiti': [1.53, 1.5, -1.9], 'pry': [2.62, .58, -2.97], 'take:carkey': [2.62, .58, -2.97], 'read:scratches': [1.75, 1.3, 2.95],
+  'read:mirror': [-3.97, 1.75, .45], 'play:mirror': [-3.97, 1.75, .45], 'read:graffiti': [1.53, 1.5, -1.9], 'play:tile': [2.62, .58, -2.97], 'take:carkey': [2.62, .58, -2.97],
+  'read:scratches': [1.75, 1.3, 2.95], 'play:scratches': [1.75, 1.3, 2.95],
   'lock': [2.2, .1, -1.1]
 };
 const keyOf = h => h.target ? `${h.action}:${h.target}` : h.action;
@@ -849,8 +866,9 @@ function act(action, target){
   S = r.state;
   if (action !== 'new') save();
   if (S.scene !== before.scene) goView(S.scene === 'tunnel' ? 'hatch' : S.scene);
-  if (action === 'read' && S.clues.includes(target) && R.CLUES[target] && !(target === 'mirror' && !S.steam)) showClue(target);
-  else if (r.message && !S.ending) say(r.message, action === 'try' && !S.ending ? 'warn' : action === 'take' || action === 'pry' ? 'good' : '');
+  if (r.cue === 'game'){ showMini(target, r.message); return r; }
+  if ((action === 'read' || action === 'win') && R.CLUES[target]) showClue(target);
+  else if (r.message && !S.ending) say(r.message, action === 'try' && !S.ending ? 'warn' : action === 'take' ? 'good' : '');
   if (action === 'try' && !S.ending){ guardShow = 3; renderLock(); }
   if (S.ending === 'A' && before.ending !== 'A'){ hideCard(); endingA(); }
   syncWorld(); renderHud(); renderHotspots();
@@ -866,6 +884,8 @@ function syncWorld(){
   if (S.tileOpen && tile.userData.fall === undefined) tile.userData.fall = 0;
   if (!S.tileOpen){ tile.position.copy(TILE_POS); tile.rotation.set(0, 0, .07); delete tile.userData.fall; }
   carKey.visible = S.tileOpen && !S.inventory.includes('carkey');
+  repaint(steamTex, paintSteam, S.clues.includes('mirror'));
+  repaint(scratchesTex, paintScratches, S.clues.includes('scratches'));
   S.lock.forEach((d, i) => { if (wheelTex[i].userData !== d){ drawDigit(wheelTex[i], d); wheelTex[i].userData = d; } });
   if (!S.ending){ lidPivot.rotation.x = 0; tunnelLight.intensity = 0; }
   shadowsMoved();
@@ -905,11 +925,12 @@ function say(text, kind){
   sayTimer = Math.min(9, 3 + text.length / 22);
 }
 function showCard(html, cls){
+  stopMini();
   card.className = 'card' + (cls ? ' ' + cls : ''); card.innerHTML = html; overlay.hidden = false;
   const b = card.querySelector('.btn'); if (b && !COARSE) b.focus({ preventScroll: true });
 }
 // ### Closes a clue or lock card.
-function hideCard(){ overlay.hidden = true; }
+function hideCard(){ stopMini(); overlay.hidden = true; }
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ### The briefing: five short cards so a first-time player knows what happened, who they are, where, why and how to play.
@@ -920,7 +941,7 @@ const BRIEF = [
   [null, null, '<div class="news-wrap"><article class="news" aria-label="Front page of The Lisbon Times"><div class="mast-top"><span>Front page</span><span>Magazine</span></div><div class="mast">The Lisbon Times</div><div class="dateline"><span>Vol. CXXI · No. 107</span><span>Lisbon, Monday 16 April 2012</span><span>€1.20</span></div><h1>Titanic necklace vanishes from naval museum</h1><div class="deck">The Starfall necklace disappears on the night of the centenary. No alarm sounded.</div><div class="cols"><div class="by">By our crime correspondent</div><p>BELÉM — The Starfall necklace, lent by the Ashford family to the Museu de Marinha for a limited exhibition marking 100 years since the sinking of the Titanic, disappeared from its glass case on the night of the centenary.</p><figure><div class="photo"><div class="ht"><svg class="necklace" viewBox="0 0 160 72" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><radialGradient id="nl-spot" cx=".5" cy=".3" r=".62"><stop offset="0" stop-color="#d8d8d8"/><stop offset=".45" stop-color="#6e6e6e"/><stop offset="1" stop-color="#141414"/></radialGradient><linearGradient id="nl-bust" x1="0" x2="1"><stop offset="0" stop-color="#1c1c1c"/><stop offset=".42" stop-color="#3e3e3e"/><stop offset=".6" stop-color="#323232"/><stop offset="1" stop-color="#161616"/></linearGradient><radialGradient id="nl-pearl" cx=".35" cy=".32" r=".7"><stop offset="0" stop-color="#fff"/><stop offset=".35" stop-color="#e6e6e6"/><stop offset=".8" stop-color="#8a8a8a"/><stop offset="1" stop-color="#3a3a3a"/></radialGradient><linearGradient id="nl-base" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#b8b8b8"/><stop offset=".12" stop-color="#5a5a5a"/><stop offset="1" stop-color="#1a1a1a"/></linearGradient><linearGradient id="nl-glass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".0"/><stop offset=".45" stop-color="#fff" stop-opacity=".0"/><stop offset=".5" stop-color="#fff" stop-opacity=".28"/><stop offset=".56" stop-color="#fff" stop-opacity=".0"/><stop offset=".7" stop-color="#fff" stop-opacity=".0"/><stop offset=".73" stop-color="#fff" stop-opacity=".14"/><stop offset=".76" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><rect width="160" height="72" fill="url(#nl-spot)"/><path d="M62 0H98V9Q98 24 124 34L132 60H28L36 34Q62 24 62 9Z" fill="url(#nl-bust)"/><path d="M28 58H132L140 72H20Z" fill="url(#nl-base)"/><rect x="72" y="62" width="16" height="5" fill="#cfcfcf"/><path d="M73.5 64h13M73.5 65.6h9" stroke="#555" stroke-width=".5"/><g fill="#000" opacity=".45"><ellipse cx="104.9" cy="15.4" rx="2" ry="1.3"/><ellipse cx="103.8" cy="19.5" rx="2" ry="1.3"/><ellipse cx="102.1" cy="23.3" rx="2" ry="1.3"/><ellipse cx="100.0" cy="26.9" rx="2" ry="1.3"/><ellipse cx="97.4" cy="30.0" rx="2" ry="1.3"/><ellipse cx="94.5" cy="32.7" rx="2" ry="1.3"/><ellipse cx="91.4" cy="34.8" rx="2" ry="1.3"/><ellipse cx="88.0" cy="36.3" rx="2" ry="1.3"/><ellipse cx="84.4" cy="37.3" rx="2" ry="1.3"/><ellipse cx="80.8" cy="37.6" rx="2" ry="1.3"/><ellipse cx="77.2" cy="37.3" rx="2" ry="1.3"/><ellipse cx="73.6" cy="36.3" rx="2" ry="1.3"/><ellipse cx="70.2" cy="34.8" rx="2" ry="1.3"/><ellipse cx="67.1" cy="32.7" rx="2" ry="1.3"/><ellipse cx="64.2" cy="30.0" rx="2" ry="1.3"/><ellipse cx="61.6" cy="26.9" rx="2" ry="1.3"/><ellipse cx="59.5" cy="23.3" rx="2" ry="1.3"/><ellipse cx="57.8" cy="19.5" rx="2" ry="1.3"/><ellipse cx="56.7" cy="15.4" rx="2" ry="1.3"/></g><g fill="url(#nl-pearl)"><circle cx="104.1" cy="13.8" r="2.1"/><circle cx="103.0" cy="17.9" r="2.1"/><circle cx="101.3" cy="21.7" r="2.1"/><circle cx="99.2" cy="25.3" r="2.1"/><circle cx="96.6" cy="28.4" r="2.1"/><circle cx="93.7" cy="31.1" r="2.1"/><circle cx="90.6" cy="33.2" r="2.1"/><circle cx="87.2" cy="34.7" r="2.1"/><circle cx="83.6" cy="35.7" r="2.1"/><circle cx="80.0" cy="36.0" r="2.1"/><circle cx="76.4" cy="35.7" r="2.1"/><circle cx="72.8" cy="34.7" r="2.1"/><circle cx="69.4" cy="33.2" r="2.1"/><circle cx="66.3" cy="31.1" r="2.1"/><circle cx="63.4" cy="28.4" r="2.1"/><circle cx="60.8" cy="25.3" r="2.1"/><circle cx="58.7" cy="21.7" r="2.1"/><circle cx="57.0" cy="17.9" r="2.1"/><circle cx="55.9" cy="13.8" r="2.1"/></g><path d="M80 36.5V41" stroke="#bbb" stroke-width=".8"/><polygon points="80,40.5 82.3,46.2 88.4,46.6 83.7,50.5 85.2,56.4 80,53.1 74.8,56.4 76.3,50.5 71.6,46.6 77.7,46.2" fill="url(#nl-pearl)" stroke="#111" stroke-width=".5"/><g stroke="#fff" stroke-linecap="round"><path d="M80 43.5v6M77 46.5h6" stroke-width=".7"/><path d="M93 15v5M90.5 17.5h5M61 27v3M59.5 28.5h3" stroke-width=".45" opacity=".8"/></g><path d="M22 2H138V72M22 2V72" fill="none" stroke="#9a9a9a" stroke-width=".5" opacity=".35"/><rect width="160" height="72" fill="url(#nl-glass)"/></svg></div><b></b></div><figcaption>The Starfall necklace on display at the Museu de Marinha, before the theft.</figcaption></figure><p>No alarm sounded. The museum has closed the exhibition.</p><p>A detective has been put on the case.</p></div></article></div>'],
   ['Cell Block D · 02:14', 'Plot <em>Twist</em>', 'Three weeks ago you were that detective. You followed the trail from the empty case at the Museu de Marinha, and it ended at your own door: the necklace’s velvet box, hidden in your car. Tonight you are <b>inmate 4471</b>, convicted of stealing it. Someone framed you.</p><p>Not everyone believed it. <b>Your oldest friend on the force</b> stood by you through the trial and kept digging until he found the proof that clears your name. But the people who framed you found out and came after him. Before he disappeared from Lisbon, he <b>hid the evidence across the city</b>, in places only you would know to look.'],
   ['The washroom · 02:16', 'Ten <em>minutes</em>', 'cine'],
-  ['The rumour', 'A way <em>down</em>', 'Inmates whisper about a <b>hatch in the floor</b> of this washroom, locked with a four-digit code. The code is hidden somewhere in the room. Find it, open the hatch, get out before Hale comes back.'],
+  ['The rumour', 'A way <em>down</em>', 'Inmates whisper about a <b>hatch in the floor</b> of this washroom, locked with a four-digit code. Three spots in the room hide what you need: <b>a car key</b>, the <b>first two digits</b> and the <b>last two digits</b> of the code. Each one is guarded by a short Titanic mini game. Win them, open the hatch, get out before Hale comes back.'],
   ['How to play', 'Your <em>moves</em>', null]
 ];
 let briefStep = 0;
@@ -940,6 +961,7 @@ function showBrief(i){
   const body = text ? (text.startsWith('<div') ? text : `<p>${text}</p>`) : `<div class="howto">
       <b>Drag</b><span>Look around (or use the arrow keys)</span>
       <b>Markers</b><span>Click a pulsing marker or the object itself to use it</span>
+      <b>Mini games</b><span>The crooked tile, the mirror and the scratches each open a mini game of ${MiniGames.TIME} s. Win it to get the clue</span>
       <b>Walk to</b><span>Buttons bottom right take you to another part of the room</span>
       <b>Items</b><span>What you pick up appears bottom left and is used automatically</span>
       <b>Clues</b><span>Everything you read is kept in your clue notes</span>
@@ -974,7 +996,7 @@ function showClue(k){
 function showNotes(){
   const list = S.clues.map(k => `<div class="paper"><small>${esc(R.CLUES[k].title)}</small>${esc(R.CLUES[k].text)}</div>`).join('');
   showCard(`<div class="eyebrow">Your clue notes</div><h2>${S.clues.length} of 3 <em>clues</em></h2>
-    <div class="clue-list">${list || '<div class="empty">Nothing yet. Look closely at the mirror, the walls and anything that looks out of place.</div>'}</div>
+    <div class="clue-list">${list || '<div class="empty">Nothing yet. Try the crooked tile, the mirror (once it is steamed up) and the scratches by the door.</div>'}</div>
     <div class="actions"><button class="btn" data-do="close">Back to the room <small>Enter</small></button></div>`);
 }
 function showLock(){
@@ -992,13 +1014,53 @@ function renderLock(){
   if (turn) ui.querySelector(`[data-turn="${turn}"]`).focus();
   card.querySelector('#tries').textContent = S.wrongTries ? `Wrong codes so far: ${S.wrongTries} · each costs ${R.WRONG_CODE_PENALTY} s` : 'Each wrong code costs ' + R.WRONG_CODE_PENALTY + ' s';
 }
+// ---------- Mini games ----------
+// ### A clue spot that is used ("play" accepted by Rules, cue "game") opens its mini game from minigames.js in the card. A
+// ### win is sent to Rules as "win", which gives the clue; a loss offers the same game again. Closing the card, pausing or
+// ### an ending stops the game without a result. The clock keeps running while you play.
+let mini = null, miniSpot = null;
+const SPOT_NAME = { tile: 'The crooked tile', mirror: 'Writing on the mirror', scratches: 'Scratches by the door' };
+const SPOT_PRIZE = { tile: 'the car key', mirror: 'the first two digits of the code', scratches: 'the last two digits of the code' };
+function showMini(spot, id){
+  const info = MiniGames.INFO[id];
+  if (!info) return;
+  showCard(`<div class="eyebrow">${SPOT_NAME[spot]} · mini game · ${MiniGames.TIME} seconds</div><h2>${info.title}</h2>
+    <p>${esc(info.how)} Win to get <b>${SPOT_PRIZE[spot]}</b>.</p><div id="miniHost"></div>
+    <div class="actions"><button class="mg-quit" data-do="close">Give up <small>Esc</small></button></div>`, 'mini');
+  miniSpot = spot;
+  mini = MiniGames.open(card.querySelector('#miniHost'), id, {
+    sound: miniSound,
+    onEnd: (won, reason) => { mini = null; if (S.ending) return; if (won) act('win', spot); else showMiniLost(spot, id, reason); }
+  });
+}
+function showMiniLost(spot, id, reason){
+  showCard(`<div class="eyebrow">${SPOT_NAME[spot]} · ${esc(MiniGames.INFO[id].name)}</div><h2>Not <em>this time</em></h2>
+    <p>${esc(reason || 'You lost the mini game.')} Try again: it is the same game, and the clock is still running.</p>
+    <div class="actions"><button class="btn" data-do="replay">Try again <small>Enter</small></button><button class="btn ghost" data-do="close">Back to the room</button></div>`);
+}
+function stopMini(){ if (mini){ mini.stop(); mini = null; } }
+// ### The short sounds of the mini games, made from the same tones and noise as the room's.
+function miniSound(n){
+  if (!ac) return;
+  switch (n){
+    case 'hit': noise(.25, .35, 'lowpass', 500); tone(110, .25, 'sine', .2, 60); break;
+    case 'splash': noise(.18, .12, 'highpass', 1800); break;
+    case 'good': tone(660, .1, 'triangle', .1); tone(990, .14, 'triangle', .08, null, .07); break;
+    case 'bad': tone(140, .2, 'square', .05, 90); break;
+    case 'jump': tone(420, .1, 'sine', .06, 760); break;
+    case 'tick': cue('tick'); break;
+    case 'win': [523, 659, 784, 1046].forEach((f, i) => tone(f, .18, 'triangle', .09, null, i * .09)); break;
+    case 'lose': tone(300, .5, 'sawtooth', .05, 90); break;
+  }
+}
+
 // ### Shows one of the two endings.
 function showEnding(){
   const A = S.ending === 'A', E = R.ENDINGS[S.ending];
   showCard(`<div class="eyebrow">${A ? 'Ending A of 2' : 'Ending B of 2'}</div>
     <h1>${A ? 'Out <em>below</em>' : 'Back to <em>the cell</em>'}</h1><p>${esc(E.text)}</p>
     <p>Time left: <b>${fmt(S.time)}</b> · Clues: <b>${S.clues.length} of 3</b> · Wrong codes: <b>${S.wrongTries}</b>${S.wedged ? ' · You jammed the door' : ''}</p>
-    ${A ? '<div class="next">Room 2 · The chase starts at the end of this tunnel</div>' : '<p>Tip: the jammed door buys you a minute, and the steam shows more than your face.</p>'}
+    ${A ? '<div class="next">Room 2 · The chase starts at the end of this tunnel</div>' : '<p>Tip: the jammed door buys you a minute, and the hot tap steams up the mirror so you can play for its digits.</p>'}
     <div class="actions"><button class="btn" data-do="new">${A ? 'Play again' : 'Try again'} <small>Enter</small></button></div>`, A ? 'ending-a' : 'ending-b');
 }
 // the volume slider on the pause card; a short tick when it is let go
@@ -1021,12 +1083,13 @@ card.addEventListener('click', e => {
   if (d === 'next') showBrief(Math.min(BRIEF.length - 1, briefStep + 1));
   else if (d === 'back') showBrief(Math.max(0, briefStep - 1));
   else if (d === 'brief') showBrief(0);
-  else if (d === 'start'){ const r = act('start'); if (r.ok){ hideCard(); hud.classList.remove('off'); } }
+  else if (d === 'start'){ const r = act('start', MiniGames.pickGames(Math.random)); if (r.ok){ hideCard(); hud.classList.remove('off'); } }
   else if (d === 'resume') resumeRoom();
   else if (d === 'pause') showPause();
   else if (d === 'ask-new') showAskNew();
   else if (d === 'new'){ paused = false; hatchAnim = -1; tileVel = 0; endingShown = false; act('new'); writeStore(R.SAVE_KEY, ''); hud.classList.add('off'); goView('intro', .8); doorFlash = 0; windowLight.intensity = .9; showBrief(0); }
   else if (d === 'close') hideCard();
+  else if (d === 'replay' && miniSpot) use('play', miniSpot);
   else if (d === 'try') act('try');
 });
 $('btnPause').addEventListener('click', e => { e.currentTarget.blur(); if (S.ending || S.scene === 'intro') return; if (paused) resumeRoom(); else showPause(); });
@@ -1234,7 +1297,8 @@ function frame(now){
   if (pendingHover){ hover(pendingHover); pendingHover = null; }
   updateMarkers();
   if (shadowFrames > 0){ renderer.shadowMap.needsUpdate = true; shadowFrames--; }
-  renderer.render(scene, camera);
+  // while a mini game runs the room behind the card stands still, so it is not drawn again and the game runs smoothly
+  if (!mini) renderer.render(scene, camera);
   adaptResolution(elapsed);
 }
 
