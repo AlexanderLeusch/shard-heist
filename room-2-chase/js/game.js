@@ -361,17 +361,52 @@ function makeTruckParts(){
   const tail = mergeGeos([boxG(0.3, 0.2, 0.06, 1.05, 1.05, -5.33), boxG(0.3, 0.2, 0.06, -1.05, 1.05, -5.33)]);
   return { body: cab, glass, cargo, trim, chrome, tire: wheels.tire, head, tail };
 }
-// The yellow Lisbon tram: lit windows between white pillars, a yellow body and a trolley pole on the roof
+// ### A railway wheel, turned on a lathe: a hub, a thin dished disc, the rim, a tread that narrows slightly outwards and the flange
+// ### on the inner side that keeps the wheel on the rail. side +1 is a right-hand wheel (flange towards -x), -1 a left-hand one.
+const RAIL_WHEEL_R = 0.33;
+function railWheel(side, x, y, z){
+  const P = [[0.001, -0.09], [0.08, -0.09], [0.08, -0.04], [0.25, -0.022], [0.27, -0.062], [0.352, -0.064], [0.362, -0.05], [0.354, -0.034], [0.333, -0.026],
+    [0.33, 0.0], [0.322, 0.062], [0.31, 0.072], [0.27, 0.072], [0.248, 0.032], [0.09, 0.042], [0.09, 0.078], [0.001, 0.078]].map(([r, a]) => new THREE.Vector2(r, a));
+  const g = new THREE.LatheGeometry(P, 22);
+  g.rotateZ(side > 0 ? -Math.PI / 2 : Math.PI / 2); g.translate(x, y, z);
+  return g;
+}
+// The yellow Lisbon tram: lit windows between white pillars, a yellow body and a trolley pole on the roof. It runs on one
+// two-axle truck: four steel railway wheels on the rails (0.72 m either side of the middle), axles, side frames with axle boxes,
+// coil springs under the body and a brake block on each wheel. Short aprons cover only the platforms at both ends.
 function makeTramParts(){
   const pillars = [];
   for (let z = -3.6; z <= 3.61; z += 1.2) pillars.push(boxG(2.26, 1.2, 0.16, 0, 2.25, z));
-  const wheels = wheelSet([[0.85, 1.5], [-0.85, 1.5], [0.85, -1.5], [-0.85, -1.5]], 0.38, 0.2);
+  const G = Core.RAIL.half, R = RAIL_WHEEL_R, Y = R + 0.035, AX = [1.5, -1.5], steel = [], tread = [], truck = [];
+  for (const z of AX){
+    for (const sd of [-1, 1]){
+      steel.push(railWheel(sd, sd * G, Y, z));
+      // the polished running surface, where the wheel touches the rail
+      const t = new THREE.CylinderGeometry(R + 0.002, R - 0.006, 0.07, 22, 1, true); t.rotateZ(Math.PI / 2); t.translate(sd * (G + 0.018), Y, z); tread.push(t);
+      // axle box with its cover, and the brake block against the inner side of the tread
+      truck.push(boxG(0.13, 0.2, 0.24, sd * (G + 0.19), Y, z), boxG(0.03, 0.12, 0.14, sd * (G + 0.265), Y, z));
+      truck.push(boxG(0.07, 0.2, 0.07, sd * (G + 0.02), Y + 0.04, z - Math.sign(z) * (R + 0.05)));
+    }
+    const axle = new THREE.CylinderGeometry(0.055, 0.055, 2 * G + 0.32, 10); axle.rotateZ(Math.PI / 2); axle.translate(0, Y, z); truck.push(axle);
+  }
+  for (const sd of [-1, 1]){
+    const x = sd * (G + 0.19);
+    // side frame over the axle boxes, the lower tie bar, the brake hanger rod, and two coil springs that carry the body
+    truck.push(boxG(0.09, 0.13, 3.9, x, Y + 0.17, 0), boxG(0.06, 0.06, 3.5, x, Y - 0.16, 0), boxG(0.04, 0.04, 2.3, sd * (G + 0.02), Y + 0.13, 0));
+    for (const z of [-0.55, 0.55]){
+      const coil = new THREE.TorusGeometry(0.07, 0.016, 5, 10);
+      for (let i = 0; i < 4; i++){ const c = coil.clone(); c.rotateX(Math.PI / 2); c.translate(x, Y + 0.25 + i * 0.035, z); truck.push(c); }
+    }
+  }
+  // cross beams of the truck, and the lifeguard trays that hang low in front of each end
+  truck.push(boxG(2 * G + 0.4, 0.08, 0.12, 0, Y + 0.17, 0.9), boxG(2 * G + 0.4, 0.08, 0.12, 0, Y + 0.17, -0.9));
+  for (const e of [-1, 1]) truck.push(boxG(1.7, 0.04, 0.34, 0, 0.17, e * 4.42), boxG(1.7, 0.18, 0.04, 0, 0.27, e * 4.28));
   return {
     body: mergeGeos([boxG(2.2, 1.0, 8.4, 0, 1.15, 0), boxG(2.1, 0.16, 7.8, 0, 3.12, 0), boxG(2.24, 1.25, 0.12, 0, 2.25, 4.14), boxG(2.24, 1.25, 0.12, 0, 2.25, -4.14)]),
     cargo: mergeGeos([boxG(2.24, 0.14, 8.4, 0, 1.6, 0), boxG(2.24, 0.26, 8.2, 0, 2.92, 0), ...pillars]),
     lit: mergeGeos([boxG(2.16, 1.2, 8.1, 0, 2.25, 0), boxG(1.3, 0.72, 0.04, 0, 2.32, 4.21), boxG(1.3, 0.72, 0.04, 0, 2.32, -4.21)]),
-    trim: mergeGeos([boxG(1.9, 0.35, 7, 0, 0.5, 0), boxG(2.0, 0.2, 0.2, 0, 0.75, 4.25), boxG(2.0, 0.2, 0.2, 0, 0.75, -4.25), boxG(0.06, 0.06, 3.2, 0, 3.9, -0.9, -0.5)]),
-    chrome: wheels.rim, tire: wheels.tire,
+    trim: mergeGeos([boxG(1.9, 0.3, 1.9, 0, 0.52, 3.25), boxG(1.9, 0.3, 1.9, 0, 0.52, -3.25), ...truck, boxG(2.0, 0.2, 0.2, 0, 0.75, 4.25), boxG(2.0, 0.2, 0.2, 0, 0.75, -4.25), boxG(0.06, 0.06, 3.2, 0, 3.9, -0.9, -0.5)]),
+    chrome: mergeGeos(tread), steel: mergeGeos(steel),
     head: boxG(0.34, 0.34, 0.06, 0, 1.3, 4.23),
     tail: mergeGeos([boxG(0.3, 0.16, 0.06, 0.7, 1.3, -4.23), boxG(0.3, 0.16, 0.06, -0.7, 1.3, -4.23)])
   };
@@ -430,6 +465,8 @@ const SHARED = {
   trim: new THREE.MeshStandardMaterial({ color: 0x15171d, roughness: 0.75 }),
   chrome: (() => { const m = new THREE.MeshStandardMaterial({ color: 0xc8ccd4, roughness: 0.25, metalness: 0.9 }); m.userData.env = 1.1; return m; })(),
   tire: new THREE.MeshStandardMaterial({ color: 0x111215, roughness: 0.92 }),
+  // the tram's railway wheels: dark, oily steel
+  steel: (() => { const m = new THREE.MeshStandardMaterial({ color: 0x6a6e76, roughness: 0.4, metalness: 0.7 }); m.userData.env = 1.2; return m; })(),
   head: new THREE.MeshBasicMaterial({ color: 0xfff4d6 }),
   tail: new THREE.MeshBasicMaterial({ color: 0xff2a3a }),
   cargo: new THREE.MeshStandardMaterial({ color: 0xe6e8ee, roughness: 0.55, metalness: 0.15 }),
@@ -445,7 +482,7 @@ const CAR_COLS = [0xe8e8ec, 0x363b48, 0x9c2d3a, 0x2f5d8c, 0xc9a24a, 0x5b6b5e, 0x
 class Fleet {
   constructor(group, parts, n, rnd, color){
     this.meshes = []; this.reach = parts.reach || 2; this.upright = !!parts.upright;
-    for (const k of ['body', 'glass', 'cargo', 'lit', 'trim', 'chrome', 'tire', 'head', 'tail', 'lens']){
+    for (const k of ['body', 'glass', 'cargo', 'lit', 'trim', 'chrome', 'tire', 'steel', 'head', 'tail', 'lens']){
       if (!parts[k]) continue;
       const m = new THREE.InstancedMesh(parts[k], k === 'body' ? SHARED.paint : SHARED[k], n);
       m.frustumCulled = false; m.userData.dynamic = true;
@@ -4069,6 +4106,15 @@ const sfx = {
   win: () => tone([659, 784, 988, 1319], 0.3, 'triangle', 0.13),
   fail: () => tone([392, 330, 262], 0.3, 'sine', 0.12),
   zap: () => tone([180, 90], 0.14, 'sawtooth', 0.07),
+  // a wheel over a tram rail: a short metallic clack with a dull thump under it, louder the faster the wheel hits it
+  rail: k => {
+    if (!audio || muted) return;
+    const ctx = audio.ctx, bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 1300 + Math.random() * 400; bp.Q.value = 3; bp.connect(audio.gameVol);
+    noiseBurst(ctx.currentTime, bp, 0.12 + k * 0.3, 0.05);
+    setTimeout(() => bp.disconnect(), 300);
+    tone([85, 55], 0.07, 'triangle', 0.04 + k * 0.08);
+  },
 };
 const engineNorm = () => { const E = ENGINES[V.key]; return clamp((eng.rpm - E.idle) / (E.max - E.idle), 0, 1); };
 function engineRpm(){ return eng.rpm; }
@@ -4693,6 +4739,7 @@ function setMode(m){
 function resetCar(){
   clearEffects();
   Object.assign(crashGuard, Core.newCrashGuard());
+  car.railPrev = null; car.rattle = 0;
   let x = mode === 'city' ? -3.5 : HW.our[1], z = mode === 'city' ? -6 : 5, heading = 0;
   if (mode === 'country'){ const pt = roadPoint(40, ROAD.lane); x = pt.x; z = pt.z; heading = pt.h; roadPos.ri = undefined; roadPos.s = 40; roadPos.lat = ROAD.lane; }
   Object.assign(car, { x, z, y: groundH(x, z), heading, camHeading: heading, speed: 0, steer: 0, yaw: 0, pitch: 0, roll: 0, bodyPitch: 0, shake: 0, prevSpeed: 0, lean: 0, lift: 0 });
@@ -5391,6 +5438,25 @@ $('btnRadio').addEventListener('click', e => { e.currentTarget.blur(); initAudio
 // ### the impact speed along the contact normal decides the damage. The chase camera follows smoothly and is kept out of
 // ### buildings (camClip) and above hills.
 const collidePoint = Core.collidePoint;
+// ### The tram rails in Lisbon: every frame each wheel is checked against the two rails (Core.trackOffset). A wheel that crossed
+// ### a rail since the last frame gives a jolt (camera, body, a clack, and a short buzz on phones that can vibrate); rolling on
+// ### the stone track bed gives a light, steady rumble. The front axle hits first and the rear one a moment later, like a real car.
+const RAIL_WHEELS = { car: [[0.87, 1.45], [-0.87, 1.45], [0.88, -1.35], [-0.88, -1.35]], bike: [[0, 0.76], [0, -0.74]], truck: [[1.1, 2.0], [-1.1, 2.0], [0.91, -1.7], [-0.91, -1.7]] };
+let railBuzz = 0;
+function updateRails(dt){
+  if (mode !== 'city' || finale.on){ car.railPrev = null; return; }
+  const ch = Math.cos(car.heading), sh = Math.sin(car.heading), now = RAIL_WHEELS[V.key].map(([lx, lz]) => Core.trackOffset(car.x + lx * ch + lz * sh, car.z - lx * sh + lz * ch));
+  let crossings = 0, onBed = false;
+  now.forEach((o, i) => { if (car.railPrev) crossings += Core.railCrossings(car.railPrev[i], o); if (Math.abs(o) <= Core.RAIL.bed) onBed = true; });
+  car.railPrev = now;
+  const { jolt, rumble } = Core.railShake(crossings, car.speed, onBed);
+  if (rumble){ car.shake = Math.max(car.shake, rumble); car.rattle = Math.max(car.rattle || 0, rumble * 1.5); }
+  if (!jolt) return;
+  car.shake = Math.max(car.shake, jolt); car.rattle = Math.max(car.rattle || 0, jolt * 2.2);
+  sfx.rail(jolt);
+  const t = performance.now();
+  if (COARSE && t > railBuzz && navigator.vibrate){ railBuzz = t + 90; try { navigator.vibrate(Math.round(12 + jolt * 50)); } catch (e) {} }
+}
 // ### Player physics each frame: speed with slopes, steering, movement, collisions, and how the vehicle sits on the ground.
 function updateCar(dt){
   if (mode === 'country') Object.assign(roadPos, roadQuery(car.x, car.z, roadPos));
@@ -5551,6 +5617,9 @@ function applyCarMesh(dt){
   // level, so a wheel on the low side would sink into the road. Lift it by as much as that lowest wheel would sink.
   const lean = V.key === 'bike' ? 0 : carTilt.rotation.z - car.roll, track = Math.max(...md.skid.x.map(Math.abs)) + md.skid.w / 2;
   carTilt.position.y = track * Math.abs(Math.sin(lean)) + Math.abs(md.skid.z) * Math.abs(Math.sin(car.bodyPitch));
+  // the rails shake the body: it hops up a few centimetres and rocks a little (never with reduced motion)
+  if ((car.rattle || 0) > 0.004 && !REDUCED){ carTilt.position.y += Math.random() * car.rattle * 0.07; carTilt.rotation.z += (Math.random() - 0.5) * car.rattle * 0.035; carTilt.rotation.x += (Math.random() - 0.5) * car.rattle * 0.02; }
+  car.rattle = (car.rattle || 0) * Math.exp(-dt * 9);
   md.wheels.forEach(w => w.rotation.x = car.wheelRot / md.r);
   md.pivots.forEach(p => p.rotation.y = car.steer * 0.45);
   md.paint.color.copy(md.base).lerp(PAINT_DEAD, damage / 100 * 0.65);
@@ -6084,6 +6153,7 @@ function frame(now){
   if (state === 'play'){
     updateCar(dt);
     if (state === 'play') updateSkids();
+    if (state === 'play') updateRails(dt);
     if (state === 'play') updatePolice(dt);
     if (state === 'play'){
       timeLeft -= dt;

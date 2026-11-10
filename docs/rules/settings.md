@@ -31,7 +31,8 @@
 | **Resolution** | If the game runs below 48 frames per second for 2 seconds, the resolution drops one step: 85 %, then 70 %, then 60 %. A step that does not make the game faster by at least 5 % is taken back and the setting stays. After 20 seconds at 57 frames per second or more it goes one step back up, at most twice. Choosing Ultra or Balanced starts again at full resolution |
 | **Shadows** | The area that gets shadows (120 m wide) follows the player in whole shadow pixels, so shadow edges do not crawl over the walls |
 | **Phones** | Phones start in Balanced and use shadows of half the size |
-| **Less motion** | If the system asks for reduced motion, the camera does not shake after crashes, the radar sweep stops and the menu turns more slowly |
+| **Less motion** | If the system asks for reduced motion, the camera and the vehicle do not shake after crashes or on the tram rails, the radar sweep stops and the menu turns more slowly |
+| **Vibration** | On a phone whose browser can vibrate (most Android phones; iPhones cannot), each tram rail under a wheel gives a short buzz of 12–30 ms, at most one every 0.09 s |
 | **Hidden tab** | When the tab is hidden or the window loses focus, the run pauses and the sound stops |
 
 ## Room 1 · Plot Twist: Cell Block D

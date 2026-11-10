@@ -683,3 +683,33 @@ test('reversing lights: on only while rolling backwards', () => {
   assert.equal(Core.isReversing(0), false);
   assert.equal(Core.isReversing(20), false);
 });
+
+// ---------- Tram rails ----------
+test('tram rails: the track runs along the trams\' lane, round the corners, and nowhere else', () => {
+  const { RAIL, TRAM_LOOP: T } = Core;
+  // north side, driven towards +x: the lane is 3.5 m to the right (+z)
+  assert.ok(Math.abs(Core.trackOffset(0, T.lane)) < 1e-9);
+  assert.ok(Math.abs(Core.trackOffset(-40, T.lane + RAIL.half) - RAIL.half) < 1e-9);
+  assert.ok(Math.abs(Core.trackOffset(40, T.lane - RAIL.half) + RAIL.half) < 1e-9);
+  // east side, driven towards +z: the lane is 3.5 m to the left of the edge (x = 92.5)
+  assert.ok(Math.abs(Core.trackOffset(T.x1 - T.lane, 50)) < 1e-9);
+  // the corner curve after the north-east corner, round the trams' turning centre (89, 7)
+  for (const a of [-1.4, -0.8, -0.2]) assert.ok(Math.abs(Core.trackOffset(89 + 3.5 * Math.cos(a), 7 + 3.5 * Math.sin(a))) < 1e-9, String(a));
+  // away from the track: other streets, the middle of the loop, outside the city, bad input
+  for (const [x, z] of [[0, -50], [0, 50], [-200, 3.5], [0, 10], [NaN, 3.5], [0, Infinity]]) assert.ok(Number.isNaN(Core.trackOffset(x, z)), `${x},${z}`);
+});
+
+test('tram rails: a wheel that crosses a rail is a jolt that grows with speed; standing still or missing the rails is not', () => {
+  assert.equal(Core.railCrossings(-1.5, 1.5), 2, 'across the whole track');
+  assert.equal(Core.railCrossings(0.5, 0.9), 1);
+  assert.equal(Core.railCrossings(0.1, 0.3), 0, 'between the rails');
+  assert.equal(Core.railCrossings(0.72, 0.72), 0, 'not moving');
+  assert.equal(Core.railCrossings(NaN, 0.72), 0, 'just arrived on the track');
+  const slow = Core.railShake(1, 5, true), fast = Core.railShake(1, 20, true);
+  assert.ok(slow.jolt > 0 && fast.jolt > slow.jolt, 'faster is harder');
+  assert.ok(Core.railShake(4, 40, true).jolt <= 0.3, 'capped');
+  assert.deepEqual(Core.railShake(2, 0.5, true), { jolt: 0, rumble: 0 }, 'creeping over the rails');
+  assert.equal(Core.railShake(0, 15, false).rumble, 0, 'off the track bed');
+  assert.ok(Core.railShake(0, 15, true).rumble > 0 && Core.railShake(0, 15, true).jolt === 0, 'rolling along the bed only rumbles');
+  assert.deepEqual(Core.railShake(1, NaN, true), { jolt: 0, rumble: 0 });
+});

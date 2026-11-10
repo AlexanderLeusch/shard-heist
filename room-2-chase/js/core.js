@@ -124,6 +124,43 @@
     const T = TRAM_LOOP, nx = x + dx * BAIXA.pitch, nz = z + dz * BAIXA.pitch;
     return nx >= T.x0 && nx <= T.x1 && nz >= T.z0 && nz <= T.z1 ? 's' : 'r';
   }
+  // ### The tram rails. The track follows the trams' path: the lane centre 3.5 m right of each side of the loop, with a curve of
+  // ### radius 3.5 m at each corner (the same curve the trams drive and the game draws). Each rail lies 0.72 m from the track's centre.
+  const RAIL = Object.freeze({ half: 0.72, bed: 1.15, corner: 7 });
+  // ### How far a point is from the centre of the tram track, sideways (positive = right of the trams' direction), or NaN when
+  // ### it is more than 3 m from the track.
+  function trackOffset(x, z){
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return NaN;
+    const T = TRAM_LOOP, R = RAIL.corner, c = [[T.x0, T.z0], [T.x1, T.z0], [T.x1, T.z1], [T.x0, T.z1]];
+    let best = NaN;
+    const keep = off => { if (Math.abs(off) <= 3 && !(Math.abs(off) >= Math.abs(best))) best = off; };
+    for (let q = 0; q < 4; q++){
+      const A = c[q], B = c[(q + 1) % 4], L = Math.hypot(B[0] - A[0], B[1] - A[1]), dx = (B[0] - A[0]) / L, dz = (B[1] - A[1]) / L, rx = -dz, rz = dx;
+      const px = x - A[0], pz = z - A[1], t = px * dx + pz * dz;
+      if (t >= R && t <= L - R) keep(px * rx + pz * rz - T.lane);
+      // the corner curve after B, around the same centre the trams turn about
+      const cx = B[0] - dx * R + rx * R, cz = B[1] - dz * R + rz * R, a0 = Math.atan2(-rz, -rx), delta = wrapAngle(Math.atan2(dz, dx) - a0);
+      const f = wrapAngle(Math.atan2(z - cz, x - cx) - a0) / delta;
+      if (f >= 0 && f <= 1) keep(R - Math.hypot(x - cx, z - cz) - T.lane);
+    }
+    return best;
+  }
+  // ### How many rails a wheel crossed between two frames (0, 1 or 2): the side of each rail it was on has changed.
+  function railCrossings(prev, now){
+    if (!Number.isFinite(prev) || !Number.isFinite(now) || prev === now) return 0;
+    let n = 0;
+    for (const r of [-RAIL.half, RAIL.half]) if ((prev - r) * (now - r) <= 0) n++;
+    return n;
+  }
+  // ### The shaking from the rails: each rail a wheel crosses gives a jolt that grows with speed, and rolling on the stone track
+  // ### bed gives a light, steady rumble. Standing or creeping over the rails gives nothing.
+  function railShake(crossings, speed, onBed){
+    const sp = Math.abs(speed);
+    if (!(sp >= 1)) return { jolt: 0, rumble: 0 };
+    const jolt = crossings > 0 ? Math.min(0.3, crossings * Math.min(0.16, 0.05 + sp * 0.006)) : 0;
+    const rumble = onBed && sp > 2 ? Math.min(0.08, 0.03 + sp * 0.002) : 0;
+    return { jolt, rumble };
+  }
   // The street or square at a point, or null on a pavement. On a crossing, the street you are driving along wins.
   function streetAt(x, z, heading){
     if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
@@ -779,7 +816,7 @@
   }
 
   return Object.freeze({
-    MODES, VEH, REV_SPEED, REPAIR_AMOUNT, MAX_DT, STORY_ACTS, KEY_MAP, BAIXA, streetAt, TRAM_LOOP, tramNext,
+    MODES, VEH, REV_SPEED, REPAIR_AMOUNT, MAX_DT, STORY_ACTS, KEY_MAP, BAIXA, streetAt, TRAM_LOOP, tramNext, RAIL, trackOffset, railCrossings, railShake,
     EVIDENCE, guideTurn, isMode, isVeh, clamp, wrapAngle, mulberry32, shuffle, fmtTime, fmtTimeExact, frameDt,
     parsePick, parseBest, applyPick, actionAllowed,
     vehStats, zeroTo80, topSpeed, stepSpeed, collidePoint, HILL_BOX, HILL_GRID, hillHeight, hillMesh, gradeAt, slopeTop,
