@@ -5468,17 +5468,17 @@ function updateCar(dt){
   if (offRoad && Math.abs(car.speed) > 8) car.shake = Math.max(car.shake, 0.06);
   car.speed = Core.stepSpeed(car.speed, keys, dt, maxNow, V, grade);
 
-  // ### Steering with the weight of a car: the wheel turns in over about a quarter of a second and comes back a little faster.
+  // ### Steering with the weight of a car, but quick: the wheel turns in within about 0.15 s and comes back a little faster.
   // ### How tightly the car can turn is limited by the grip of its tyres: the sideways pull (speed x turn rate) never passes
   // ### GRIP x handling, so at walking pace it turns on the spot and at speed it draws a wide arc instead of flicking round like
   // ### a bicycle. The turn rate itself builds up and fades smoothly (yaw), and the handbrake lets the rear step out.
   const steerIn = (keys.left ? 1 : 0) - (keys.right ? 1 : 0) || TILT.value;
-  car.steer += (steerIn - car.steer) * Math.min(1, (steerIn ? 4.5 : 6) * dt);
-  const sp = Math.abs(car.speed), GRIP = V.key === 'bike' ? 19 : 16;
+  car.steer += (steerIn - car.steer) * Math.min(1, (steerIn ? 7.5 : 10) * dt);
+  const sp = Math.abs(car.speed), GRIP = V.key === 'bike' ? 28 : 24;
   const ask = car.steer * Math.min(1, sp / 6) * (2.5 * V.handling / (1 + sp * 0.035));
   const most = GRIP * V.handling * (keys.brake ? 1.5 : 1) / Math.max(sp, 1);
   const turn = clamp(ask * (keys.brake ? 1.5 : 1), -most, most);
-  car.yaw = (car.yaw || 0) + (turn - (car.yaw || 0)) * Math.min(1, dt * (V.key === 'truck' ? 4 : 6));
+  car.yaw = (car.yaw || 0) + (turn - (car.yaw || 0)) * Math.min(1, dt * (V.key === 'truck' ? 7 : 11));
   car.heading += car.yaw * dt * (car.speed >= 0 ? 1 : -1);
 
   const fx = Math.sin(car.heading), fz = Math.cos(car.heading);
@@ -5653,7 +5653,7 @@ function camClip(tx, tz){
 function chaseCam(dt){
   // the camera swings round after the car on a smoothed heading, so a quick tap of the steering does not jerk the whole view
   if (car.camHeading === undefined || Math.abs(wrapAngle(car.heading - car.camHeading)) > 1.2) car.camHeading = car.heading;
-  car.camHeading += wrapAngle(car.heading - car.camHeading) * Math.min(1, dt * 3.5);
+  car.camHeading += wrapAngle(car.heading - car.camHeading) * Math.min(1, dt * 6);
   const fx = Math.sin(car.camHeading), fz = Math.cos(car.camHeading), sp = Math.abs(car.speed);
   const dist = V.cam[0] + sp * 0.07;
   let tx = car.x - fx * dist, tz = car.z - fz * dist;
