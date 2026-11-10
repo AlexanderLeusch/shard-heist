@@ -2760,6 +2760,20 @@ const reverseLights = { mat: new THREE.MeshBasicMaterial({ color: 0x4a4e55 }), g
   };
   const led = new THREE.MeshBasicMaterial({ color: 0xeef6ff });
   const red = brakeLights.mat;
+  // ### The passenger door on the right (-x): a group hinged at its front edge that swings out to the side, with the outer panel in
+  // ### the paint, the window, the handle and the dark door card on the inside. Hidden while shut, so the body looks as before; while
+  // ### it is open, a dark panel on the body (hole) shows the opening behind it.
+  const cabin = new THREE.MeshStandardMaterial({ color: 0x141518, roughness: 0.85 });
+  const passengerDoor = (group, o, pm) => {
+    const pivot = new THREE.Group(); pivot.position.set(o.x, 0, o.z); pivot.visible = false; group.add(pivot);
+    const L = o.len, panel = o.y1 - o.y0;
+    mk(boxG(0.05, panel, L, -0.012, o.y0 + panel / 2, -L / 2), pm, pivot);
+    mk(boxG(0.02, panel * 0.86, L * 0.9, 0.024, o.y0 + panel / 2, -L / 2), cabin, pivot);
+    mk(boxG(0.025, o.w1 - o.y1, L * 0.86, -0.004, (o.y1 + o.w1) / 2, -L * 0.5), SHARED.glass, pivot);
+    mk(boxG(0.035, 0.045, 0.17, -0.045, o.y1 - 0.12, -L + 0.2), alu, pivot);
+    const hole = mk(boxG(0.02, panel - 0.06, L - 0.06, o.x + 0.012, o.y0 + panel / 2, o.z - L / 2), cabin, group); hole.visible = false;
+    return { pivot, hole, max: o.max };
+  };
   const brakeGlow = (group, lamps, size) => lamps.forEach(p => {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color: 0xff2030, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
     s.position.set(p[0], p[1], p[2]); s.scale.setScalar(size); s.visible = false; group.add(s); brakeLights.glows.push(s);
@@ -2857,7 +2871,8 @@ const reverseLights = { mat: new THREE.MeshBasicMaterial({ color: 0x4a4e55 }), g
     hinged(damageParts, 3, boxG(1.62, 0.05, 1.4, 0, 0, 0.7), pm, g, [0, 1.0, 0.66], [-0.5, 0, 0]);
     hinged(damageParts, 3, boxG(0.5, 0.13, 0.06, -0.66, 0.69, 2.51), SHARED.trim, g);
     hinged(damageParts, 3, boxG(0.05, 0.5, 1.15, 0, 0, -0.57), pm, g, [-1.0, 0.66, 0.42], [0, -0.3, 0]);
-    MODELS.car = { skid: { x: [-0.88, 0.88], z: -1.35, w: 0.28 }, g, paint: pm, base: C(base), wheels, pivots, r: 0.38, damageParts, dent: 1, smoke: [1.5, 1.1], stage: 0 };
+    const door = passengerDoor(g, { x: -0.985, z: 0.45, len: 1.16, y0: 0.36, y1: 0.97, w1: 1.3, max: 1.15 }, pm);
+    MODELS.car = { skid: { x: [-0.88, 0.88], z: -1.35, w: 0.28 }, g, paint: pm, base: C(base), wheels, pivots, r: 0.38, damageParts, dent: 1, smoke: [1.5, 1.1], stage: 0, door };
   }
 
   // Motorcycle: superbike with an inline four, twin-spar frame, upside-down fork and a tucked rider in leathers.
@@ -3099,7 +3114,8 @@ const reverseLights = { mat: new THREE.MeshBasicMaterial({ color: 0x4a4e55 }), g
     hinged(damageParts, 2, mergeGeos([boxG(0.25, 0.56, 0.1, 0, -0.28, 0), boxG(0.21, 0.5, 0.012, 0, -0.28, -0.058)]), plastic, g, [-1.5, 3.16, 2.86], [0.1, 0, -0.45]);
     hinged(damageParts, 3, boxG(1.3, 0.3, 0.1, -0.65, 0, 0), plastic, g, [0.12, 0.72, 3.3], [0, 0, 0.2]);
     hinged(damageParts, 3, mergeGeos([[-0.5, 2.72, 0.5, 2.84], [-0.5, 2.72, -0.2, 2.42], [-0.5, 2.72, -1.0, 2.98], [-0.5, 2.72, -0.72, 2.46], [-0.5, 2.72, 0.05, 3.06]].map(([x0, y0, x1, y1]) => limb([x0, y0, 3.09 - (y0 - 2.42) * 0.17], [x1, y1, 3.09 - (y1 - 2.42) * 0.17], 0.006, 0.006, 4))), new THREE.MeshBasicMaterial({ color: 0xc8d0da }), g);
-    MODELS.truck = { skid: { x: [-0.91, 0.91], z: -1.7, w: 0.56 }, g, paint: pm, base: C(base), wheels, pivots, r: 0.52, damageParts, dent: 1.4, smoke: [0.7, 3.95], stage: 0 };
+    const door = passengerDoor(g, { x: -1.262, z: 2.9, len: 1.18, y0: 1.22, y1: 2.28, w1: 3.04, max: 1.2 }, pm);
+    MODELS.truck = { skid: { x: [-0.91, 0.91], z: -1.7, w: 0.56 }, g, paint: pm, base: C(base), wheels, pivots, r: 0.52, damageParts, dent: 1.4, smoke: [0.7, 3.95], stage: 0, door };
   }
 
   Object.values(MODELS).forEach(m => { m.g.visible = false; carTilt.add(m.g); });
@@ -4106,6 +4122,12 @@ const sfx = {
   win: () => tone([659, 784, 988, 1319], 0.3, 'triangle', 0.13),
   fail: () => tone([392, 330, 262], 0.3, 'sine', 0.12),
   zap: () => tone([180, 90], 0.14, 'sawtooth', 0.07),
+  // a car door: the latch clicks open, or shuts with a dull thud
+  door: open => {
+    if (!audio || muted) return;
+    if (open) tone([1400, 900], 0.035, 'square', 0.03);
+    else { noiseBurst(audio.ctx.currentTime, audio.gameVol, 0.22, 0.09); tone([120, 70], 0.1, 'triangle', 0.1); }
+  },
   // a wheel over a tram rail: a short metallic clack with a dull thump under it, louder the faster the wheel hits it
   rail: k => {
     if (!audio || muted) return;
@@ -4993,22 +5015,31 @@ const witness = (() => {
   const g = new THREE.Group(), mat = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.75 });
   const coat = mat(0xb08a5a), dark = mat(0x23262e), skin = mat(0xd9a98a), hair = mat(0x3a2418), scarf = mat(0xa8323a);
   const add = (geo, m, parent) => { const o = new THREE.Mesh(geo, m); o.castShadow = true; (parent || g).add(o); return o; };
-  add(mergeGeos([boxG(0.13, 0.5, 0.14, 0.1, 0.27, 0), boxG(0.13, 0.5, 0.14, -0.1, 0.27, 0)]), dark);
-  add(mergeGeos([boxG(0.14, 0.08, 0.26, 0.1, 0.04, 0.04), boxG(0.14, 0.08, 0.26, -0.1, 0.04, 0.04)]), mat(0x15161a));
-  add(mergeGeos([boxG(0.44, 0.62, 0.26, 0, 1.13, 0), boxG(0.48, 0.42, 0.3, 0, 0.7, 0), boxG(0.11, 0.56, 0.12, 0.28, 1.1, 0)]), coat);
-  add(new THREE.CylinderGeometry(0.1, 0.12, 0.1, 10).translate(0, 1.47, 0), scarf);
-  add(new THREE.SphereGeometry(0.115, 14, 10).translate(0, 1.62, 0.01), skin);
-  add(mergeGeos([new THREE.SphereGeometry(0.128, 14, 10).scale(1, 0.95, 1).translate(0, 1.66, -0.02), boxG(0.08, 0.2, 0.06, 0, 1.52, -0.12)]), hair);
-  add(boxG(0.08, 0.24, 0.2, -0.3, 0.86, 0.02), mat(0x5a2f22));
-  // the left arm waves: it hangs from the shoulder
-  const arm = new THREE.Group(); arm.position.set(-0.28, 1.4, 0); g.add(arm);
+  // each leg turns at the hip and the knee, so she can walk and sit down; the upper body leans back from the hips
+  const shoe = mat(0x15161a), hips = [], knees = [];
+  for (const sd of [-1, 1]){
+    const hip = new THREE.Group(); hip.position.set(sd * 0.1, 0.52, 0); g.add(hip);
+    add(boxG(0.13, 0.28, 0.14, 0, -0.135, 0), dark, hip);
+    const knee = new THREE.Group(); knee.position.y = -0.27; hip.add(knee);
+    add(boxG(0.12, 0.25, 0.13, 0, -0.125, 0), dark, knee);
+    add(boxG(0.14, 0.08, 0.26, 0, -0.21, 0.04), shoe, knee);
+    hips.push(hip); knees.push(knee);
+  }
+  const upper = new THREE.Group(); upper.position.y = 0.52; g.add(upper);
+  add(mergeGeos([boxG(0.44, 0.62, 0.26, 0, 0.61, 0), boxG(0.48, 0.42, 0.3, 0, 0.18, 0), boxG(0.11, 0.56, 0.12, 0.28, 0.58, 0)]), coat, upper);
+  add(new THREE.CylinderGeometry(0.1, 0.12, 0.1, 10).translate(0, 0.95, 0), scarf, upper);
+  add(new THREE.SphereGeometry(0.115, 14, 10).translate(0, 1.1, 0.01), skin, upper);
+  add(mergeGeos([new THREE.SphereGeometry(0.128, 14, 10).scale(1, 0.95, 1).translate(0, 1.14, -0.02), boxG(0.08, 0.2, 0.06, 0, 1.0, -0.12)]), hair, upper);
+  add(boxG(0.08, 0.24, 0.2, -0.3, 0.34, 0.02), mat(0x5a2f22), upper);
+  // the left arm waves and reaches for the door handle: it hangs from the shoulder
+  const arm = new THREE.Group(); arm.position.set(-0.28, 0.88, 0); upper.add(arm);
   add(boxG(0.11, 0.56, 0.12, 0, -0.28, 0), coat, arm);
   add(new THREE.SphereGeometry(0.055, 8, 6).translate(0, -0.58, 0), skin, arm);
   const marker = glowSprite(GOLD, 2.4, 0.9); marker.position.y = 2.5; g.add(marker);
   const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
   ring.position.y = 0.06; g.add(ring);
   g.visible = false; scene.add(g);
-  return { g, arm, marker, ring, active: false, inCar: false, boarding: 0, x: 0, z: 0, h: 0, home: null };
+  return { g, arm, upper, hips, knees, marker, ring, active: false, inCar: false, boarding: 0, phase: '', t: 0, lock: null, x: 0, z: 0, h: 0, home: null };
 })();
 // ### Puts the witness on a pavement 70 to 200 m from the player, facing the street.
 function spawnWitness(){
@@ -5026,36 +5057,120 @@ function spawnWitness(){
   witness.g.visible = true; witness.marker.visible = true; witness.ring.visible = true;
   renderChips();
 }
-function hideWitness(){ Object.assign(witness, { active: false, inCar: false, boarding: 0 }); witness.g.visible = false; }
-// ### Waves, walks to the car when it stops next to her, and gets in.
+// ### Where she gets in, in the vehicle's own coordinates (x to the left, z forward, metres): where she stands beside the door, the
+// ### sill she steps over (and how high it is), and her seat (hip height, how far she leans back, legs astride on the motorcycle).
+const BOARD = {
+  car: { stand: [-1.62, -0.45], sill: [-1.02, -0.2, 0], seat: [-0.43, 0.42, -0.22], lean: 0.62, legs: 'sit' },
+  truck: { stand: [-2.0, 2.15], sill: [-1.45, 2.25, 1.22], seat: [-0.62, 1.86, 2.05], lean: 0.18, legs: 'sit' },
+  bike: { stand: [-0.85, -0.5], sill: [-0.32, -0.5, 0.2], seat: [0, 0.9, -0.52], lean: -0.15, legs: 'astride' }
+};
+const BOARD_T = { open: 0.5, enter: 1.15, close: 0.45 };
+const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+// The passenger door of the vehicle (none on the motorcycle): 0 shut, 1 wide open
+function setDoor(k){
+  const d = MODELS[V.key].door;
+  if (!d) return;
+  d.pivot.visible = k > 0.001; d.hole.visible = k > 0.04;
+  d.pivot.rotation.y = d.max * k;
+}
+// Puts her back in the world: off the seat, out of the vehicle, the door shut
+function unseatWitness(){
+  const W = witness;
+  if (W.g.parent !== scene) scene.add(W.g);
+  W.g.rotation.set(0, 0, 0); W.upper.rotation.set(0, 0, 0);
+  W.hips.forEach(h => h.rotation.set(0, 0, 0)); W.knees.forEach(k => k.rotation.set(0, 0, 0));
+  W.marker.visible = true; W.ring.visible = true; W.lock = null; W.phase = '';
+  Object.values(MODELS).forEach(m => { if (m.door){ m.door.pivot.visible = false; m.door.hole.visible = false; m.door.pivot.rotation.y = 0; } });
+}
+function hideWitness(){ unseatWitness(); Object.assign(witness, { active: false, inCar: false, boarding: 0 }); witness.g.visible = false; }
+// ### Her legs: a walking stride (w = stride phase, 0 = standing), or sitting (k from 0 to 1, knees bent, or astride on the motorcycle)
+function witnessLegs(stride, sit, astride){
+  const W = witness;
+  W.hips.forEach((h, i) => {
+    const sd = i ? 1 : -1, swing = stride ? Math.sin(stride + i * Math.PI) * 0.55 : 0;
+    h.rotation.x = swing * (1 - sit) - sit * (astride ? 1.15 : Math.PI / 2);
+    h.rotation.z = astride ? sd * 0.32 * sit : 0;
+    W.knees[i].rotation.x = (stride ? Math.max(0, -Math.sin(stride + i * Math.PI)) * 0.7 : 0) * (1 - sit) + sit * (astride ? 1.5 : Math.PI / 2);
+  });
+}
+// ### Waves; when the car stops next to her she walks to the passenger door, opens it, gets in, sits down and pulls the door
+// ### shut (on the motorcycle she climbs onto the pillion seat). The car waits while she gets in. She then rides along, visible
+// ### through the window, until the run ends.
 function updateWitness(dt, live){
   const W = witness;
   if (!W.active) return;
+  const B = BOARD[V.key], ch = Math.cos(car.heading), sh = Math.sin(car.heading);
+  const toWorld = (lx, lz) => [car.x + lx * ch + lz * sh, car.z - lx * sh + lz * ch];
   const d = Math.hypot(W.x - car.x, W.z - car.z), slow = Math.abs(car.speed) < 3;
-  if (live && !W.boarding && d < 7 && slow){ W.boarding = 0.001; toast(`${WITNESS.name} runs to your car.`, '', 1800); }
-  if (W.boarding){
-    if (d > 12 || !live){ Object.assign(W, { boarding: 0, x: W.home.x, z: W.home.z, h: W.home.h }); }
+  if (live && !W.boarding && d < 7 && slow){ W.boarding = 0.001; W.phase = 'walk'; W.t = 0; toast(`${WITNESS.name} walks to your car.`, '', 1800); }
+  // waiting on the pavement: she turns a little and waves, under the golden light
+  if (!W.phase){
+    W.g.position.set(W.x, groundH(W.x, W.z), W.z);
+    W.g.rotation.y = W.h + Math.sin(clock * 0.7) * 0.25;
+    witnessLegs(0, 0, false);
+    W.arm.rotation.z = -2.5 + Math.sin(clock * 7) * 0.45; W.arm.rotation.x = 0;
+    W.marker.position.y = 2.5 + Math.sin(clock * 2.4) * 0.15;
+    W.ring.material.opacity = 0.3 + 0.25 * Math.sin(clock * 3);
+    return;
+  }
+  // ### 1. She walks to the door. Drive off before she gets there and she goes back to wait.
+  if (W.phase === 'walk'){
+    if (d > 12 || !live){ unseatWitness(); Object.assign(W, { boarding: 0, x: W.home.x, z: W.home.z, h: W.home.h }); }
     else {
       W.boarding += dt;
-      // the passenger door, on the right of the car
-      const fx = Math.sin(car.heading), fz = Math.cos(car.heading), tx = car.x - fz * 1.4, tz = car.z + fx * 1.4, dx = tx - W.x, dz = tz - W.z, l = Math.hypot(dx, dz);
-      if (l > 0.2){ const step = Math.min(l, dt * 3.4); W.x += dx / l * step; W.z += dz / l * step; W.h = Math.atan2(dx, dz); }
-      if (l < 0.5 || W.boarding > 3){
-        W.active = false; W.inCar = true; W.g.visible = false;
-        sfx.collect(); burst(tx, car.y + 1.4, tz, GOLD, 24);
-        renderChips();
-        openGate(WITNESS.found);
-        return;
+      const [tx, tz] = toWorld(B.stand[0], B.stand[1]), dx = tx - W.x, dz = tz - W.z, l = Math.hypot(dx, dz);
+      if (l > 0.06){ const step = Math.min(l, dt * 2.4); W.x += dx / l * step; W.z += dz / l * step; W.h = Math.atan2(dx, dz); }
+      W.g.position.set(W.x, groundH(W.x, W.z) + (l > 0.06 ? Math.abs(Math.sin(clock * 9)) * 0.03 : 0), W.z);
+      W.g.rotation.y = W.h;
+      witnessLegs(l > 0.06 ? clock * 9 : 0, 0, false);
+      W.arm.rotation.z = l > 0.06 ? Math.sin(clock * 9) * 0.35 : 0; W.arm.rotation.x = l > 0.06 ? Math.sin(clock * 9) * 0.5 : 0;
+      W.marker.visible = false; W.ring.visible = false;
+      // there, and the car is standing: she takes over in the car's own coordinates, and the car waits for her
+      if (l <= 0.06 && Math.abs(car.speed) < 1.5){
+        W.lock = { x: car.x, z: car.z, heading: car.heading };
+        MODELS[V.key].g.add(W.g);
+        W.phase = MODELS[V.key].door ? 'open' : 'enter'; W.t = 0;
+        if (MODELS[V.key].door) sfx.door(true);
       }
     }
+    return;
   }
-  const walking = W.boarding > 0;
-  W.g.position.set(W.x, groundH(W.x, W.z) + (walking ? Math.abs(Math.sin(clock * 11)) * 0.04 : 0), W.z);
-  W.g.rotation.y = walking ? W.h : W.h + Math.sin(clock * 0.7) * 0.25;
-  W.arm.rotation.z = walking ? Math.sin(clock * 11) * 0.5 : -2.5 + Math.sin(clock * 7) * 0.45;
-  W.arm.rotation.x = walking ? Math.sin(clock * 11) * 0.6 : 0;
-  W.marker.position.y = 2.5 + Math.sin(clock * 2.4) * 0.15; W.marker.visible = !walking;
-  W.ring.material.opacity = 0.3 + 0.25 * Math.sin(clock * 3);
+  if (W.lock){ car.x = W.lock.x; car.z = W.lock.z; car.heading = W.lock.heading; car.speed = 0; }
+  W.t += dt;
+  const [sx, sz] = B.stand, [ix, iz, iy] = B.sill, [px, py, pz] = B.seat;
+  // ### 2. She opens the door: faces the car and pulls the handle; the door swings out
+  if (W.phase === 'open'){
+    const k = Math.min(1, W.t / BOARD_T.open);
+    setDoor(ease(k));
+    W.g.position.set(sx, 0, sz); W.g.rotation.y = Math.PI / 2;
+    witnessLegs(0, 0, false);
+    W.arm.rotation.x = -1.2 * Math.sin(k * Math.PI); W.arm.rotation.z = 0;
+    if (k >= 1){ W.phase = 'enter'; W.t = 0; }
+  // ### 3. She steps in over the sill (up the steps into the truck cab), turns to face forward and sits down
+  } else if (W.phase === 'enter'){
+    const k = Math.min(1, W.t / BOARD_T.enter), a = ease(Math.min(1, k / 0.4)), b = ease(Math.max(0, (k - 0.4) / 0.6));
+    const x = sx + (ix - sx) * a + (px - ix) * b, z = sz + (iz - sz) * a + (pz - iz) * b;
+    const y = iy * a + (py - 0.52 - iy) * b;
+    W.g.position.set(x, y, z);
+    W.g.rotation.y = Math.PI / 2 * (1 - b);
+    witnessLegs(k < 0.4 ? k * 20 : 0, b, B.legs === 'astride');
+    W.upper.rotation.x = -B.lean * b;
+    W.arm.rotation.x = -0.4 * b; W.arm.rotation.z = 0;
+    if (k >= 1){ W.phase = MODELS[V.key].door ? 'close' : 'done'; W.t = 0; }
+  // ### 4. She pulls the door shut behind her
+  } else if (W.phase === 'close'){
+    const k = Math.min(1, W.t / BOARD_T.close);
+    setDoor(1 - k * k);
+    if (k >= 1){ sfx.door(false); car.shake = Math.max(car.shake, 0.08); W.phase = 'done'; }
+  }
+  if (W.phase === 'done'){
+    W.phase = 'seated'; W.lock = null;
+    W.active = false; W.inCar = true;
+    sfx.collect();
+    const [bx, bz] = toWorld(px, pz); burst(bx, car.y + py + 0.8, bz, GOLD, 18);
+    renderChips();
+    openGate(WITNESS.found);
+  }
 }
 
 // ### The finale: through the gate the picture fades, and you are on the 25 de Abril bridge with Marta beside you, driving south
@@ -5093,7 +5208,7 @@ function updateFinale(dt){
     CITY.bridge.updateMatrixWorld(true);
     const p = onBridge(F.start, F.lane), ahead = onBridge(F.start + 10, F.lane);
     Object.assign(car, { x: p.x, z: p.z, y: p.y, heading: Math.atan2(ahead.x - p.x, ahead.z - p.z), speed: F.speed, steer: 0, yaw: 0, pitch: 0, roll: 0, bodyPitch: 0, lift: 0, shake: 0 });
-    resetPolice(); clearEffects(); hideWitness();
+    resetPolice(); clearEffects(); if (!witness.inCar) hideWitness();  // Marta rides over the bridge in the passenger seat
     playAnthem();
     toast(`${WITNESS.name}: “I saw him climb out of that window. I will tell them everything.”`, 'gold', 5200);
     setTimeout(() => { if (finale.on && !finale.done) toast('HALE: Across the bridge and you are out of the city. Well done, detective.', 'hale', 5200); }, 5600);
