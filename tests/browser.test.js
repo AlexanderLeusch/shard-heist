@@ -49,6 +49,12 @@ const click = sel => evaluate(`(() => { const b = document.querySelector(${JSON.
 const text = sel => evaluate(`(document.querySelector(${JSON.stringify(sel)}) || {}).textContent || ''`);
 const menuReady = "!document.getElementById('overlay').hidden && !!document.querySelector('[data-action=\"go\"]')";
 const playing = "document.getElementById('overlay').hidden && !document.getElementById('hud').classList.contains('off')";
+// A Lisbon run first shows the map of the evidence; this presses "Start driving" and waits until the car can move
+async function startDriving(label){
+  await waitFor("!!document.getElementById('ovMap') || (" + playing + ")", 30000, label);
+  if (await evaluate("!!document.getElementById('ovMap')")) await click('[data-action="resume"]');
+  await waitFor(playing, 30000, label);
+}
 async function load(){
   errors.length = 0;
   await send('Page.navigate', { url: base });
@@ -120,7 +126,15 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
 
     await t.test('a run starts, the timer runs and the throttle moves the car', async () => {
       await click('[data-action="go"]');
+      await waitFor("!!document.getElementById('ovMap')", 30000, 'the map of the evidence');
+      assert.match(await text('#card h2'), /Where the evidence is/);
+      assert.match(await evaluate("document.getElementById('ovMap').getAttribute('aria-label')"), /Photos.*Fingerprints.*Torch.*Lockpick.*Clothes.*Balaclava/);
+      const clock0 = await text('#time'); await sleep(1500);
+      assert.equal(await text('#time'), clock0, 'the clock waits while the map is open');
+      await click('[data-action="resume"]');
       await waitFor(playing, 30000, 'run to start');
+      await waitFor("!document.getElementById('guide').hidden", 10000, 'the guide arrow');
+      assert.match(await text('#guideName'), /Photos|Fingerprints|Torch|Lockpick|Clothes|Balaclava/);
       const t0 = await text('#time');
       await key('keydown', 'KeyW');
       await waitFor("parseInt(document.getElementById('speed').textContent) > 20", 30000, 'speed above 20 km/h');
@@ -156,7 +170,7 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       assert.match(await text('#card h1'), /Necklace/);
       assert.equal(await evaluate("document.querySelectorAll('.acts > div').length"), 3);
       await click('[data-action="act"]');
-      await waitFor(playing, 30000, 'act 1 to start');
+      await startDriving('act 1 to start');
       assert.match(await text('#missionEye'), /Act 1 · The Evidence/);
       assert.equal(await evaluate("[...document.querySelectorAll('#chips .chip.ev')].map(c => c.getAttribute('aria-label')).join()"), 'Photos,Fingerprints,Torch,Lockpick,Clothes,Balaclava', 'six pieces of evidence to find in Lisbon');
       assert.deepEqual(errors, []);
@@ -204,7 +218,7 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       await load();
       assert.equal(await evaluate("document.querySelector('[data-vol=\"game\"]').value + '/' + document.querySelector('[data-vol=\"music\"]').value"), '40/15', 'kept after a reload');
       await click('[data-action="go"]');
-      await waitFor(playing, 20000, 'a run');
+      await startDriving('a run');
       await key('keydown', 'KeyP');
       await waitFor("document.querySelectorAll('#card [data-vol]').length === 2", 10000, 'sliders on the pause card');
       await click('[data-action="menu"]');
@@ -226,7 +240,7 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       await load();
       assert.equal(await evaluate("document.querySelector('[data-steer=\"tilt\"]').getAttribute('aria-pressed')"), 'true', 'a phone starts with tilt');
       await click('[data-action="go"]');
-      await waitFor(playing, 20000, 'run on the phone');
+      await startDriving('run on the phone');
       await waitFor("document.getElementById('touch').classList.contains('tilt')", 20000, 'tilt to take over');
       assert.equal(await evaluate("getComputedStyle(document.querySelector('[data-key=\"left\"]')).visibility"), 'hidden');
       assert.equal(await evaluate("getComputedStyle(document.querySelector('[data-key=\"up\"]')).visibility"), 'visible', 'gas stays');

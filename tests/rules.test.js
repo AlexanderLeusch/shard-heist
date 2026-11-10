@@ -490,6 +490,17 @@ test('hills: smooth and bounded on every map, level at the Arco, the river and t
   assert.equal(Core.hillHeight('nowhere', 3, 3), 0);
 });
 
+test('the guide arrow points the right way: ahead, right, left, behind, from any heading', () => {
+  const deg = (h, tx, tz) => Math.round(Core.guideTurn(0, 0, h, tx, tz) * 180 / Math.PI);
+  assert.equal(deg(0, 0, 50), 0, 'straight ahead');
+  assert.equal(deg(0, -50, 0), 90, 'to the right of a car facing +z (the screen right is -x)');
+  assert.equal(deg(0, 50, 0), -90, 'to the left');
+  assert.equal(Math.abs(deg(0, 0, -50)), 180, 'behind');
+  assert.equal(deg(Math.PI / 2, 50, 0), 0, 'ahead after turning');
+  assert.equal(deg(Math.PI / 2, 0, 50), 90, 'facing +x, the +z side is on the right');
+  for (const h of [-7, -1, 0.3, 4, 12]) assert.ok(Math.abs(Core.guideTurn(3, 4, h, 10, -20)) <= Math.PI, 'always between -180° and 180°');
+});
+
 test('Lisbon holds the six pieces of evidence that prove the detective innocent, each once', () => {
   assert.deepEqual(Core.EVIDENCE.map(e => e.key), ['photos', 'prints', 'torch', 'lockpick', 'clothes', 'balaclava']);
   assert.equal(Core.MODES.city.shards, Core.EVIDENCE.length, 'one of each in the city, and the gate opens after the last');

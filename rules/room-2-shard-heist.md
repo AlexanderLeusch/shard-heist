@@ -49,6 +49,8 @@ In Lisbon you do not collect star shards. Your oldest friend on the force found 
 | **Clothes** | The dark clothes from the photos, with glass splinters from the display case in the seams |
 | **Balaclava** | The balaclava from the photos, with hairs inside that are not yours |
 
+**Before you drive** a map of the Baixa shows where the six pieces lie, with their names, the repair kits, your start and the gate. The clock waits until you press **Start driving**. **While you drive** an arrow on the screen (at the bottom in the middle; on an upright phone under the pursuit panel) points to the nearest piece still out there, with its name and distance; once all six are found it turns gold and points to the gate. (The story's sealed letter is on neither.)
+
 With all six in the car, the gate under the Arco da Rua Augusta opens. The highway and the countryside keep their **bonus shards** (+4 s each).
 
 ## The city map: Lisbon's Baixa

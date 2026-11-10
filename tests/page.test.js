@@ -20,7 +20,7 @@ test('every element the game looks up by id exists in index.html', () => {
   const wanted = [...game.matchAll(/\$\('([A-Za-z0-9_-]+)'\)/g)].map(m => m[1]);
   assert.ok(wanted.length > 20);
   // ids created at runtime inside menu cards
-  const runtime = new Set(['vehDetail']);
+  const runtime = new Set(['vehDetail', 'ovMap']);
   for (const id of new Set(wanted)) assert.ok(ids.has(id) || runtime.has(id), `#${id} is missing from index.html`);
 });
 

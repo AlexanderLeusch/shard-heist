@@ -4179,6 +4179,7 @@ const ui = {
   gVal: $('gVal'), gGlow: $('gGlow'), gTip: $('gTip'), gears: [...document.querySelectorAll('.gearbox [data-g]')], gearD: $('gearD'),
   pBrake: $('pBrake'), pGas: $('pGas'), pBrakeV: $('pBrakeV'), pGasV: $('pGasV'), tBrake: $('tBrake'), tGas: $('tGas'),
   dash: $('dash'), dmg: $('dmg'), dmgPct: $('dmgPct'), dmgState: $('dmgState'), dfill: $('dfill'),
+  guide: $('guide'), guideArrow: $('guideArrow'), guideName: $('guideName'), guideDist: $('guideDist'),
   pursuit: $('pursuit'), edge: $('edgeWarn'), edgeBanner: $('ewBanner'), edgeArrow: $('ewArrow'), purState: $('purState'), cops: [...$('cops').children], stars: $('stars'), bustPct: $('bustPct'), bfill: $('bfill')
 };
 const DIAMOND = '<svg class="chip" viewBox="0 0 16 16"><path d="M8 1.5 14.5 8 8 14.5 1.5 8Z"/></svg>';
@@ -4238,7 +4239,7 @@ function renderChips(){
     `<span class="count">${collected}/${items.length}</span>`;
 }
 const pedal = { thr: 0, brk: 0 };
-const last = { street: '', time: '', speed: -1, rpm: -1, sig: '', gear: '', hb: null, thr: -1, brk: -1, dmg: -1, km: '', pur: '', bust: -1 };
+const last = { guide: '', guideDeg: 999, street: '', time: '', speed: -1, rpm: -1, sig: '', gear: '', hb: null, thr: -1, brk: -1, dmg: -1, km: '', pur: '', bust: -1 };
 // ### Updates the HUD. A value is only written when it has changed, because touching the page every frame is slow.
 function updateHud(dt){
   // in story mode this line names the act instead
@@ -4494,15 +4495,77 @@ function startRun(m, v){
   hud.classList.remove('off');
   hideOverlay();
   state = 'play';
-  if (mode === 'city') toast('Find the 6 pieces of evidence that prove you innocent, then escape through the Arco da Rua Augusta. Every police car is looking for inmate 4471.', '', 4500);
+  if (mode === 'city') showOverview();
   else if (mode === 'country') toast('Follow the country road to the village. Shards add +4 s. Watch the oncoming traffic.', '', 4500);
   else toast(`Reach the finish 4 km ahead. Shards add +${M.bonus} s. Police incoming.`, '', 4500);
+}
+// ### Lisbon starts with a map of the Baixa: where the six pieces of evidence lie, the repair kits, your start and the gate.
+// ### The run is paused while it is open; "Start driving" begins the clock. The sealed letter of the story is not on it.
+let overviewOpen = false;
+function showOverview(){
+  state = 'pause'; overviewOpen = true;
+  showCard(`
+    <div class="eyebrow">${story ? 'Act 1 · The Evidence' : 'Lisbon · Baixa'} · ${V.name}</div>
+    <h2>Where the evidence is</h2>
+    <p>Your friend hid six pieces of evidence in the Baixa. Collect all six, then escape through the Arco da Rua Augusta. While you drive, an arrow on the screen points to the nearest piece.</p>
+    <canvas class="ov-map" id="ovMap" width="640" height="640" role="img" aria-label="Map of the Baixa: ${items.map(it => it.ev.name).join(', ')}, the repair kits, your start and the gate"></canvas>
+    <div class="actions">
+      <button class="btn" data-action="resume">Start driving <small class="desk-only">Enter</small></button>
+      <button class="btn ghost" data-action="menu">Main menu</button>
+    </div>`);
+  drawOverview($('ovMap'));
+}
+// ### Draws the map: north is up (z grows to the south), the same blocks as the radar, then the markers with their names.
+function drawOverview(cv){
+  const g = cv.getContext('2d'), S = cv.width, span = LIMIT + 24, k = S / (2 * span);
+  const X = x => (x + span) * k, Y = z => (z + span) * k;
+  g.fillStyle = '#0e1022'; g.fillRect(0, 0, S, S);
+  for (const r of CITY.radar){ g.fillStyle = r.c; g.fillRect(X(r.x0), Y(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k); }
+  g.strokeStyle = 'rgba(255,93,108,.6)'; g.lineWidth = 2; g.setLineDash([7, 7]); g.strokeRect(X(-LIMIT), Y(-LIMIT), 2 * LIMIT * k, 2 * LIMIT * k); g.setLineDash([]);
+  g.font = '700 25px "Big Shoulders Display", "Segoe UI", sans-serif'; g.textBaseline = 'middle';
+  const label = (text, x, y, color) => {
+    const w = g.measureText(text).width + 14, lx = Math.min(S - w - 4, Math.max(4, x - w / 2)), ly = Math.min(S - 16, y + 36);
+    g.fillStyle = 'rgba(8,10,22,.86)'; g.fillRect(lx, ly - 15, w, 30); g.fillStyle = color; g.fillText(text, lx + 7, ly + 1);
+  };
+  // the gate under the arch and your start
+  g.strokeStyle = '#ffc857'; g.lineWidth = 3; g.lineWidth = 4; g.beginPath(); g.arc(X(gate.x), Y(gate.z), 16, 0, Math.PI * 2); g.stroke(); label('Gate · Arco', X(gate.x), Y(gate.z), '#ffc857');
+  g.save(); g.translate(X(car.x), Y(car.z)); g.rotate(-car.heading + Math.PI); g.fillStyle = '#ffffff';
+  g.beginPath(); g.moveTo(0, -18); g.lineTo(13, 15); g.lineTo(0, 8); g.lineTo(-13, 15); g.closePath(); g.fill(); g.restore();
+  label('You', X(car.x), Y(car.z) - 72, '#ffffff');
+  for (const kt of kits){ g.fillStyle = '#4ef0a0'; g.fillRect(X(kt.x) - 10, Y(kt.z) - 3.5, 20, 7); g.fillRect(X(kt.x) - 3.5, Y(kt.z) - 10, 7, 20); }
+  items.forEach((it, i) => {
+    const x = X(it.x), y = Y(it.z);
+    g.fillStyle = 'rgba(85,236,255,.22)'; g.beginPath(); g.arc(x, y, 30, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#0e1022'; g.strokeStyle = '#55ecff'; g.lineWidth = 3; g.beginPath(); g.arc(x, y, 22, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.save(); g.translate(x - 14, y - 14); g.scale(28 / 16, 28 / 16); g.lineWidth = 1.3; g.lineCap = 'round'; g.lineJoin = 'round'; g.stroke(new Path2D(EV_ICON[it.ev.key])); g.restore();
+    label(`${i + 1} · ${it.ev.name}`, x, y, '#55ecff');
+  });
+}
+// ### The guide arrow: points at the nearest piece of evidence still out there, and at the gate once all six are in the car.
+function updateGuide(){
+  let t = null, name = '';
+  if (mode === 'city' && state === 'play'){
+    let best = Infinity;
+    for (const it of items) if (!it.taken){ const d = Math.hypot(it.x - car.x, it.z - car.z); if (d < best){ best = d; t = it; name = it.ev ? it.ev.name : 'Evidence'; } }
+    if (!t && gate && gate.active){ t = gate; name = 'Gate · Arco'; }
+  }
+  if (!t){ if (!ui.guide.hidden) ui.guide.hidden = true; last.guide = ''; return; }
+  if (ui.guide.hidden) ui.guide.hidden = false;
+  const d = Math.hypot(t.x - car.x, t.z - car.z), deg = Core.guideTurn(car.x, car.z, car.heading, t.x, t.z) * 180 / Math.PI;
+  const key = name + '|' + Math.round(d / 10);
+  if (key !== last.guide){
+    last.guide = key;
+    ui.guideName.textContent = name;
+    ui.guideDist.textContent = d < 15 ? 'right here' : Math.round(d / 10) * 10 + ' m';
+    ui.guide.classList.toggle('gold', t === gate);
+  }
+  if (Math.abs(deg - last.guideDeg) > 0.5){ last.guideDeg = deg; ui.guideArrow.style.transform = `rotate(${deg.toFixed(1)}deg)`; }
 }
 // what is collected on this map
 const what = () => mode === 'city' ? 'pieces of evidence' : 'shards';
 // ### Pauses the run and shows the pause card.
 function pause(){
-  state = 'pause';
+  state = 'pause'; overviewOpen = false;
   showCard(`
     <div class="eyebrow">${M.title} · ${V.name}</div>
     <h2>Paused</h2>
@@ -4516,7 +4579,10 @@ function pause(){
     ${volumeRow()}`);
 }
 // ### Goes back to driving after a pause.
-function resume(){ hideOverlay(); state = 'play'; initAudio(); }
+function resume(){
+  hideOverlay(); state = 'play'; initAudio();
+  if (overviewOpen){ overviewOpen = false; toast('Follow the arrow to the evidence. Every police car is looking for inmate 4471.', '', 3600); }
+}
 
 // ### Picks up a shard or a piece of evidence, adds any bonus time, and opens the finish gate after the last one.
 function collect(it){
@@ -5521,6 +5587,7 @@ function frame(now){
   updateRadio();
   updateHud(dt);
   if (state !== 'menu') drawRadar();
+  updateGuide();
   if (composer && GFX[gfx].post) composer.render(); else renderer.render(scene, camera);
 }
 
