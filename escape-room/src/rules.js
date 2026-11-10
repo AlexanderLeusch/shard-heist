@@ -13,7 +13,7 @@
   // ### The code is a year: 1912, the year the "unsinkable" Titanic sank. Three clues in the room point to it, and one of
   // ### them (the graffiti) also gives the missing digit to players who do not know the history.
   const TIME_LIMIT = 600, WRONG_CODE_PENALTY = 30, WEDGE_GRACE = 60, CODE = '1912', SAVE_KEY = 'escape-room-save';
-  const ITEMS = { spoon: 'Spoon', mop: 'Mop', carkey: 'Car key' };
+  const ITEMS = { mop: 'Mop', carkey: 'Car key' };
   const CLUES = {
     mirror: { title: 'Writing in the steam', text: 'Someone traced letters on the mirror. In the steam they read: “UNSINKABLE?”' },
     graffiti: { title: 'Scratched into the stall wall', text: '“She was unsinkable. She sailed only once. — The year opens the floor.”' },
@@ -27,9 +27,9 @@
     door: { title: 'The Door', text: 'A steel door with a small barred window. Officer Hale waits on the other side. Someone has scratched words into the wall beside it. In the corner: a mop in a bucket.',
       exits: ['sinks', 'stall'],
       hotspots: [['go', 'sinks', 'Sinks'], ['go', 'stall', 'Toilet stall'], ['read', 'scratches', 'Scratches by the door'], ['take', 'mop', 'Mop and bucket'], ['wedge', null, 'Jam the door with the mop']] },
-    sinks: { title: 'The Sinks', text: 'Two steel sinks under a polished metal mirror. A soap dish, a hot tap that still works.',
+    sinks: { title: 'The Sinks', text: 'Two steel sinks under a polished metal mirror. An empty soap dish, a hot tap that still works.',
       exits: ['door', 'stall'],
-      hotspots: [['go', 'door', 'Back to the door'], ['go', 'stall', 'Toilet stall'], ['take', 'spoon', 'Soap dish'], ['tap', null, 'Hot tap'], ['read', 'mirror', 'Mirror']] },
+      hotspots: [['go', 'door', 'Back to the door'], ['go', 'stall', 'Toilet stall'], ['tap', null, 'Hot tap'], ['read', 'mirror', 'Mirror']] },
     stall: { title: 'The Stall', text: 'A steel prison toilet. Words are scratched into the wall. One tile behind the toilet sits crooked. And in the floor: a hatch.',
       exits: ['door', 'sinks', 'hatch'],
       hotspots: [['go', 'door', 'Back to the door'], ['go', 'sinks', 'Sinks'], ['read', 'graffiti', 'Scratches on the wall'], ['pry', null, 'Crooked tile'], ['take', 'carkey', 'Car key behind the tile'], ['go', 'hatch', 'Hatch in the floor']] },
@@ -92,7 +92,7 @@
         if (has(s, target) || (target === 'mop' && s.wedged)) return reject(s, `You already have the ${ITEMS[target].toLowerCase()}.`);
         if (!here) return reject(s, target === 'carkey' && s.scene === 'stall' ? 'The tile is still in place.' : `There is no ${ITEMS[target].toLowerCase()} here.`);
         const n = copy(s); n.inventory.push(target);
-        const took = { spoon: 'A bent metal spoon, left in the soap dish. You slip it into your sleeve.', mop: 'You lift the mop out of the bucket. The handle is long and solid.',
+        const took = { mop: 'You lift the mop out of the bucket. The handle is long and solid.',
           carkey: 'A car key on a worn leather fob. Someone hid it here for you. You pocket it.' };
         return result(n, true, took[target], 'take');
       }
@@ -118,9 +118,8 @@
       case 'pry': {
         if (s.scene !== 'stall') return reject(s, 'There is no loose tile here.');
         if (s.tileOpen) return reject(s, 'The tile is already off.');
-        if (!has(s, 'spoon')) return reject(s, 'The tile wobbles, but your fingers cannot get behind it. Something thin and hard would do.');
         const n = copy(s); n.tileOpen = true;
-        return result(n, true, 'You work the spoon into the grout. The tile comes away. Behind it, in a hollow in the wall: a car key.', 'scrape');
+        return result(n, true, 'You work your fingers into the cracked grout. The tile comes away. Behind it, in a hollow in the wall: a car key.', 'scrape');
       }
       case 'turn': {
         if (s.scene !== 'hatch') return reject(s, 'Kneel down at the hatch to reach the lock.');
@@ -186,14 +185,13 @@
       && (s.ending === null || s.ending === 'A' || s.ending === 'B')
       && !(s.wedged && s.inventory.includes('mop'))
       && !(s.inventory.includes('carkey') && !s.tileOpen)
-      // only an ending leads to the cell or the tunnel; the grace minute needs the jammed door, and the tile needs the spoon, the car key needs the tile off
+      // only an ending leads to the cell or the tunnel; the grace minute needs the jammed door, and the car key needs the tile off
       && (s.ending === 'A' ? s.scene === 'tunnel' : s.ending === 'B' ? s.scene === 'cell' : s.scene !== 'tunnel' && s.scene !== 'cell')
       && !(s.graceUsed && !s.wedged)
       // the clock only runs down: every wrong code took 30 s from it, and only the grace minute sets it back, to one minute
       && s.wrongTries <= (TIME_LIMIT + WEDGE_GRACE) / WRONG_CODE_PENALTY + 1
       && s.time <= (s.graceUsed ? WEDGE_GRACE : Math.max(0, TIME_LIMIT - s.wrongTries * WRONG_CODE_PENALTY))
-      && (s.graceUsed || s.warned.every(w => s.time <= w))
-      && !(s.tileOpen && !s.inventory.includes('spoon'));
+      && (s.graceUsed || s.warned.every(w => s.time <= w));
     if (!ok) return null;
     return { scene: s.scene, time: s.time, inventory: s.inventory.slice(), clues: s.clues.slice(), tileOpen: s.tileOpen, steam: s.steam,
       wedged: s.wedged, graceUsed: s.graceUsed, lock: s.lock.slice(), wrongTries: s.wrongTries, ending: s.ending, warned: s.warned.slice() };

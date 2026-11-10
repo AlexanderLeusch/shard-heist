@@ -285,22 +285,24 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       assert.deepEqual(errors, []);
     });
 
-    await t.test('escape room rejected: the tile will not come off without the spoon', async () => {
+    await t.test('escape room rejected: the car key cannot be taken while the tile is on, and the sinks have nothing to take', async () => {
       await hs('go:stall');
-      await hs('pry');
-      assert.match(await text('#say'), /thin and hard/);
+      assert.equal(await evaluate("!!document.querySelector('[data-hotspot=\"take:carkey\"]')"), false);
+      assert.equal(await evaluate("!!document.querySelector('[data-hotspot=\"pry\"]')"), true);
+      await hs('go:sinks');
+      assert.equal(await evaluate("[...document.querySelectorAll('[data-hotspot^=\"take:\"]')].length"), 0);
       assert.equal(await evaluate("document.querySelectorAll('.slot.full').length"), 0);
-      assert.equal(await text('#place'), 'The Stall');
+      assert.equal(await text('#place'), 'The Sinks');
     });
 
     await t.test('escape room: progress is saved and offered after a reload', async () => {
-      await hs('go:sinks');
-      await hs('take:spoon');
+      await hs('go:door');
+      await hs('take:mop');
       await send('Page.navigate', { url: base + 'escape-room/' });
       await waitFor("!!document.querySelector('[data-do=\"resume\"]')", LOAD_MS, 'continue card');
-      assert.match(await text('#card'), /Spoon/);
+      assert.match(await text('#card'), /Mop/);
       await click('[data-do="resume"]');
-      assert.equal(await text('#place'), 'The Sinks');
+      assert.equal(await text('#place'), 'The Door');
       assert.equal(await evaluate("document.querySelectorAll('.slot.full').length"), 1);
     });
 

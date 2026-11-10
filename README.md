@@ -20,7 +20,7 @@ You were the detective on the Ashford necklace case; now you are inmate 4471, co
 | | |
 |---|---|
 | Scenes (5) | The door, the sinks, the toilet stall, the hatch, the tunnel |
-| Items (3) | A spoon (pries the crooked tile off the wall), the car key hidden behind that tile, and a mop (optional: jams the door) |
+| Items (2) | The car key hidden behind the crooked tile (pried off by hand), and a mop (optional: jams the door) |
 | Clues (3) | Steam on the mirror, graffiti in the stall, scratches in the wall beside the door. Together they give the year the "unsinkable" ship sank. The code is always the same |
 | Endings (2) | **A:** the hatch opens in time and you climb down into the tunnel. **B:** time runs out and Hale takes you back to your cell. The earlier choice to jam the door buys one extra minute before Ending B |
 | Pressure | 10:00 clock, warnings at 5:00, 2:00, 1:00 and 0:30; every wrong code makes noise and costs 30 seconds |
@@ -109,7 +109,7 @@ docs/             Code Guide (PDF): architecture, all code sections, tuning, lim
 
 `npm test` runs 118 tests in Node (17 of them for the escape room), and `npm run test:browser` runs 18 more in headless Chrome (4 of them in the escape room). CI runs all of them, plus the SRI check and the 36 pytest checks of `plot-twist/`, on every push to `main` and on every pull request. They cover:
 
-- **Escape room:** both endings and the jammed-door grace minute; refused actions (walking where there is no exit, taking an item twice, the tile without the spoon, the door without the mop, lock wheels that do not exist, anything before the briefing or after an ending) return the unchanged state; wrong codes cost 30 s but never take the clock below zero; warnings sound once; tampered saved games are rejected; in the browser: briefing, refused action, save and continue after a reload, a wrong code and then Ending A.
+- **Escape room:** both endings and the jammed-door grace minute; refused actions (walking where there is no exit, taking an item twice, the car key before the tile is off, the door without the mop, lock wheels that do not exist, anything before the briefing or after an ending) return the unchanged state; wrong codes cost 30 s but never take the clock below zero; warnings sound once; tampered saved games are rejected; in the browser: briefing, refused action, save and continue after a reload, a wrong code and then Ending A.
 - **Accepted actions:** each menu action in the states whose cards show it; valid map and vehicle picks; restoring a valid saved selection; finishing every story act; both story endings.
 - **Rejected actions:** card buttons while driving; story buttons without a story; "next act" after the last act; unknown actions; picks such as `"tank"`, `"constructor"` or `"__proto__"`; acts outside 1–3; the act 2 toll without the clasp; tampered saved data; dev-server requests for `.git`, for paths outside the folder, and with methods other than GET or HEAD.
 - **Edge cases:** gas and brake held together, zero-length and 3-second frames, negative frame times, NaN impacts, damage above 100 or below 0, coasting to exactly zero, a letter found in an attempt that then failed, radio lines that must not repeat, time displays that must never show negative or NaN.

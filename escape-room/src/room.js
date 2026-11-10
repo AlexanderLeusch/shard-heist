@@ -370,7 +370,7 @@ haleShadow.position.set(.12, .004, 2.05); haleShadow.rotation.set(-Math.PI / 2, 
 const doorLight = new THREE.SpotLight(0xd4e6ff, 0, 9, .62, .55, 1.3);
 doorLight.position.set(0, 2.3, 4.1); doorLight.target.position.set(0, 0, .3); room.add(doorLight, doorLight.target);
 
-// Sinks with a polished steel mirror, the soap dish with the spoon and the hot tap
+// Sinks with a polished steel mirror, an empty soap dish and the hot tap
 box(.5, .06, 2.6, M.steel, -3.75, .86, 0);
 box(.5, .12, 2.6, M.steel, -3.75, .78, 0);
 const basins = [];
@@ -387,12 +387,7 @@ const mirror = plane(2.2, .72, M.mirror, -3.985, 1.6, 0, Math.PI / 2);
 box(.01, .8, 2.28, M.dullSteel, -3.996, 1.6, 0);
 const steam = plane(2.2, .72, M.steam, -3.975, 1.6, 0, Math.PI / 2); steam.renderOrder = 2;
 hot('read:mirror', mirror, steam);
-const dish = box(.12, .025, .2, M.dullSteel, -3.85, .905, 0);
-const spoon = new THREE.Group();
-const sBowl = new THREE.Mesh(new THREE.SphereGeometry(.03, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), M.steel); sBowl.scale.set(1, .25, 1.4); sBowl.rotation.x = Math.PI;
-const sHandle = new THREE.Mesh(new THREE.BoxGeometry(.012, .005, .13), M.steel); sHandle.position.z = .09;
-spoon.add(sBowl, sHandle); spoon.position.set(-3.85, .93, -.04); spoon.rotation.y = .5; room.add(spoon);
-hot('take:spoon', dish, sBowl, sHandle);
+box(.12, .025, .2, M.dullSteel, -3.85, .905, 0);
 const steamPuffs = [];
 const puffTex = canvasTex(64, 64, (g, w) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, w); });
 for (let i = 0; i < 14; i++){ const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true, opacity: 0, depthWrite: false })); s.userData.t = i / 14; room.add(s); steamPuffs.push(s); }
@@ -525,7 +520,7 @@ canvas.addEventListener('pointercancel', () => { drag = null; canvas.classList.r
 // ### works with a keyboard and on touch screens); walking happens with the "Walk to" buttons. Clicking an object in the
 // ### 3D view does the same as its marker.
 const ANCHORS = {
-  'take:mop': [3.35, .9, 2.45], 'wedge': [.38, 1.02, 2.86], 'take:spoon': [-3.85, .95, 0], 'tap': [-3.94, 1.08, -.53],
+  'take:mop': [3.35, .9, 2.45], 'wedge': [.38, 1.02, 2.86], 'tap': [-3.94, 1.08, -.53],
   'read:mirror': [-3.97, 1.75, .45], 'read:graffiti': [1.53, 1.5, -1.9], 'pry': [2.62, .58, -2.97], 'take:carkey': [2.62, .58, -2.97], 'read:scratches': [1.75, 1.3, 2.95],
   'lock': [2.2, .1, -1.1]
 };
@@ -610,10 +605,9 @@ function act(action, target){
   return r;
 }
 
-// ### syncWorld puts every object where the state says it is: spoon in the dish or gone, mop in the bucket or jammed
+// ### syncWorld puts every object where the state says it is: mop in the bucket or jammed
 // ### against the door, the tile on the wall or on the floor, the car key in its hollow, the lock wheels, the steam.
 function syncWorld(){
-  spoon.visible = !S.inventory.includes('spoon');
   const mp = S.wedged ? MOP_DOOR : S.inventory.includes('mop') ? null : MOP_CORNER;
   mop.visible = !!mp;
   if (mp){ mop.position.copy(mp.p); mop.rotation.copy(mp.r); }
@@ -628,7 +622,6 @@ function syncWorld(){
 // ### The clock, inventory and journal, and the cards for clues, the lock and the endings. They only show what Rules says.
 const overlay = $('overlay'), card = $('card'), hud = $('hud');
 const ICON = {
-  spoon: '<svg viewBox="0 0 40 24" aria-hidden="true"><ellipse cx="10" cy="12" rx="8" ry="5" fill="#cfd6d9"/><rect x="16" y="10.5" width="22" height="3" rx="1.5" fill="#cfd6d9"/></svg>',
   mop: '<svg viewBox="0 0 40 24" aria-hidden="true"><rect x="2" y="10.5" width="28" height="3" rx="1.5" fill="#c49a64"/><path d="M28 6h10v12H28z" fill="#d8d2bf"/></svg>',
   carkey: '<svg viewBox="0 0 40 24" aria-hidden="true"><rect x="6" y="7" width="12" height="10" rx="3" fill="#7d8489"/><path d="M18 10.5h16l2 1.5-2 1.5h-3l-1 1.5-1-1.5H18z" fill="#d6b25a"/><circle cx="5" cy="12" r="3" fill="none" stroke="#cfd6d9" stroke-width="1.5"/></svg>'
 };
