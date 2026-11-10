@@ -5011,35 +5011,62 @@ function openGate(text){
 // ### over her head and a gold mark on the radar. Stop next to her (closer than 7 m, slower than about 11 km/h) and she walks
 // ### to the car and gets in; drive off before she reaches it and she goes back to wait. With her on board the gate opens.
 const WITNESS = Object.freeze({ name: 'Marta Silva', job: 'a night-shift nurse', found: 'Marta Silva is in the car. She saw a man climb out of the museum window that night, and she will say so in court. That is the last piece of evidence. Escape through the Arco da Rua Augusta: follow the golden beam.' });
+// ### Marta is built like a person, about 1.70 m tall: legs of 0.88 m that turn at the hip and the knee, a long belted coat over dark
+// ### trousers and boots, a red scarf, a face with eyes, nose and lips, hair tied in a bun, a handbag on her left shoulder, and arms
+// ### that turn at the shoulder, the elbow and the wrist. Every part is a smooth tube or a lofted shell (limbLoft, loft), not a box.
+const HIP = 0.88;
 const witness = (() => {
-  const g = new THREE.Group(), mat = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.75 });
-  const coat = mat(0xb08a5a), dark = mat(0x23262e), skin = mat(0xd9a98a), hair = mat(0x3a2418), scarf = mat(0xa8323a);
+  const g = new THREE.Group(), mat = (c, r) => new THREE.MeshStandardMaterial({ color: c, roughness: r || 0.78 });
+  const coat = mat(0xb48a58), coatDark = mat(0x8e6a42), trousers = mat(0x23262e), boot = mat(0x18130f, 0.45), skin = mat(0xe0ae90, 0.6);
+  const hair = mat(0x3a2418, 0.55), scarf = mat(0xa8323a), bagMat = mat(0x5a2f22, 0.5), eye = mat(0x1b1410, 0.3), lip = mat(0xa5524e, 0.5);
   const add = (geo, m, parent) => { const o = new THREE.Mesh(geo, m); o.castShadow = true; (parent || g).add(o); return o; };
-  // each leg turns at the hip and the knee, so she can walk and sit down; the upper body leans back from the hips
-  const shoe = mat(0x15161a), hips = [], knees = [];
+  // legs: thigh from the hip, shin and boot from the knee
+  const hips = [], knees = [];
   for (const sd of [-1, 1]){
-    const hip = new THREE.Group(); hip.position.set(sd * 0.1, 0.52, 0); g.add(hip);
-    add(boxG(0.13, 0.28, 0.14, 0, -0.135, 0), dark, hip);
-    const knee = new THREE.Group(); knee.position.y = -0.27; hip.add(knee);
-    add(boxG(0.12, 0.25, 0.13, 0, -0.125, 0), dark, knee);
-    add(boxG(0.14, 0.08, 0.26, 0, -0.21, 0.04), shoe, knee);
+    const hip = new THREE.Group(); hip.position.set(sd * 0.095, HIP, 0); g.add(hip);
+    add(limbLoft([0, 0.02, 0], [0, -0.43, 0], [0.078, 0.075, 0.066, 0.056, 0.05], 12), trousers, hip);
+    const knee = new THREE.Group(); knee.position.y = -0.43; hip.add(knee);
+    add(limbLoft([0, 0.01, 0], [0, -0.36, 0], [0.052, 0.054, 0.046, 0.038, 0.036], 12), trousers, knee);
+    add(mergeGeos([limbLoft([0, -0.2, 0], [0, -0.4, 0], [0.047, 0.047, 0.044], 12), ball([0, -0.42, 0.045], 0.05, 0.85, 0.55, 2.0)]), boot, knee);
     hips.push(hip); knees.push(knee);
   }
-  const upper = new THREE.Group(); upper.position.y = 0.52; g.add(upper);
-  add(mergeGeos([boxG(0.44, 0.62, 0.26, 0, 0.61, 0), boxG(0.48, 0.42, 0.3, 0, 0.18, 0), boxG(0.11, 0.56, 0.12, 0.28, 0.58, 0)]), coat, upper);
-  add(new THREE.CylinderGeometry(0.1, 0.12, 0.1, 10).translate(0, 0.95, 0), scarf, upper);
-  add(new THREE.SphereGeometry(0.115, 14, 10).translate(0, 1.1, 0.01), skin, upper);
-  add(mergeGeos([new THREE.SphereGeometry(0.128, 14, 10).scale(1, 0.95, 1).translate(0, 1.14, -0.02), boxG(0.08, 0.2, 0.06, 0, 1.0, -0.12)]), hair, upper);
-  add(boxG(0.08, 0.24, 0.2, -0.3, 0.34, 0.02), mat(0x5a2f22), upper);
-  // the left arm waves and reaches for the door handle: it hangs from the shoulder
-  const arm = new THREE.Group(); arm.position.set(-0.28, 0.88, 0); upper.add(arm);
-  add(boxG(0.11, 0.56, 0.12, 0, -0.28, 0), coat, arm);
-  add(new THREE.SphereGeometry(0.055, 8, 6).translate(0, -0.58, 0), skin, arm);
+  // the upper body turns at the hips: the coat skirt, the torso, the neck and the head
+  const upper = new THREE.Group(); upper.position.y = HIP; g.add(upper);
+  add(loft([[0, 0.14, 0, 0.15, 0.1], [0, 0.0, 0, 0.175, 0.12], [0, -0.18, 0, 0.19, 0.135], [0, -0.36, 0.01, 0.205, 0.145]], 16), coat, upper);
+  add(loft([[0, 0.06, 0, 0.165, 0.11], [0, 0.18, 0.005, 0.155, 0.105], [0, 0.32, 0.01, 0.17, 0.115], [0, 0.44, 0, 0.19, 0.11], [0, 0.52, -0.005, 0.175, 0.095], [0, 0.57, -0.01, 0.07, 0.06]], 16), coat, upper);
+  // belt, lapels and the buttons down the front
+  add(mergeGeos([loft([[0, 0.135, 0, 0.158, 0.106], [0, 0.175, 0, 0.158, 0.106]], 16), boxG(0.09, 0.04, 0.02, 0, 0.155, 0.105)]), coatDark, upper);
+  add(mergeGeos([0.36, 0.27, 0.06, -0.06].map(y => ball([0.03, y, 0.118 + (y > 0.2 ? 0.003 : 0.015)], 0.011))), coatDark, upper);
+  add(mergeGeos([limb([-0.02, 0.5, 0.1], [0.06, 0.32, 0.12], 0.012, 0.03, 6), limb([0.02, 0.5, 0.1], [-0.05, 0.36, 0.115], 0.012, 0.024, 6)]), coatDark, upper);
+  // neck, scarf, head
+  const head = new THREE.Group(); head.position.y = 0.6; upper.add(head);
+  add(limbLoft([0, -0.04, 0], [0, 0.08, 0], [0.048, 0.045, 0.045]), skin, head);
+  add(new THREE.TorusGeometry(0.06, 0.032, 8, 16).rotateX(Math.PI / 2).translate(0, 0.0, 0.005), scarf, head);
+  add(limb([0.03, -0.01, 0.07], [0.05, -0.17, 0.1], 0.025, 0.018, 6), scarf, head);
+  add(ball([0, 0.17, 0.01], 0.1, 0.86, 1.08, 0.95), skin, head);
+  add(mergeGeos([ball([0.034, 0.185, 0.088], 0.012, 1, 0.8, 0.6), ball([-0.034, 0.185, 0.088], 0.012, 1, 0.8, 0.6)]), eye, head);
+  add(mergeGeos([ball([0, 0.16, 0.1], 0.016, 0.8, 1.2, 1), ball([-0.084, 0.165, 0.005], 0.018, 0.5, 1, 0.8), ball([0.084, 0.165, 0.005], 0.018, 0.5, 1, 0.8)]), skin, head);
+  add(ball([0, 0.118, 0.087], 0.022, 1.2, 0.45, 0.6), lip, head);
+  add(mergeGeos([ball([0, 0.2, -0.01], 0.106, 0.92, 0.98, 1.0).translate(0, 0, -0.008), ball([0, 0.27, 0.04], 0.07, 1.3, 0.5, 1.0), ball([0, 0.2, -0.12], 0.05, 1, 1, 0.9)]), hair, head);
+  // arms: shoulder, elbow, wrist. [0] is her right arm (-x), which waves and opens the door; [1] her left, with the bag
+  const sh = [], el = [], hands = [];
+  for (const sd of [-1, 1]){
+    const s0 = new THREE.Group(); s0.position.set(sd * 0.2, 0.5, -0.01); upper.add(s0);
+    add(mergeGeos([ball([0, 0, 0], 0.062, 1, 0.9, 1), limbLoft([0, 0, 0], [0, -0.29, 0], [0.058, 0.054, 0.05, 0.046], 12)]), coat, s0);
+    const e = new THREE.Group(); e.position.y = -0.29; s0.add(e);
+    add(mergeGeos([ball([0, 0, 0], 0.047), limbLoft([0, 0, 0], [0, -0.24, 0], [0.047, 0.044, 0.04, 0.042], 12)]), coat, e);
+    add(limbLoft([0, -0.22, 0], [0, -0.25, 0], [0.046, 0.046], 12), coatDark, e);
+    const h = new THREE.Group(); h.position.y = -0.25; e.add(h);
+    add(mergeGeos([ball([0, -0.06, 0.005], 0.045, 0.62, 1.1, 0.38), limb([sd * 0.025, -0.02, 0.02], [sd * 0.035, -0.07, 0.035], 0.012, 0.01, 5)]), skin, h);
+    sh.push(s0); el.push(e); hands.push(h);
+  }
+  // the handbag hangs from the left shoulder on a strap
+  add(mergeGeos([boxG(0.07, 0.2, 0.2, 0.25, 0.02, 0.0), limb([0.21, 0.52, 0.0], [0.27, 0.1, 0.0], 0.008, 0.008, 5)]), bagMat, upper);
   const marker = glowSprite(GOLD, 2.4, 0.9); marker.position.y = 2.5; g.add(marker);
   const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
   ring.position.y = 0.06; g.add(ring);
   g.visible = false; scene.add(g);
-  return { g, arm, upper, hips, knees, marker, ring, active: false, inCar: false, boarding: 0, phase: '', t: 0, lock: null, x: 0, z: 0, h: 0, home: null };
+  return { g, upper, head, hips, knees, sh, el, hands, marker, ring, active: false, inCar: false, boarding: 0, phase: '', t: 0, lock: null, x: 0, z: 0, h: 0, face: 0, wave: 0, home: null };
 })();
 // ### Puts the witness on a pavement 70 to 200 m from the player, facing the street.
 function spawnWitness(){
@@ -5053,7 +5080,7 @@ function spawnWitness(){
     break;
   }
   if (!pick) pick = { x: 8.3, z: 100, h: -Math.PI / 2 };
-  Object.assign(witness, { active: true, inCar: false, boarding: 0, x: pick.x, z: pick.z, h: pick.h, home: pick });
+  Object.assign(witness, { active: true, inCar: false, boarding: 0, x: pick.x, z: pick.z, h: pick.h, face: pick.h, wave: 0, home: pick });
   witness.g.visible = true; witness.marker.visible = true; witness.ring.visible = true;
   renderChips();
 }
@@ -5077,21 +5104,40 @@ function setDoor(k){
 function unseatWitness(){
   const W = witness;
   if (W.g.parent !== scene) scene.add(W.g);
-  W.g.rotation.set(0, 0, 0); W.upper.rotation.set(0, 0, 0);
-  W.hips.forEach(h => h.rotation.set(0, 0, 0)); W.knees.forEach(k => k.rotation.set(0, 0, 0));
+  W.g.rotation.set(0, 0, 0); witnessPose({});
   W.marker.visible = true; W.ring.visible = true; W.lock = null; W.phase = '';
   Object.values(MODELS).forEach(m => { if (m.door){ m.door.pivot.visible = false; m.door.hole.visible = false; m.door.pivot.rotation.y = 0; } });
 }
 function hideWitness(){ unseatWitness(); Object.assign(witness, { active: false, inCar: false, boarding: 0 }); witness.g.visible = false; }
-// ### Her legs: a walking stride (w = stride phase, 0 = standing), or sitting (k from 0 to 1, knees bent, or astride on the motorcycle)
-function witnessLegs(stride, sit, astride){
-  const W = witness;
+// ### Her whole pose in one call. stride: the walking phase (0 = standing); sit: 0 standing to 1 seated (astride on a motorcycle);
+// ### wave: how far the right arm is raised to wave (0..1); reach: the right hand to the door handle (0..1); lean: the upper body
+// ### leaning back; look: how far the head turns (radians). The arms swing against the legs while she walks.
+function witnessPose(o){
+  const W = witness, stride = o.stride || 0, sit = o.sit || 0, wave = o.wave || 0, reach = o.reach || 0, walk = stride ? 1 : 0;
   W.hips.forEach((h, i) => {
-    const sd = i ? 1 : -1, swing = stride ? Math.sin(stride + i * Math.PI) * 0.55 : 0;
-    h.rotation.x = swing * (1 - sit) - sit * (astride ? 1.15 : Math.PI / 2);
-    h.rotation.z = astride ? sd * 0.32 * sit : 0;
-    W.knees[i].rotation.x = (stride ? Math.max(0, -Math.sin(stride + i * Math.PI)) * 0.7 : 0) * (1 - sit) + sit * (astride ? 1.5 : Math.PI / 2);
+    const sd = i ? 1 : -1, ph = stride + i * Math.PI, swing = walk * Math.sin(ph) * 0.5;
+    h.rotation.x = -swing * (1 - sit) - sit * (o.astride ? 1.15 : Math.PI / 2);
+    h.rotation.z = o.astride ? sd * 0.3 * sit : sd * 0.02;
+    // the knee bends as the leg swings through, and is nearly straight when the foot is down
+    W.knees[i].rotation.x = walk * Math.max(0, Math.sin(ph - 1.2)) * 0.75 * (1 - sit) + sit * (o.astride ? 1.5 : Math.PI / 2);
   });
+  W.sh.forEach((s0, i) => {
+    const sd = i ? 1 : -1, ph = stride + i * Math.PI;
+    // hanging, a little away from the body; swinging against the leg of the same side; in the lap when seated
+    let x = walk * Math.sin(ph) * 0.38 * (1 - sit) - sit * 0.45, z = sd * 0.07, ex = -0.12 - walk * (0.25 + 0.15 * Math.sin(ph)) - sit * 1.0, ez = 0, hz = 0;
+    if (i === 0){
+      // reach for the door handle
+      x += (-1.15 - x) * reach; ex += (-0.35 - ex) * reach;
+      // wave: the upper arm out and up, the forearm upright and swinging from the elbow, the hand loose at the wrist
+      const ph2 = (o.wavePhase || 0);
+      x += (-0.35 - x) * wave; z += (-2.35 - z) * wave;
+      ex += (0 - ex) * wave; ez = wave * (0.55 + 0.42 * Math.sin(ph2));
+      hz = wave * 0.3 * Math.sin(ph2 - 0.7);
+    }
+    s0.rotation.set(x, 0, z); W.el[i].rotation.set(ex, 0, ez); W.hands[i].rotation.set(0, 0, hz);
+  });
+  W.upper.rotation.set(-(o.lean || 0) + walk * 0.05, walk * Math.sin(stride) * 0.06, (o.sway || 0));
+  W.head.rotation.set(walk * 0.04, o.look || 0, -(o.sway || 0) * 0.6);
 }
 // ### Waves; when the car stops next to her she walks to the passenger door, opens it, gets in, sits down and pulls the door
 // ### shut (on the motorcycle she climbs onto the pillion seat). The car waits while she gets in. She then rides along, visible
@@ -5103,12 +5149,16 @@ function updateWitness(dt, live){
   const toWorld = (lx, lz) => [car.x + lx * ch + lz * sh, car.z - lx * sh + lz * ch];
   const d = Math.hypot(W.x - car.x, W.z - car.z), slow = Math.abs(car.speed) < 3;
   if (live && !W.boarding && d < 7 && slow){ W.boarding = 0.001; W.phase = 'walk'; W.t = 0; toast(`${WITNESS.name} walks to your car.`, '', 1800); }
-  // waiting on the pavement: she turns a little and waves, under the golden light
+  // ### Waiting on the pavement under the golden light. She turns to face the player's car, shifts her weight, and waves: in bursts
+  // ### of about three seconds while the car is far away, and all the time, with the whole arm, once it is closer than 45 m.
   if (!W.phase){
     W.g.position.set(W.x, groundH(W.x, W.z), W.z);
-    W.g.rotation.y = W.h + Math.sin(clock * 0.7) * 0.25;
-    witnessLegs(0, 0, false);
-    W.arm.rotation.z = -2.5 + Math.sin(clock * 7) * 0.45; W.arm.rotation.x = 0;
+    const toCar = Math.atan2(car.x - W.x, car.z - W.z), near = d < 45;
+    W.face += wrapAngle((d < 160 ? toCar : W.h) - W.face) * Math.min(1, dt * 2.2);
+    W.g.rotation.y = W.face;
+    const cyc = clock % 4.2, waveOn = cyc < 0.35 ? cyc / 0.35 : cyc < 3.0 ? 1 : cyc < 3.4 ? 1 - (cyc - 3.0) / 0.4 : 0;
+    W.wave += ((near ? 1 : waveOn) - W.wave) * Math.min(1, dt * 7);
+    witnessPose({ wave: W.wave, wavePhase: clock * (near ? 11 : 8.5), sway: Math.sin(clock * 1.1) * 0.035, look: clamp(wrapAngle(toCar - W.face), -0.6, 0.6) });
     W.marker.position.y = 2.5 + Math.sin(clock * 2.4) * 0.15;
     W.ring.material.opacity = 0.3 + 0.25 * Math.sin(clock * 3);
     return;
@@ -5120,10 +5170,12 @@ function updateWitness(dt, live){
       W.boarding += dt;
       const [tx, tz] = toWorld(B.stand[0], B.stand[1]), dx = tx - W.x, dz = tz - W.z, l = Math.hypot(dx, dz);
       if (l > 0.06){ const step = Math.min(l, dt * 2.4); W.x += dx / l * step; W.z += dz / l * step; W.h = Math.atan2(dx, dz); }
-      W.g.position.set(W.x, groundH(W.x, W.z) + (l > 0.06 ? Math.abs(Math.sin(clock * 9)) * 0.03 : 0), W.z);
-      W.g.rotation.y = W.h;
-      witnessLegs(l > 0.06 ? clock * 9 : 0, 0, false);
-      W.arm.rotation.z = l > 0.06 ? Math.sin(clock * 9) * 0.35 : 0; W.arm.rotation.x = l > 0.06 ? Math.sin(clock * 9) * 0.5 : 0;
+      const moving = l > 0.06, stride = moving ? W.boarding * 8.5 + 0.001 : 0;
+      W.g.position.set(W.x, groundH(W.x, W.z) + (moving ? Math.abs(Math.cos(stride)) * 0.025 : 0), W.z);
+      W.face += wrapAngle(W.h - W.face) * Math.min(1, dt * 8); W.g.rotation.y = W.face;
+      // she keeps waving for a moment as she sets off, then walks with both arms
+      W.wave = Math.max(0, W.wave - dt * 1.4);
+      witnessPose({ stride, wave: W.wave, wavePhase: clock * 11 });
       W.marker.visible = false; W.ring.visible = false;
       // there, and the car is standing: she takes over in the car's own coordinates, and the car waits for her
       if (l <= 0.06 && Math.abs(car.speed) < 1.5){
@@ -5143,19 +5195,17 @@ function updateWitness(dt, live){
     const k = Math.min(1, W.t / BOARD_T.open);
     setDoor(ease(k));
     W.g.position.set(sx, 0, sz); W.g.rotation.y = Math.PI / 2;
-    witnessLegs(0, 0, false);
-    W.arm.rotation.x = -1.2 * Math.sin(k * Math.PI); W.arm.rotation.z = 0;
+    witnessPose({ reach: Math.sin(Math.min(1, k * 1.4) * Math.PI / 2) * (1 - Math.max(0, k - 0.75) * 2), look: -0.25 });
     if (k >= 1){ W.phase = 'enter'; W.t = 0; }
   // ### 3. She steps in over the sill (up the steps into the truck cab), turns to face forward and sits down
   } else if (W.phase === 'enter'){
     const k = Math.min(1, W.t / BOARD_T.enter), a = ease(Math.min(1, k / 0.4)), b = ease(Math.max(0, (k - 0.4) / 0.6));
     const x = sx + (ix - sx) * a + (px - ix) * b, z = sz + (iz - sz) * a + (pz - iz) * b;
-    const y = iy * a + (py - 0.52 - iy) * b;
+    const y = iy * a + (py - HIP - iy) * b;
     W.g.position.set(x, y, z);
     W.g.rotation.y = Math.PI / 2 * (1 - b);
-    witnessLegs(k < 0.4 ? k * 20 : 0, b, B.legs === 'astride');
-    W.upper.rotation.x = -B.lean * b;
-    W.arm.rotation.x = -0.4 * b; W.arm.rotation.z = 0;
+    // she ducks her head under the roof as she gets in
+    witnessPose({ stride: k < 0.4 ? k * 18 + 0.001 : 0, sit: b, astride: B.legs === 'astride', lean: B.lean * b - Math.sin(Math.min(1, k * 1.6) * Math.PI) * (B.legs === 'sit' ? 0.35 : 0.1) });
     if (k >= 1){ W.phase = MODELS[V.key].door ? 'close' : 'done'; W.t = 0; }
   // ### 4. She pulls the door shut behind her
   } else if (W.phase === 'close'){
