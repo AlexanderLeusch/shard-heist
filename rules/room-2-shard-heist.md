@@ -32,7 +32,8 @@ Percentages are relative to the map's top speed and to the car. The menu shows t
 | **Countryside** | Reach the village at the end of the road. Shards: **+4 s** each | 2:30 | 158 km/h | 148 km/h | 10 | 3 |
 
 - A shard is picked up within 3.8 m; a repair kit within 3.6 m, and only when you have damage.
-- Lisbon has traffic lights, other cars and three yellow trams. The trams only run on their tracks, a stone track bed with two rails set into the road: a clockwise loop through Rua da Conceição, Rua da Prata, the north side of the Praça do Comércio and Rua Áurea. As on real Lisbon streets, cars and the player can drive over the tracks. The trams stop at red lights and behind other vehicles. On the highway traffic drives both ways. On country roads there is oncoming traffic, and driving off the road cuts your top speed to 55 %.
+- Lisbon has traffic lights, other cars, two white city buses, four motorcycles and three yellow trams. The trams only run on their tracks, a stone track bed with two rails set into the road: a clockwise loop through Rua da Conceição, Rua da Prata, the north side of the Praça do Comércio and Rua Áurea. As on real Lisbon streets, cars and the player can drive over the tracks. The buses are 12 m long, so at a crossing they go straight on or turn left in the wide arc, never right into the tight corner (unless that is the only way left at the edge of the map). Everything stops at red lights and keeps its distance to the back of the vehicle ahead, so nobody runs into the long tail of a bus or a tram. On the highway traffic drives both ways: cars, SUVs, lorries, three coaches and six motorcycles; lorries and coaches keep to the middle and slow lanes. On country roads there is oncoming traffic, with one coach and three motorcycles among it, and driving off the road cuts your top speed to 55 %.
+- **Other vehicles at night:** every vehicle throws its headlights on the road ahead, so a car waiting at a dark crossing can be seen from far away. Its bright brake lights are on while it slows down or stands. You can crash into buses and motorcycles like into any other vehicle.
 - Each map has an edge you cannot cross. When you near it the screen turns red and a "turn back" arrow appears. In Lisbon the outer streets are part of the map, so there this only happens when you head for the edge.
 
 ## The city map: Lisbon's Baixa
@@ -62,6 +63,7 @@ The Baixa is the centre of Lisbon, rebuilt as a street grid after the 1755 earth
 | Brake | slows you down, then reverses, up to 40 km/h backwards |
 | No pedal | the car rolls to a stop |
 | Handbrake (`Space`) | slows you quickly and turns sharper |
+| Headlights | always on: a wide, soft beam that lights the road ahead and fades into the dark |
 | Brake lights | on while you brake, in either direction, and with the handbrake while moving |
 | Reversing lights | white, on while you roll backwards |
 | Skid marks and tyre squeal | with the handbrake above about 15 km/h, when braking above about 30 km/h, and in very fast corners (above about 80 km/h, steering hard). They only mark the road, and they are cleared when a new run starts |
@@ -75,7 +77,7 @@ The Baixa is the centre of Lisbon, rebuilt as a street grid after the 1755 earth
 | Rule | Value |
 |---|---|
 | Crash | impacts under 4 m/s (about 14 km/h) are free; above that, damage = (impact − 4) × 1.0 × the vehicle's damage factor. A wall at 122 km/h costs the car 30 %, the truck 17 %. One crash counts once: for 0.35 s after contact, only a harder hit costs more |
-| 25 % damage | the paint shows dents and scratches, and thin grey smoke rises from the engine |
+| 25 % damage | the paint shows dents (deepest at the nose and the tail), long scratches and dirt, and loses its shine as the damage grows; thin grey smoke rises from the engine |
 | 50 % damage | warning: "Engine damaged: top speed reduced." Loose parts and a smashed light; the engine misfires; the smoke turns dark |
 | 75 % damage | hood up (car), screen gone (motorcycle), hanging bumper and cracked windscreen (truck); a thick black column of smoke; sparks at speed |
 | 88 % damage | the engine is on fire |
@@ -90,6 +92,7 @@ The Baixa is the centre of Lisbon, rebuilt as a street grid after the 1755 earth
 | **Wanted stars** | 1 to 5, shown under the clock. A new star every fifth of the time limit or of the way to the end (shards in the city, distance on the open roads), whichever is further along. Each wrecked police car counts as 4 % more. Stars never fall. |
 | New police car | until the number for your stars is reached, see the table below |
 | Ramming | every hard hit lowers a police car's health by impact × your ramming power × 0.09; a police car is wrecked when its health is gone and comes back after the time in the table below |
+| **Police wreck** | stays where it stopped: lights out, dented and dull, sagging to one side and smoking for about 14 s. Traffic stops behind it, and you and the police can crash into it. It is cleared when you are more than 260 m away, or after 30 s once you are more than 70 m away. When that car is sent back into the chase, it comes back clean |
 | Far behind | a police car more than 140 m away drives 20 % faster; one more than 230 m away in the city, or 320 m on the open roads, is sent back near you with full health |
 | Hills | police slow down uphill and speed up downhill as you do; other traffic keeps its speed |
 | **Bust meter** | fills while a police car is **within 9 m** and you are **slower than 4.5 m/s** (about 16 km/h): full in 2.2 s. Otherwise it drains (empty from full in 3 s). |
