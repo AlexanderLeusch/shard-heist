@@ -159,6 +159,14 @@ All of it is composed and synthesised by the game, with no music files. The tune
 - More than 50 % damage costs one star, but never the last one.
 - The best drive time per map is saved in the browser. Saved values under 10 s or over 15 minutes are ignored, because no run can take that long or that little.
 
+## Drivers and the leaderboard
+
+- **Driver.** In the main menu (section 03) you create a driver by typing a name, or pick a saved one. A name keeps letters, digits, spaces and `. _ ' -`, up to 16 characters; capital letters do not matter, so *alex* and *Alex* are the same driver.
+- **Leaderboard.** Every finished free ride (Lisbon, Highway, Countryside) goes on the board of its map under the active driver, with the drive time and the vehicle. Each driver has one entry per map, their best time; a slower run never replaces it. The fastest time is first, and on a tie the time that was there first stays ahead.
+- **End screen.** After the finish the board of that map shows the top five, and the driver's own place below them if they are further down. It says whether the run is a new personal best and which place it has. Without a driver, the end screen asks for a name first; the time is saved as soon as the name is entered.
+- Runs that end busted, wrecked or out of time, and the story mode, do not go on the board.
+- The drivers and the boards are kept in this browser only. There is no password and nothing is sent anywhere, so the board shows the people who play on the same device.
+
 ## Story mode: The Necklace Job
 
 | Act | Map | Goal | Special rule |
@@ -194,7 +202,7 @@ Any other button or action is refused, and no card button works while you are dr
 
 ## Saved settings
 
-The last map and vehicle, the best times, the radio station, the graphics, the steering and both volumes are saved in the browser. Every saved value is checked when loaded; invalid values fall back to Lisbon, Car, radio off and the defaults. All settings are explained in [Settings and options](settings.md).
+The last map and vehicle, the best times, the drivers and leaderboards, the radio station, the graphics, the steering and both volumes are saved in the browser. Every saved value is checked when loaded; invalid values fall back to Lisbon, Car, radio off and the defaults. All settings are explained in [Settings and options](settings.md).
 
 ## Controls
 

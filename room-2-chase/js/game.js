@@ -4193,6 +4193,11 @@ const keys = { up: false, down: false, left: false, right: false, brake: false }
 const keyMap = Core.KEY_MAP, held = new Set(), crashGuard = Core.newCrashGuard();
 addEventListener('keydown', e => {
   if (!$('fatal').hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+  // typing a driver name: the letters go into the field, not to the car, and Enter saves the name
+  if (e.target && e.target.classList && e.target.classList.contains('drv-input')){
+    if (e.code === 'Enter' || e.code === 'NumpadEnter'){ e.preventDefault(); if (!e.repeat) addDriverFrom(e.target); }
+    return;
+  }
   // on a volume slider the arrow keys move the slider, not the car
   if (e.target && e.target.type === 'range' && /^(Arrow|Home|End|Page)/.test(e.code)) return;
   if (e.repeat && e.code === 'Enter'){ e.preventDefault(); return; }
@@ -4568,6 +4573,68 @@ let state = 'menu', collected = 0, timeLeft = M.time, damage = 0, clock = 0, orb
 let edgeHint = false, warnedDamage = false;
 const best = {};
 for (const k of Object.keys(MODES)){ const b = Core.parseBest(readStore(MODES[k].store)); if (b) best[k] = b; }
+
+// ---------- Drivers & leaderboard ----------
+// ### The player creates a driver (just a name) in the menu. Each finished free ride goes on the leaderboard of its map under that
+// ### driver, and the end screen shows the board. Without a driver, the end screen asks for a name before the time is saved.
+// ### Drivers and times stay in this browser (localStorage); nothing is sent anywhere. The rules are in Core (cleanName, recordRun, ...).
+let board = Core.parseBoard(readStore('shard-heist-board')), pendingRun = null, lastRank = null;
+let driver = board.drivers.find(d => Core.sameName(d, Core.cleanName(readStore('shard-heist-driver') || ''))) || '';
+// names are cleaned by Core already; escaping them again keeps any HTML out of the page
+const esc = s => String(s).replace(/[&<>"']/g, c => '&#' + c.charCodeAt(0) + ';');
+function saveBoard(){ writeStore('shard-heist-board', JSON.stringify(board)); writeStore('shard-heist-driver', driver); }
+// ### Creates or picks a driver; false when the name is empty after cleaning.
+function setDriver(raw){
+  const r = Core.addDriver(board, raw);
+  if (!r.name) return false;
+  board = r.board; driver = r.name; saveBoard();
+  return true;
+}
+// ### Saves the run that just ended under the active driver (once).
+function recordPending(){
+  if (!pendingRun || !driver) return;
+  lastRank = Core.recordRun(board, pendingRun.mode, driver, pendingRun.time, pendingRun.veh, pendingRun.stars);
+  board = lastRank.board; pendingRun = null; saveBoard();
+}
+// The name field with its button; the same one is used in the menu and on the end screen
+const nameField = (ph, label) => `<span class="drv-new"><input type="text" class="drv-input" maxlength="${Core.NAME_MAX}" placeholder="${ph}" aria-label="${ph}" autocomplete="off" spellcheck="false"><button type="button" class="drv-add" data-driver-add>${label}</button></span>`;
+// ### The menu section: every driver as a button (the active one pressed) and a field for a new one.
+function driverSection(){
+  return `<div class="m-label"><span>03</span>Driver · your name on the leaderboard</div>
+      <div class="drivers">${board.drivers.slice().reverse().map(d => `<button class="drv" data-driver="${esc(d)}" aria-pressed="${Core.sameName(d, driver)}">${esc(d)}</button>`).join('')}${nameField(board.drivers.length ? 'New driver' : 'Your name', 'Add driver')}</div>
+      <p class="drv-hint">${driver ? `Driving as <b>${esc(driver)}</b>. Each finished run goes on the leaderboard of its map.` : 'Add a name to put your times on the leaderboard. It stays on this device.'}</p>`;
+}
+// ### The end screen's leaderboard for one map: the top five, the driver's own place, and the name field when nobody is signed in.
+function boardSection(m){
+  const rows = Core.boardRows(board, m, driver);
+  let head = '';
+  if (lastRank && lastRank.rank){
+    const who = esc(driver);
+    head = lastRank.personalBest
+      ? (lastRank.prev ? `New personal best for ${who} (was ${fmtTimeExact(lastRank.prev)}).` : `${who} is on the board.`)
+      : `${who}'s best stays ${fmtTimeExact(lastRank.prev)}.`;
+    head = `<p class="lb-head">${head} Place <b>${lastRank.rank}</b> of ${board.runs[m].length}.</p>`;
+  }
+  const list = rows.length
+    ? `<ol class="lb-list">${rows.map(r => `<li class="${r.me ? 'me' : ''}${r.gap ? ' gap' : ''}"><span class="lb-place">${r.place}</span><span class="lb-name">${esc(r.name)}</span><span class="lb-veh">${VEH[r.veh].name}</span><b>${fmtTimeExact(r.time)}</b></li>`).join('')}</ol>`
+    : '<p class="note">No times on this map yet.</p>';
+  const ask = !driver && pendingRun ? `<div class="lb-ask"><span>Enter your name to put this time on the board</span>${nameField('Your name', 'Save time')}</div>` : '';
+  return `<div class="eyebrow">Leaderboard · ${MODES[m].title}</div>${head}${list}${ask}`;
+}
+// ### Reads the name field next to the button (or the field itself) and creates the driver.
+function addDriverFrom(el){
+  const wrap = el.closest('.drv-new'), input = wrap && wrap.querySelector('.drv-input');
+  if (!input) return;
+  if (!setDriver(input.value)){ input.value = ''; input.classList.remove('bad'); void input.offsetWidth; input.classList.add('bad'); input.focus(); return; }
+  refreshDriverViews();
+}
+// ### After a driver change: the menu redraws its section; the end screen saves the waiting run and redraws the board.
+function refreshDriverViews(){
+  const sec = card.querySelector('[data-drivers]');
+  if (sec) sec.innerHTML = driverSection();
+  const lb = card.querySelector('[data-board]');
+  if (lb){ recordPending(); lb.innerHTML = boardSection(lb.dataset.board); }
+}
 
 // ### Switches map. A map is built the first time it is chosen, then bent over its hills once.
 function setMode(m){
@@ -4950,6 +5017,8 @@ function finish(){
   sfx.win();
   let isBest = false;
   if (Core.isNewBest(best[mode], used)){ best[mode] = used; isBest = true; writeStore(M.store, String(used)); }
+  pendingRun = { mode, time: used, veh: V.key, stars }; lastRank = null;
+  recordPending();
   const city = mode === 'city';
   showCard(`
     <div class="eyebrow">${M.title} · ${V.name}</div>
@@ -4962,7 +5031,8 @@ function finish(){
       <div class="stat"><span class="eyebrow">Damage</span><b>${Math.round(damage)}%</b></div>
       <div class="stat"><span class="eyebrow">Cops wrecked</span><b>${copsWrecked}</b></div>
     </div>
-    <p class="note">${isBest ? 'New best time!' : 'Best time: ' + fmtTimeExact(best[mode])}${lostStar ? ' · One star lost for heavy damage.' : ''}</p>
+    <p class="note">${isBest ? 'New best time on this device!' : 'Best time on this device: ' + fmtTimeExact(best[mode])}${lostStar ? ' · One star lost for heavy damage.' : ''}</p>
+    <section class="lb" data-board="${mode}">${boardSection(mode)}</section>
     <div class="actions">
       <button class="btn" data-action="again">Drive again <small class="desk-only">Enter</small></button>
       <button class="btn ghost" data-action="menu">Change vehicle</button>
@@ -5078,6 +5148,7 @@ function showMenu(){
       <div class="vtabs">${['car', 'bike', 'truck'].map(k => `<button class="vtab" data-pick="veh" data-val="${k}" aria-pressed="${sel.veh === k}">${PREVIEWS[k] ? `<img src="${PREVIEWS[k]}" alt="">` : ICONS[k]}<span>${VEH[k].name}<small>${VEH[k].cls}</small></span></button>`).join('')}</div>
       <div class="vdetail" id="vehDetail"></div>
     </section>
+    <section class="m-sec" data-drivers>${driverSection()}</section>
     <button class="btn m-start" data-action="go"><span>Start the getaway</span><kbd class="desk-only">Enter</kbd></button>
     <div class="m-foot">
       <span class="desk-only"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive · <kbd>Space</kbd> handbrake · <kbd>P</kbd> pause · <kbd>M</kbd> sound · <kbd>R</kbd> radio</span>
@@ -5127,6 +5198,10 @@ card.addEventListener('input', e => {
 });
 card.addEventListener('change', e => { const r = e.target.closest('[data-vol="game"]'); if (r) sfx.collect(); });
 card.addEventListener('click', e => {
+  const da = e.target.closest('[data-driver-add]');
+  if (da){ addDriverFrom(da); return; }
+  const db = e.target.closest('[data-driver]');
+  if (db){ if (setDriver(db.dataset.driver)) refreshDriverViews(); return; }
   const rb = e.target.closest('[data-radio]');
   if (rb){
     setStation(rb.dataset.radio, false);

@@ -126,7 +126,7 @@ shard-heist/
 
 ## Testing
 
-`npm test` runs 118 tests in Node (17 of them for the escape room), and `npm run test:browser` runs 19 more in headless Chrome (4 of them in the escape room). CI runs all of them, plus the SRI check and the 36 pytest checks of `original-solo-project/`, on every push to `main` and on every pull request. They cover:
+`npm test` runs 123 tests in Node (17 of them for the escape room), and `npm run test:browser` runs 20 more in headless Chrome (4 of them in the escape room). CI runs all of them, plus the SRI check and the 36 pytest checks of `original-solo-project/`, on every push to `main` and on every pull request. They cover:
 
 - **Escape room:** both endings and the jammed-door grace minute; refused actions (walking where there is no exit, taking an item twice, the car key before the tile is off, the door without the mop, lock wheels that do not exist, anything before the briefing or after an ending) return the unchanged state; wrong codes cost 30 s but never take the clock below zero; warnings sound once; tampered saved games are rejected; in the browser: briefing, refused action, save and continue after a reload, a wrong code and then Ending A.
 - **Accepted actions:** each menu action in the states whose cards show it; valid map and vehicle picks; restoring a valid saved selection; finishing every story act; both story endings.
@@ -141,7 +141,7 @@ Writing the tests found two real bugs. Both are fixed:
 
 ## Security
 
-- **No accounts, no server, no personal data.** The only data the game stores is your last map and vehicle, best times, the radio station, the graphics setting, the steering choice, the volumes and the saved escape-room game, all in your browser's `localStorage` (the full list is in [docs/rules/settings.md](docs/rules/settings.md)). The game has no server of its own. The fonts ship with the game; only the three.js library comes from cdnjs and jsDelivr, so those two services see your IP address. There are no credentials anywhere in the repository; a test scans every file for keys and tokens.
+- **No real accounts, no server, no personal data.** A driver for the leaderboard is only a name, with no password, kept in this browser; names are cleaned and escaped before they are shown. The only data the game stores is your last map and vehicle, best times, the drivers and leaderboards, the radio station, the graphics setting, the steering choice, the volumes and the saved escape-room game, all in your browser's `localStorage` (the full list is in [docs/rules/settings.md](docs/rules/settings.md)). The game has no server of its own. The fonts ship with the game; only the three.js library comes from cdnjs and jsDelivr, so those two services see your IP address. There are no credentials anywhere in the repository; a test scans every file for keys and tokens.
 - **Input validation.** Everything read back from `localStorage` is checked (`parsePick`, `parseBest`, `parseRadio`, `parseSteer`, `parseVolume`, and `restore` and `parseVolume` in room 1) and replaced by defaults when it is invalid. Menu picks and actions are checked against fixed lists using own properties only. Error messages are inserted as text, never as HTML.
 - **Access control.** Nothing on the site needs a login. Cards accept only the actions allowed in the current state, and the dev server only serves known file types from the project folder (no `.git`, no path traversal, GET and HEAD only).
 - **Dependencies.** No npm packages at all. The two fonts ship in each room's `fonts/` folder with their licences, so no font service is needed. The Python project pins every package in `uv.lock`, and CI audits them with `pip-audit` on every push; a known vulnerability fails the build and stops the deploy. GitHub's Dependabot alerts are on for the repository, so a newly published vulnerability in a pinned version is reported even when nobody pushes. The only runtime library is three.js 0.128.0 (9 files), pinned by exact URL, checked by SRI hashes (`npm run test:sri`) and loaded with `crossorigin="anonymous"`. `npm audit` reports 0 known vulnerabilities for `three@0.128.0` (checked 3 November 2026). GitHub Actions are pinned to commit hashes.
@@ -155,7 +155,7 @@ The game needs no server of its own and calls no API. The only outside service i
 |---|---|
 | three.js or one of its effect files (cdnjs, jsDelivr), offline or blocked, or a file that fails its integrity check | The error screen in `room-2-chase/js/boot.js` says which file could not load and offers *Reload*, instead of a black page. A browser test blocks the library on purpose and checks this card |
 | WebGL (old or locked-down browser) | The same error screen explains how to turn on hardware acceleration. A browser test removes WebGL and checks it |
-| `localStorage` (private mode, blocked storage) | Every read and write is wrapped, so the game runs with the defaults and simply does not remember settings, best times or the escape-room save |
+| `localStorage` (private mode, blocked storage) | Every read and write is wrapped, so the game runs with the defaults and simply does not remember settings, best times, drivers or the escape-room save |
 | The motion sensor on a phone (missing or refused) | Steering stays on the buttons |
 
 ## Limits
@@ -167,7 +167,7 @@ The game needs no server of its own and calls no API. The only outside service i
 - **Physics:** arcade model with collision circles; no tyre grip or mass transfer.
 - **Structure:** `game.js` is one large closure (about 5,100 lines) whose sections share variables, so it is harder to work on in parallel than separate modules would be.
 - **Testing:** the browser test checks the main workflows, but not long play sessions, every map end to end, or sound quality, and the CI browser renders in software.
-- **Persistence:** best times live in one browser only and can be edited by the player.
+- **Persistence:** best times and the leaderboard live in one browser only and can be edited by the player, so the board compares the people who play on the same device, not everyone online. A shared online board would need a server and a database.
 
 The street names and their order were checked against [OpenStreetMap](https://www.openstreetmap.org/copyright) (© OpenStreetMap contributors, ODbL). The game ships no map data and calls no map service.
 

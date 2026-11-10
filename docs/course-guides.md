@@ -31,7 +31,7 @@
 
 | Guide point | Status | Where / how |
 |---|---|---|
-| What must survive, who shares it, its shape | ✅ | Settings and the escape-room save, per browser, in `localStorage`; nothing is shared between players |
+| What must survive, who shares it, its shape | ✅ | Settings, best times, drivers and leaderboards, and the escape-room save, per browser, in `localStorage`; nothing is shared between devices (the leaderboard compares the players on one device) |
 | No credentials, tests never touch real data | ✅ | No database; tests run on fixed values in Node and on a fresh browser profile |
 | Storage choice and how to reset it recorded | ✅ | `docs/rules/settings.md` (table of stored values, reset by clearing site data), `AGENTS.md` |
 | Stored data is validated | ✅ | `parsePick`, `parseBest`, `parseRadio`, `parseSteer`, `parseVolume`, `restore` |

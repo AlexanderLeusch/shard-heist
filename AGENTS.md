@@ -13,7 +13,7 @@ A two-room browser game for the Nova SBE course *Introduction to Programming*. *
 
 - **Plain HTML, CSS and JavaScript**, no framework, no build step, **no npm packages**. three.js r128 is loaded from a CDN with SRI hashes; nothing else comes from outside.
 - **Hosting:** GitHub Pages, deployed by `.github/workflows/ci.yml` from `main`, and only when all tests pass.
-- **Data:** only the player's browser (`localStorage`). There is no server, no database and no account. The full list of stored values, and how to reset them, is in `docs/rules/settings.md`.
+- **Data:** only the player's browser (`localStorage`). There is no server, no database and no real account: a leaderboard driver is only a name kept in the browser, with no password. The full list of stored values, and how to reset them, is in `docs/rules/settings.md`.
 - **No secrets.** The game uses no API key, password or token. See "Secrets" below if that ever changes.
 - The course's default stack is Python with Streamlit. A JavaScript stack needs the teaching staff's approval (course guide *Choosing a stack*).
 

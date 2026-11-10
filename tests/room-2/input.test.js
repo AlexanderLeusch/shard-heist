@@ -80,3 +80,74 @@ test('the rules module is frozen so the game cannot change it by accident', () =
   assert.ok(Object.isFrozen(Core));
   assert.throws(() => { 'use strict'; Core.parsePick = () => ({}); });
 });
+
+// ---------- Drivers and leaderboard ----------
+test('driver names: letters, digits and a few signs stay, everything else is dropped, at most 16 characters', () => {
+  assert.equal(Core.cleanName('  Alex  '), 'Alex');
+  assert.equal(Core.cleanName('Zoë  Müller-Lopes'), 'Zoë Müller-Lopes');
+  assert.equal(Core.cleanName("O'Neil_2.0"), "O'Neil_2.0");
+  assert.equal(Core.cleanName('<img src=x onerror=alert(1)>'), 'img srcx onerror');
+  assert.equal(Core.cleanName('a"b&c<d>e`f'), 'abcdef');
+  assert.equal(Core.cleanName('x'.repeat(40)).length, Core.NAME_MAX);
+  for (const raw of [null, undefined, 42, {}, [], '', '   ', '<<>>', '\n\t']) assert.equal(Core.cleanName(raw), '', String(raw));
+  assert.ok(Core.sameName('alex', 'ALEX'));
+  assert.ok(!Core.sameName('alex', 'alexa'));
+});
+
+test('drivers: a name is created once (any case), the newest is last, and at most 12 are kept', () => {
+  let b = Core.newBoard(), r = Core.addDriver(b, 'Alex');
+  assert.equal(r.name, 'Alex'); b = r.board;
+  r = Core.addDriver(b, '  alex '); assert.equal(r.name, 'Alex', 'the existing spelling is kept'); b = r.board;
+  assert.deepEqual(b.drivers, ['Alex']);
+  r = Core.addDriver(b, '<>'); assert.equal(r.name, ''); assert.equal(r.board, b, 'an empty name changes nothing');
+  for (let i = 0; i < 20; i++) b = Core.addDriver(b, 'Driver ' + i).board;
+  assert.equal(b.drivers.length, Core.DRIVERS_MAX);
+  assert.equal(b.drivers.at(-1), 'Driver 19');
+  b = Core.addDriver(b, 'Driver 10').board;
+  assert.equal(b.drivers.at(-1), 'Driver 10', 'picking a driver again makes it the newest');
+});
+
+test('leaderboard: one best entry per driver and map, fastest first, slower runs never replace a best', () => {
+  let b = Core.newBoard(), r = Core.recordRun(b, 'city', 'Alex', 95.2, 'bike', 2);
+  assert.deepEqual([r.rank, r.personalBest, r.prev], [1, true, null]); b = r.board;
+  r = Core.recordRun(b, 'city', 'alex', 101, 'car', 3);
+  assert.deepEqual([r.rank, r.personalBest, r.prev], [1, false, 95.2]); b = r.board;
+  assert.equal(b.runs.city.length, 1); assert.equal(b.runs.city[0].time, 95.2);
+  r = Core.recordRun(b, 'city', 'Sarah', 80, 'car', 3); b = r.board; assert.equal(r.rank, 1);
+  r = Core.recordRun(b, 'city', 'Alex', 80, 'truck', 3); b = r.board;
+  assert.deepEqual([r.rank, r.personalBest, r.prev], [2, true, 95.2], 'a tie goes behind the time that was there first');
+  assert.deepEqual(b.runs.city.map(x => x.name), ['Sarah', 'Alex']);
+  assert.equal(b.runs.highway.length, 0, 'each map has its own board');
+  // nothing impossible gets on the board
+  for (const [m, n, t] of [['moon', 'A', 90], ['city', '', 90], ['city', 'A', 5], ['city', 'A', 9999], ['city', 'A', NaN], ['__proto__', 'A', 90]]){
+    const x = Core.recordRun(b, m, n, t, 'car', 1); assert.equal(x.board, b, `${m} ${n} ${t}`); assert.equal(x.rank, 0);
+  }
+});
+
+test('leaderboard rows: the top five, plus the driver further down after a gap', () => {
+  let b = Core.newBoard();
+  for (let i = 0; i < 8; i++) b = Core.recordRun(b, 'highway', 'P' + i, 60 + i, 'car', 3).board;
+  let rows = Core.boardRows(b, 'highway', 'P7');
+  assert.deepEqual(rows.map(r => r.place), [1, 2, 3, 4, 5, 8]);
+  assert.ok(rows[5].me && rows[5].gap);
+  rows = Core.boardRows(b, 'highway', 'P5');
+  assert.ok(rows[5].me && !rows[5].gap, 'sixth place follows straight on');
+  rows = Core.boardRows(b, 'highway', 'p2');
+  assert.equal(rows.length, 5); assert.ok(rows[2].me);
+  assert.deepEqual(Core.boardRows(b, 'nope', 'P1'), []);
+});
+
+test('a saved leaderboard is read back exactly, and broken or changed data is cleaned', () => {
+  let b = Core.addDriver(Core.newBoard(), 'Alex').board;
+  b = Core.recordRun(b, 'country', 'Alex', 120.4, 'truck', 2).board;
+  assert.deepEqual(Core.parseBoard(JSON.stringify(b)), b);
+  for (const raw of [null, '', 'not json', '[]', '42', 'null', '{"runs":7}', 'x'.repeat(30000)]) assert.deepEqual(Core.parseBoard(raw), Core.newBoard(), String(raw).slice(0, 20));
+  const bad = Core.parseBoard(JSON.stringify({
+    drivers: ['Alex', 'alex', '<b>', 7, 'Sarah'],
+    runs: { city: [{ name: 'Alex', time: 99 }, { name: 'ALEX', time: 90, veh: 'tank', stars: 9 }, { name: '<script>', time: 'x' }, { name: 'Eve', time: 2 }, null, 'x'], moon: [{ name: 'A', time: 50 }], highway: 'no' }
+  }));
+  assert.deepEqual(bad.drivers, ['Alex', 'b', 'Sarah']);
+  assert.deepEqual(bad.runs.city, [{ name: 'ALEX', time: 90, veh: 'car', stars: 1 }]);
+  assert.deepEqual(Object.keys(bad.runs), ['city', 'highway', 'country']);
+  assert.deepEqual(bad.runs.highway, []);
+});

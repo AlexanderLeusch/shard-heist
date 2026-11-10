@@ -402,6 +402,77 @@
   }
   const isNewBest = (prev, used) => Number.isFinite(used) && used > 0 && (!prev || used < prev);
 
+  // ---------- Drivers and leaderboard ----------
+  // ### A driver is a name the player creates in the menu; it is saved in this browser only, with no password and nothing sent
+  // ### anywhere. Every finished run is put on the leaderboard of its map under the active driver: each driver keeps one entry per
+  // ### map (their best time), fastest first. Everything read back from storage is checked again, so a changed value can't break the game.
+  const NAME_MAX = 16, DRIVERS_MAX = 12, BOARD_KEEP = 50, BOARD_SHOW = 5;
+  // A name keeps letters (of any language), digits, spaces and . _ ' - ; anything else is dropped, and it is at most 16 characters
+  function cleanName(raw){
+    if (typeof raw !== 'string') return '';
+    return raw.normalize('NFC').replace(/[^\p{L}\p{N} ._'-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, NAME_MAX).trim();
+  }
+  // Names are matched without case, so "alex" and "Alex" are the same driver
+  const sameName = (a, b) => typeof a === 'string' && typeof b === 'string' && a.toLowerCase() === b.toLowerCase();
+  function newBoard(){ return { drivers: [], runs: { city: [], highway: [], country: [] } }; }
+  // ### Reads a saved leaderboard. Bad names, impossible times and unknown maps are dropped, and only each driver's best run stays.
+  function parseBoard(raw){
+    const board = newBoard();
+    if (typeof raw !== 'string' || raw.length > 20000) return board;
+    let s; try { s = JSON.parse(raw); } catch (e) { return board; }
+    if (!s || typeof s !== 'object' || Array.isArray(s)) return board;
+    if (Array.isArray(s.drivers)) for (const d of s.drivers){ const n = cleanName(d); if (n && !board.drivers.some(x => sameName(x, n))) board.drivers.push(n); }
+    board.drivers = board.drivers.slice(-DRIVERS_MAX);
+    const runs = s.runs && typeof s.runs === 'object' ? s.runs : {};
+    for (const m of Object.keys(board.runs)){
+      if (!Array.isArray(runs[m])) continue;
+      for (const r of runs[m]){
+        if (!r || typeof r !== 'object') continue;
+        const name = cleanName(r.name), time = parseBest(String(r.time));
+        if (!name || time === null) continue;
+        const stars = Number.isInteger(r.stars) && r.stars >= 1 && r.stars <= 3 ? r.stars : 1;
+        const entry = { name, time, veh: isVeh(r.veh) ? r.veh : 'car', stars };
+        const i = board.runs[m].findIndex(x => sameName(x.name, name));
+        if (i < 0) board.runs[m].push(entry); else if (time < board.runs[m][i].time) board.runs[m][i] = entry;
+      }
+      board.runs[m].sort((a, b) => a.time - b.time);
+      board.runs[m] = board.runs[m].slice(0, BOARD_KEEP);
+    }
+    return board;
+  }
+  // ### Creates a driver, or picks the existing one with the same name. The newest driver is last; the oldest drops off after 12.
+  function addDriver(board, raw){
+    const name = cleanName(raw);
+    if (!name) return { board, name: '' };
+    const old = board.drivers.find(d => sameName(d, name)) || name;
+    const drivers = board.drivers.filter(d => !sameName(d, old)).concat(old).slice(-DRIVERS_MAX);
+    return { board: { drivers, runs: board.runs }, name: old };
+  }
+  // ### Puts a finished run on its map's board. A driver's slower run never replaces their best one.
+  // ### Returns the new board, the driver's place (1 = fastest) and whether the run is their new personal best.
+  function recordRun(board, modeKey, raw, time, veh, stars){
+    const name = cleanName(raw), t = parseBest(String(time));
+    if (!isMode(modeKey) || !name || t === null) return { board, rank: 0, personalBest: false, prev: null };
+    const list = board.runs[modeKey].slice(), i = list.findIndex(x => sameName(x.name, name));
+    const prev = i >= 0 ? list[i].time : null, personalBest = prev === null || t < prev;
+    if (personalBest){
+      if (i >= 0) list.splice(i, 1);
+      // a tie goes behind the run that was there first
+      let at = list.findIndex(x => x.time > t); if (at < 0) at = list.length;
+      list.splice(at, 0, { name: i >= 0 ? board.runs[modeKey][i].name : name, time: t, veh: isVeh(veh) ? veh : 'car', stars: Number.isInteger(stars) && stars >= 1 && stars <= 3 ? stars : 1 });
+    }
+    const kept = list.slice(0, BOARD_KEEP), rank = kept.findIndex(x => sameName(x.name, name)) + 1;
+    return { board: { drivers: board.drivers, runs: Object.assign({}, board.runs, { [modeKey]: kept }) }, rank, personalBest, prev };
+  }
+  // ### The rows the end screen shows: the top five, plus the driver's own row below them when they are further down.
+  function boardRows(board, modeKey, name){
+    const list = isMode(modeKey) ? board.runs[modeKey] : [];
+    const rows = list.slice(0, BOARD_SHOW).map((r, i) => Object.assign({ place: i + 1, me: sameName(r.name, name) }, r));
+    const mine = list.findIndex(r => sameName(r.name, name));
+    if (mine >= BOARD_SHOW) rows.push(Object.assign({ place: mine + 1, me: true, gap: mine > BOARD_SHOW }, list[mine]));
+    return rows;
+  }
+
   // ---------- Story mode rules ----------
   // ### The Necklace Job: three acts on the three maps. The optional letter (act 1) decides Ending A or B; being busted,
   // ### wrecked or out of time is Ending C and lets you retry the act. Retrying restores the letter to what you had when
@@ -715,6 +786,7 @@
     crashDamage, CRASH_FREE, CRASH_FACTOR, CRASH_QUIET, newCrashGuard, chargeCrash, addDamage, repairDamage, isWrecked, damageStage, damageLevel, smokeFor, actionHeld, TILT_DEAD, TILT_FULL, tiltSteer, parseSteer, snapShadow, QUALITY_SCALES, newQuality, stepQuality, parseVolume, volumeGain,
     PURSUIT, MAX_STARS, SPOT_RADIUS, HELI_AFTER, wantedStars, pursuit, helicopterDue, copTopSpeed, trackStep, inSpotlight, bustStep, edgeDistance,
     driveTime, runStars, isNewBest,
+    NAME_MAX, DRIVERS_MAX, BOARD_KEEP, BOARD_SHOW, cleanName, sameName, newBoard, parseBoard, addDriver, recordRun, boardRows,
     newStory, beginAct, retryAct, finishOpen, storyEnding, dueRadio,
     ENGINES, ENGINE_SR, gearFor, engineTarget, isBraking, isReversing, skidAmount, engineLoop, engineLoops, ROTOR, rotorLoop,
     RADIO, RADIO_ORDER, BACH, parseRadio, radioNext, radioBar

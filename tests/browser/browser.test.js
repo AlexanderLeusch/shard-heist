@@ -229,6 +229,30 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       assert.deepEqual(errors, []);
     });
 
+    await t.test('drivers: a name is added in the menu and kept; Enter in the field saves it; bad names and HTML are refused', async () => {
+      await evaluate(`localStorage.setItem('shard-heist-board', JSON.stringify({ drivers: ['Sarah', '<img src=x onerror=window.__xss=1>'], runs: { city: [{ name: '<b>Eve</b>', time: 99 }] } })), true`);
+      await load();
+      const names = "[...document.querySelectorAll('#card [data-driver]')].map(b => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? '*' : '')).join()";
+      assert.equal(await evaluate(names), 'img srcx onerror,Sarah', 'rejected: the HTML in a saved name is shown as plain text');
+      assert.equal(await evaluate("!document.querySelector('#card img[src=\"x\"]') && !window.__xss"), true);
+      const type = (v, how) => evaluate(`(() => { const i = document.querySelector('#card .drv-input'); i.value = ${JSON.stringify(v)}; ${how === 'enter' ? "i.dispatchEvent(new KeyboardEvent('keydown', { code: 'Enter', bubbles: true }))" : "document.querySelector('#card .drv-add').click()"}; return true; })()`);
+      await type('  Alex  ', 'enter');
+      assert.equal(await evaluate(names), 'Alex*,img srcx onerror,Sarah');
+      assert.ok(await evaluate(menuReady), 'Enter in the name field does not start a run');
+      assert.equal(await evaluate("localStorage.getItem('shard-heist-driver')"), 'Alex');
+      await type('<>', 'click');
+      assert.ok(await evaluate("document.querySelector('#card .drv-input').classList.contains('bad')"), 'rejected: an empty name is marked');
+      assert.equal(await evaluate(names), 'Alex*,img srcx onerror,Sarah');
+      await load();
+      assert.equal(await evaluate(names), 'Alex*,img srcx onerror,Sarah', 'kept after a reload');
+      assert.match(await text('#card .drv-hint'), /Driving as Alex/);
+      await click('#card [data-driver="Sarah"]');
+      assert.equal(await evaluate(names), 'Sarah*,Alex,img srcx onerror');
+      assert.equal(await evaluate("localStorage.getItem('shard-heist-driver')"), 'Sarah');
+      await evaluate("localStorage.removeItem('shard-heist-board'), localStorage.removeItem('shard-heist-driver'), true");
+      assert.deepEqual(errors, []);
+    });
+
     await t.test('phone: tilt steering is offered, hides the steering buttons sideways, and is refused upright', async () => {
       await load();
       // the choice is offered exactly when the browser reports a touch screen and a motion sensor (a mouse-only desktop is refused)

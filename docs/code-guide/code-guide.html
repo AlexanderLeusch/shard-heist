@@ -103,16 +103,16 @@ pre .c{ color:#7fd4e2; }
   <h2>The game at a glance</h2>
   <p><b>Shard Heist</b> is a 3D police-chase game that runs entirely in the browser as a static website: one page, one stylesheet and three scripts. The player picks a map (Lisbon's Baixa, Highway or Countryside) and a getaway vehicle (Car, Motorcycle or Truck), collects glowing star shards, escapes up to four police cars and a helicopter, and reaches a finish gate before the clock runs out. Five wanted stars make the chase harder over time. All three maps have hills that slow the player down or speed them up. Crashes cause visible damage; repair kits remove it; police can bust the player when they box the vehicle in. Seven radio stations play while driving, all synthesised by the game. The story mode <b>The Necklace Job</b> is an option in the same main menu (section 10).</p>
   <div class="kpis">
-    <div class="kpi"><b>7,277</b><span>lines of game code</span></div>
-    <div class="kpi"><b>6,662</b><span>lines of JavaScript</span></div>
-    <div class="kpi"><b>252</b><span>named functions</span></div>
+    <div class="kpi"><b>7,453</b><span>lines of game code</span></div>
+    <div class="kpi"><b>6,809</b><span>lines of JavaScript</span></div>
+    <div class="kpi"><b>265</b><span>named functions</span></div>
     <div class="kpi"><b>25</b><span>code sections</span></div>
-    <div class="kpi"><b>137</b><span>automated tests</span></div>
+    <div class="kpi"><b>143</b><span>automated tests</span></div>
     <div class="kpi"><b>0</b><span>npm dependencies</span></div>
     <div class="kpi"><b>0</b><span>image / sound files</span></div>
-    <div class="kpi"><b>504 KB</b><span>game code size</span></div>
+    <div class="kpi"><b>516 KB</b><span>game code size</span></div>
   </div>
-  <p class="mono" style="color:var(--muted)">Figures for room 2 (room-2-chase/: index.html, styles.css, js/). Room 1 is described in section 14. The test count covers both rooms: 118 unit and page tests and 19 browser tests. Tests add 1,826 lines.</p>
+  <p class="mono" style="color:var(--muted)">Figures for room 2 (room-2-chase/: index.html, styles.css, js/). Room 1 is described in section 14. The test count covers both rooms: 123 unit and page tests and 20 browser tests. Tests add 1,921 lines.</p>
   <h3>The three maps</h3>
   <table>
     <tr><th>Map</th><th>Layout</th><th>Goal</th><th class="num">Car top speed</th><th class="num">Police</th><th class="num">Time</th></tr>
@@ -140,8 +140,8 @@ pre .c{ color:#7fd4e2; }
   <h2>Languages in the code</h2>
   <p>The game contains <b>no Python at all</b>. A web browser can only run JavaScript natively, so all logic is JavaScript. The other languages describe appearance (CSS), page structure (HTML), GPU programs (GLSL) and vector graphics (SVG).</p>
   <div class="bars">
-    <div class="bar"><span>JavaScript</span><div class="track"><div class="fill" style="width:91.5%;background:#e0b100"></div></div><span class="val">91.5 %</span></div>
-    <div class="bar"><span>CSS</span><div class="track"><div class="fill" style="width:6.0%;background:#7a5cff"></div></div><span class="val">6.0 %</span></div>
+    <div class="bar"><span>JavaScript</span><div class="track"><div class="fill" style="width:91.4%;background:#e0b100"></div></div><span class="val">91.4 %</span></div>
+    <div class="bar"><span>CSS</span><div class="track"><div class="fill" style="width:6.3%;background:#7a5cff"></div></div><span class="val">6.3 %</span></div>
     <div class="bar"><span>HTML (incl. inline SVG)</span><div class="track"><div class="fill" style="width:1.9%;background:#e2603b"></div></div><span class="val">1.9 %</span></div>
     <div class="bar"><span>GLSL (shaders)</span><div class="track"><div class="fill" style="width:0.4%;background:#0e8aa0"></div></div><span class="val">0.4 %</span></div>
     <div class="bar"><span>SVG in JS strings</span><div class="track"><div class="fill" style="width:0.1%;background:#1f8a4c"></div></div><span class="val">0.1 %</span></div>
@@ -149,14 +149,14 @@ pre .c{ color:#7fd4e2; }
   </div>
   <table>
     <tr><th>Language</th><th class="num">Lines</th><th class="num">Share</th><th class="num">Characters</th><th class="num">Share</th><th>Role in the game</th></tr>
-    <tr><td>JavaScript</td><td class="num">6,662</td><td class="num">91.5 %</td><td class="num">458,313</td><td class="num">88.9 %</td><td>All logic: rules (core.js), worlds, vehicles, AI, physics, audio, HUD, menus, error screen</td></tr>
-    <tr><td>CSS</td><td class="num">440</td><td class="num">6.0 %</td><td class="num">37,867</td><td class="num">7.3 %</td><td>Look of the HUD, cockpit, menus, warnings, error screen</td></tr>
-    <tr><td>HTML</td><td class="num">140</td><td class="num">1.9 %</td><td class="num">10,674</td><td class="num">2.1 %</td><td>Page skeleton, HUD panels, gauge and icons (inline SVG), script order, security policy</td></tr>
+    <tr><td>JavaScript</td><td class="num">6,809</td><td class="num">91.4 %</td><td class="num">468,758</td><td class="num">88.7 %</td><td>All logic: rules (core.js), worlds, vehicles, AI, physics, audio, HUD, menus, error screen</td></tr>
+    <tr><td>CSS</td><td class="num">469</td><td class="num">6.3 %</td><td class="num">40,364</td><td class="num">7.6 %</td><td>Look of the HUD, cockpit, menus, warnings, error screen</td></tr>
+    <tr><td>HTML</td><td class="num">140</td><td class="num">1.9 %</td><td class="num">10,674</td><td class="num">2.0 %</td><td>Page skeleton, HUD panels, gauge and icons (inline SVG), script order, security policy</td></tr>
     <tr><td>GLSL</td><td class="num">29</td><td class="num">0.4 %</td><td class="num">2,600</td><td class="num">0.5 %</td><td>Sky gradient, force field and the damage dents (run on the GPU)</td></tr>
     <tr><td>SVG in JS strings</td><td class="num">6</td><td class="num">0.1 %</td><td class="num">6,203</td><td class="num">1.2 %</td><td>Map pictures and fallback vehicle icons in the start menu</td></tr>
     <tr><td><b>Python</b></td><td class="num"><b>0</b></td><td class="num"><b>0 %</b></td><td class="num"><b>0</b></td><td class="num"><b>0 %</b></td><td>Not used</td></tr>
   </table>
-  <p class="mono" style="color:var(--muted)">Game code: 7,277 lines, 515,657 characters. The tests (1,826 lines), the dev server and SRI checker are JavaScript too; the CI pipeline is YAML. About 700 of the JavaScript lines are comments, including the “###” explanations.</p>
+  <p class="mono" style="color:var(--muted)">Game code: 7,453 lines, 528,599 characters. The tests (1,921 lines), the dev server and SRI checker are JavaScript too; the CI pipeline is YAML. About 730 of the JavaScript lines are comments, including the “###” explanations.</p>
   <h3>External code that is loaded, not written</h3>
   <table>
     <tr><th>Library</th><th>Language</th><th>Purpose</th></tr>
@@ -285,12 +285,13 @@ composer.render()  or  renderer.render(scene, camera)               <span class=
     <tr><td class="num">3,815</td><td>Sound</td><td>Plays the engine model, rotor, road, wind and tyres, siren; the radio</td><td><code>setEngineVoice</code>, <code>updateEngine</code>, <code>radioNote</code>, <code>updateRadio</code></td></tr>
     <tr><td class="num">4,109</td><td>Map boundary</td><td>Force-field wall, edge distance, HUD warning</td><td><code>buildBoundary</code>, <code>boundaryDistance</code>, <code>updateBoundary</code></td></tr>
     <tr><td class="num">4,190</td><td>Input</td><td>Keyboard, touch pads, tilt steering on phones, audio suspend, error-screen and lost-graphics hooks</td><td><code>keys</code></td></tr>
-    <tr><td class="num">4,273</td><td>HUD</td><td>Gauges, pedals, pursuit, radar</td><td><code>updateHud</code>, <code>drawRadar</code>, <code>initGauge</code></td></tr>
-    <tr><td class="num">4,563</td><td>Game state</td><td>Runs, events, result cards, showroom menu and its previews, validated clicks</td><td><code>startRun</code>, <code>finish</code>, <code>showMenu</code>, <code>renderPreviews</code></td></tr>
-    <tr><td class="num">5,185</td><td>Physics</td><td>Driving model with slopes, collisions, cameras</td><td><code>updateCar</code>, <code>chaseCam</code>, <code>camClip</code></td></tr>
-    <tr><td class="num">5,468</td><td>Graphics quality</td><td>Ultra / Balanced, bloom composer</td><td><code>applyGfx</code>, <code>buildComposer</code></td></tr>
-    <tr><td class="num">5,508</td><td>Story mode</td><td>Three acts, radio timeline, letter, courier lorry, endings</td><td><code>startStoryAct</code>, <code>updateStory</code>, <code>showEnding</code>, <code>warmUp</code></td></tr>
-    <tr><td class="num">5,838</td><td>Loop</td><td>Resize handling and the frame loop</td><td><code>frame</code>, <code>resize</code></td></tr>
+    <tr><td class="num">4,278</td><td>HUD</td><td>Gauges, pedals, pursuit, radar</td><td><code>updateHud</code>, <code>drawRadar</code>, <code>initGauge</code></td></tr>
+    <tr><td class="num">4,568</td><td>Game state</td><td>Runs, events, result cards, showroom menu and its previews, validated clicks</td><td><code>startRun</code>, <code>finish</code>, <code>showMenu</code>, <code>renderPreviews</code></td></tr>
+    <tr><td class="num">4,577</td><td>Drivers &amp; leaderboard</td><td>Driver names from the menu, the leaderboard of each map on the end screen, the name field when nobody is signed in</td><td><code>setDriver</code>, <code>recordPending</code>, <code>boardSection</code>, <code>driverSection</code></td></tr>
+    <tr><td class="num">5,260</td><td>Physics</td><td>Driving model with slopes, collisions, cameras</td><td><code>updateCar</code>, <code>chaseCam</code>, <code>camClip</code></td></tr>
+    <tr><td class="num">5,543</td><td>Graphics quality</td><td>Ultra / Balanced, bloom composer</td><td><code>applyGfx</code>, <code>buildComposer</code></td></tr>
+    <tr><td class="num">5,583</td><td>Story mode</td><td>Three acts, radio timeline, letter, courier lorry, endings</td><td><code>startStoryAct</code>, <code>updateStory</code>, <code>showEnding</code>, <code>warmUp</code></td></tr>
+    <tr><td class="num">5,913</td><td>Loop</td><td>Resize handling and the frame loop</td><td><code>frame</code>, <code>resize</code></td></tr>
   </table>
   <h3>room-2-chase/js/core.js: the rules</h3>
   <table>
@@ -304,6 +305,7 @@ composer.render()  or  renderer.render(scene, camera)               <span class=
     <tr><td>Sound</td><td><code>ENGINES</code>, <code>gearFor</code>, <code>engineTarget</code>, <code>isBraking</code>, <code>engineLoop</code>, <code>engineLoops</code>, <code>rotorLoop</code></td></tr>
     <tr><td>Radio</td><td><code>RADIO</code>, <code>parseRadio</code>, <code>radioNext</code>, <code>radioBar</code></td></tr>
     <tr><td>Scoring</td><td><code>driveTime</code>, <code>runStars</code>, <code>isNewBest</code>, <code>fmtTime</code>, <code>fmtTimeExact</code></td></tr>
+    <tr><td>Drivers &amp; leaderboard</td><td><code>cleanName</code>, <code>sameName</code>, <code>parseBoard</code>, <code>addDriver</code>, <code>recordRun</code>, <code>boardRows</code></td></tr>
     <tr><td>Story</td><td><code>newStory</code>, <code>beginAct</code>, <code>retryAct</code>, <code>finishOpen</code>, <code>storyEnding</code>, <code>dueRadio</code></td></tr>
   </table>
 </section>
@@ -515,7 +517,7 @@ damage += max(0, (impact − 4) · 1.0 · VEH.dmg)              <span class="c">
     <li><b>Performance</b>: Ultra (bloom, 4096² shadows, 2048² facades) needs a decent GPU; phones default to Balanced. The hills and detailed models added triangles; this has only been measured in software rendering, not on a real phone.</li>
     <li><b>AI</b>: traffic never changes lanes and keeps its speed on hills; city police can take detours when the grid route is blocked; police ignore traffic lights.</li>
     <li><b>Physics</b>: no real tyre grip or mass transfer; collisions use circles.</li>
-    <li><b>Structure</b>: game.js is one closure of about 5,900 lines whose sections share variables.</li>
+    <li><b>Structure</b>: game.js is one closure of about 6,000 lines whose sections share variables.</li>
     <li><b>Testing</b>: the rules and the main browser workflows are tested; long sessions, every map end to end and sound quality are not. CI renders in software.</li>
     <li><b>Persistence</b>: best times live in one browser and can be edited by the player.</li>
   </ul>
@@ -557,10 +559,10 @@ damage += max(0, (impact − 4) · 1.0 · VEH.dmg)              <span class="c">
     <tr><th>File</th><th class="num">Tests</th><th>Accepted</th><th>Rejected and edge cases</th></tr>
     <tr><td><code>room-2/rules.test.js</code></td><td class="num">47</td><td>Top speeds, 0–80 times, stat bars, collisions, damage, stars, best times; wanted stars, helicopter timing, searchlight; hills and slopes; gearbox, engine, idle and rotor loops; brake lights; damage stages; radio bars by genre</td><td>Gas and brake together, 0 s and 3 s frames, negative frame time, NaN impact, damage outside 0–100, coasting to exactly 0, a stopped vehicle on a hill, unknown stations such as <code>constructor</code></td></tr>
     <tr><td><code>room-2/story.test.js</code></td><td class="num">8</td><td>Three acts in order, Ending A with the letter, Ending B without</td><td>Acts outside 1–3, toll without the clasp, letter found in a failed attempt, radio lines repeating</td></tr>
-    <tr><td><code>room-2/input.test.js</code></td><td class="num">9</td><td>Every menu action in its states, valid picks, valid saved data</td><td>Actions while driving, story actions without a story, unknown actions, picks like <code>constructor</code> or <code>__proto__</code>, tampered storage, implausible best times</td></tr>
+    <tr><td><code>room-2/input.test.js</code></td><td class="num">14</td><td>Every menu action in its states, valid picks, valid saved data</td><td>Actions while driving, story actions without a story, unknown actions, picks like <code>constructor</code> or <code>__proto__</code>, tampered storage, implausible best times</td></tr>
     <tr><td><code>project/page.test.js</code></td><td class="num">37</td><td>Element ids, button actions, script order, dev server serves files; the same page checks for room 1</td><td>Unpinned or unhashed libraries, inline scripts, secrets in any file, <code>.git</code> requests, path traversal, wrong HTTP methods, one room loading the other’s files</td></tr>
     <tr><td><code>room-1/rules.test.js</code></td><td class="num">17</td><td>Both endings, the grace minute, clues, lock, saved games</td><td>Actions before the briefing or after an ending, no exit, items twice, car key before the tile is off, door without mop, wheels that do not exist, clock below zero, tampered saves</td></tr>
-    <tr><td><code>browser/browser.test.js</code></td><td class="num">19</td><td>Room 2: menu with previews, radio choice, vehicle choice, a run, pause, story act 1. Room 1: briefing, save and continue after reload, Ending A</td><td>Card buttons while driving, tampered saved data, blocked library, no WebGL; the car key before the tile is off, a wrong code</td></tr>
+    <tr><td><code>browser/browser.test.js</code></td><td class="num">20</td><td>Room 2: menu with previews, radio choice, vehicle choice, a run, pause, story act 1. Room 1: briefing, save and continue after reload, Ending A</td><td>Card buttons while driving, tampered saved data, blocked library, no WebGL; the car key before the tile is off, a wrong code</td></tr>
   </table>
   <div class="note gold"><b>Bugs the tests found (fixed):</b> saved data such as <code>{"mode":"constructor"}</code> passed the old check, because every JavaScript object inherits <code>constructor</code>; the next load would have crashed. And the throttle let the car run about 5 km/h above the top speed shown in the menu; it now stops at the limit.</div>
   <h3>Security</h3>
