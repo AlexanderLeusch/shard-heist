@@ -32,14 +32,20 @@ const canvas = $('room');
 let renderer;
 try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }); }
 catch (e){ ShardFatal('3D graphics are not available', 'This game needs WebGL. Turn on hardware acceleration in your browser settings, update your graphics driver or try another browser.'); return; }
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, COARSE ? 1.5 : 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, COARSE ? 1.5 : 2));   // lowered by adaptResolution() when frames run slow
 renderer.setSize(innerWidth, innerHeight, false);
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-const ANISO = renderer.capabilities.getMaxAnisotropy();
+// ### Nothing in the room moves most of the time, so the shadow maps are only redrawn for the frames in which something
+// ### does (the mop, the tile, the hatch lid, the door and Hale in the briefing). shadowsMoved() asks for that.
+renderer.shadowMap.autoUpdate = false;
+let shadowFrames = 2;
+const shadowsMoved = () => { shadowFrames = 2; };
+// sharp textures at grazing angles, but no more than 8 samples: beyond that the cost rises and the picture barely changes
+const ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x050607);
 scene.fog = new THREE.FogExp2(0x0b0e0e, 0.03);
@@ -184,19 +190,100 @@ function drawDigit(t, d){
   g.fillStyle = '#e9ece6'; g.font = '700 46px Consolas, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(String(d), 32, 35);
   t.needsUpdate = true;
 }
+// ### The relief of the tiles: one height map (the grout lies lower, the glaze has a rounded edge) and one gloss map (the
+// ### glaze is smooth, the grout matt), painted once and shared by every tiled surface.
+const tileRelief = (() => {
+  const S2 = 512, n = 8, s = S2 / n, gw = s * .037;
+  const bump = document.createElement('canvas'), gloss = document.createElement('canvas');
+  bump.width = bump.height = gloss.width = gloss.height = S2;
+  const b = bump.getContext('2d'), r = gloss.getContext('2d');
+  b.fillStyle = '#000'; b.fillRect(0, 0, S2, S2); r.fillStyle = '#ececec'; r.fillRect(0, 0, S2, S2);
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++){
+    for (let k = 0; k < 4; k++){ const v = 110 + k * 45, o = gw + k * 1.2; b.fillStyle = `rgb(${v},${v},${v})`; b.fillRect(i * s + o, j * s + o, s - o * 2, s - o * 2); }
+    const v = 46 + rnd() * 30 | 0; r.fillStyle = `rgb(${v},${v},${v})`; r.fillRect(i * s + gw, j * s + gw, s - gw * 2, s - gw * 2);
+  }
+  // dull patches where years of cleaning have worn the glaze
+  for (let i = 0; i < 40; i++){ const x = rnd() * S2, y = rnd() * S2, rr = 10 + rnd() * 40, g = r.createRadialGradient(x, y, 0, x, y, rr); g.addColorStop(0, 'rgba(170,170,170,.35)'); g.addColorStop(1, 'rgba(170,170,170,0)'); r.fillStyle = g; r.fillRect(x - rr, y - rr, rr * 2, rr * 2); }
+  return { bump, gloss };
+})();
+// ### A tiled material: colour, relief and gloss share the same repeat, so the grout lines meet exactly.
+function tileMat(repeatX, repeatY = 1.5){
+  const map = tileTex(repeatX), mk = img => { const t = new THREE.CanvasTexture(img); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = Math.min(ANISO, 2); t.repeat.set(repeatX, repeatY); return t; };
+  map.repeat.set(repeatX, repeatY);
+  return new THREE.MeshStandardMaterial({ map, bumpMap: mk(tileRelief.bump), bumpScale: .012, roughnessMap: mk(tileRelief.gloss), roughness: 1, metalness: 0 });
+}
+// ### Brushed stainless steel: fine streaks in one direction change how glossy the metal is, so highlights stretch along them.
+const brushedTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#8c8c8c'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 2600; i++){ const v = rnd() < .5 ? 255 : 0; g.fillStyle = `rgba(${v},${v},${v},${.03 + rnd() * .06})`; g.fillRect(rnd() * w - 40, rnd() * h, 30 + rnd() * 160, 1); }
+  for (let i = 0; i < 18; i++){ g.strokeStyle = `rgba(255,255,255,${.12 + rnd() * .15})`; g.lineWidth = .8; g.beginPath(); const x = rnd() * w, y = rnd() * h; g.moveTo(x, y); g.lineTo(x + (rnd() - .5) * 90, y + (rnd() - .5) * 90); g.stroke(); }
+  grime(g, w, h, 10, 'rgba(255,255,255,.12)', 50, false);
+}, [1, 1]);
+// ### Powder-coated stall partitions: a slightly mottled finish, scuffs, scratched tally marks and dirt rising from the floor.
+const partitionTex = canvasTex(512, 512, (g, w, h) => {
+  g.fillStyle = '#6f7c75'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 5000; i++){ const v = rnd() < .5 ? 255 : 0; g.fillStyle = `rgba(${v},${v},${v},${rnd() * .05})`; g.fillRect(rnd() * w, rnd() * h, 2, 2); }
+  grime(g, w, h, 30, 'rgba(50,44,30,.22)', w * .12, true);
+  g.strokeStyle = 'rgba(205,210,200,.35)'; g.lineWidth = 1;
+  for (let i = 0; i < 26; i++){ const x = rnd() * w, y = rnd() * h; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (rnd() - .5) * 70, y + (rnd() - .5) * 18); g.stroke(); }
+  g.fillStyle = 'rgba(30,30,28,.3)'; for (let i = 0; i < 12; i++){ g.beginPath(); g.arc(rnd() * w, rnd() * h, 1 + rnd() * 3, 0, 7); g.fill(); }
+});
+// ### The ceiling: painted concrete with the joints of the slabs and brown water stains around the old leaks.
+const ceilingTex = canvasTex(TEX / 2, TEX / 2, (g, w, h) => {
+  g.fillStyle = '#4a4f4c'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 6000; i++){ const v = rnd(); g.fillStyle = v > .5 ? `rgba(255,255,255,${(v - .5) * .08})` : `rgba(0,0,0,${v * .12})`; g.fillRect(rnd() * w, rnd() * h, 2, 2); }
+  for (let k = 0; k < 5; k++){ const x = rnd() * w, y = rnd() * h, r = 20 + rnd() * 70;
+    for (let j = 0; j < 3; j++){ g.strokeStyle = `rgba(110,80,40,${.25 - j * .06})`; g.lineWidth = 2; g.beginPath(); g.ellipse(x, y, r * (1 - j * .2), r * (.7 - j * .12), rnd(), 0, 7); g.stroke(); }
+    const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(90,70,40,.25)'); gr.addColorStop(1, 'rgba(90,70,40,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
+  g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+}, [2, 1.5]);
+// ### Soft shadows where surfaces meet (ambient occlusion), painted as gradients rather than computed every frame.
+const aoTex = canvasTex(8, 128, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, 'rgba(0,0,0,.62)'); gr.addColorStop(.35, 'rgba(0,0,0,.22)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+const blobTex = canvasTex(128, 128, (g, w, h) => { const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(0,0,0,.7)'); gr.addColorStop(.55, 'rgba(0,0,0,.3)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+// ### Dirt on the floor: rings of limescale and grime around the toilet and the drain, stains and drips.
+const stainTex = canvasTex(256, 256, (g, w, h) => {
+  for (let i = 0; i < 26; i++){ const x = w / 2 + (rnd() - .5) * w * .5, y = h / 2 + (rnd() - .5) * h * .5, r = 10 + rnd() * 50, gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(${60 + rnd() * 40 | 0},${50 + rnd() * 30 | 0},30,.3)`); gr.addColorStop(1, 'rgba(60,50,30,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
+  g.strokeStyle = 'rgba(200,195,170,.25)'; g.lineWidth = 3; g.beginPath(); g.ellipse(w / 2, h / 2, w * .36, h * .3, 0, 0, 7); g.stroke();
+});
+const puddleTex = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#fff'; g.beginPath();
+  for (let a = 0; a <= 64; a++){ const t = a / 64 * Math.PI * 2, r = w * (.34 + .08 * Math.sin(t * 3 + 1) + .05 * Math.sin(t * 7)); g.lineTo(w / 2 + Math.cos(t) * r, h / 2 + Math.sin(t) * r * .7); }
+  g.fill();
+});
+// ### Grilles: slots for the air vent, small holes for the intercom speaker.
+const grilleTex = canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#9aa2a4'; g.fillRect(0, 0, w, h); g.fillStyle = '#121414'; for (let y = 10; y < h - 8; y += 12) g.fillRect(8, y, w - 16, 6); });
+const speakerTex = canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#a4abad'; g.fillRect(0, 0, w, h); g.fillStyle = '#181a1a'; for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) if (Math.hypot(x - 3, y - 3) < 3.4){ g.beginPath(); g.arc(22 + x * 14, 22 + y * 14, 3.5, 0, 7); g.fill(); } });
+
+// soft gradients and small parts need no extra texture samples at grazing angles; the ceiling and steel need only a few
+for (const t of [aoTex, blobTex, stainTex, puddleTex, grilleTex, speakerTex]) t.anisotropy = 1;
+brushedTex.anisotropy = 2; ceilingTex.anisotropy = partitionTex.anisotropy = 4;
 
 // ---------- Materials ----------
 // ### The surfaces of the cell: painted canvas textures for walls, floor and metal, so the room loads no image files.
 const M = {
-  tiles: w => new THREE.MeshStandardMaterial({ map: tileTex(w / 1.2), roughness: .32, metalness: 0 }),
+  tiles: w => tileMat(w / 1.2),
   paint: new THREE.MeshStandardMaterial({ map: paintTex, roughness: .9 }),
   floor: new THREE.MeshStandardMaterial({ map: concreteTex, roughness: .78 }),
-  ceiling: new THREE.MeshStandardMaterial({ color: 0x3a3e3c, roughness: .95 }),
-  steel: new THREE.MeshStandardMaterial({ color: 0xbcc4c8, metalness: .88, roughness: .3 }),
-  dullSteel: new THREE.MeshStandardMaterial({ color: 0x8f989c, metalness: .7, roughness: .5 }),
+  ceiling: new THREE.MeshStandardMaterial({ map: ceilingTex, roughness: .95 }),
+  steel: new THREE.MeshStandardMaterial({ color: 0xbcc4c8, metalness: .9, roughness: .55, roughnessMap: brushedTex }),
+  dullSteel: new THREE.MeshStandardMaterial({ color: 0x8f989c, metalness: .7, roughness: .85, roughnessMap: brushedTex }),
+  // the toilet: polished stainless steel, seen from both sides inside the bowl and the basin
+  bowl: new THREE.MeshStandardMaterial({ color: 0xc4cbce, metalness: .92, roughness: .42, roughnessMap: brushedTex, side: THREE.DoubleSide }),
+  water: new THREE.MeshStandardMaterial({ color: 0x5d6b5e, metalness: .1, roughness: .04, transparent: true, opacity: .88 }),
+  chrome: new THREE.MeshStandardMaterial({ color: 0xe8ecee, metalness: 1, roughness: .12 }),
+  cove: new THREE.MeshStandardMaterial({ color: 0x3d4440, roughness: .35 }),
+  grille: new THREE.MeshStandardMaterial({ map: grilleTex, metalness: .5, roughness: .6 }),
+  speaker: new THREE.MeshStandardMaterial({ map: speakerTex, metalness: .6, roughness: .5 }),
+  plastic: new THREE.MeshStandardMaterial({ color: 0xd9dad3, roughness: .45 }),
+  red: new THREE.MeshStandardMaterial({ color: 0xa8251c, roughness: .4 }),
+  led: new THREE.MeshStandardMaterial({ color: 0x220000, emissive: 0xff2a1a, emissiveIntensity: 3 }),
+  ao: new THREE.MeshBasicMaterial({ map: aoTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
+  blob: new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
+  stain: new THREE.MeshStandardMaterial({ map: stainTex, transparent: true, depthWrite: false, roughness: .9, polygonOffset: true, polygonOffsetFactor: -3 }),
+  puddle: new THREE.MeshStandardMaterial({ color: 0x1d2220, alphaMap: puddleTex, transparent: true, opacity: .38, roughness: .03, metalness: .3, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }),
   mirror: new THREE.MeshStandardMaterial({ color: 0xdfe4e6, metalness: 1, roughness: .12 }),
   door: new THREE.MeshStandardMaterial({ color: 0x3e4b54, metalness: .55, roughness: .55 }),
-  partition: new THREE.MeshStandardMaterial({ color: 0x6d7a73, metalness: .4, roughness: .55 }),
+  partition: new THREE.MeshStandardMaterial({ map: partitionTex, metalness: .35, roughness: .5 }),
   plate: new THREE.MeshStandardMaterial({ map: plateTex, metalness: .75, roughness: .4 }),
   dark: new THREE.MeshStandardMaterial({ color: 0x0c0d0e, roughness: 1 }),
   pipe: new THREE.MeshStandardMaterial({ color: 0x59605c, metalness: .6, roughness: .45 }),
@@ -222,6 +309,16 @@ const add = (mesh, parent = room) => { mesh.castShadow = mesh.receiveShadow = tr
 const box = (w, h, d, mat, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); return add(m); };
 const cyl = (rt, rb, h, mat, x, y, z, seg = 20) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, seg), mat); m.position.set(x, y, z); return add(m); };
 const plane = (w, h, mat, x, y, z, ry = 0, rx = 0) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat); m.position.set(x, y, z); m.rotation.set(rx, ry, 0); m.receiveShadow = true; room.add(m); return m; };
+// ### Decals that lie flat on the floor: soft shadows, stains and puddles.
+const flat = (w, d, mat, x, z, y = .003) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat); m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); room.add(m); return m; };
+// ### A soft shadow along the line where two surfaces meet: dark at the edge (pos), fading towards fade, facing normal.
+const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
+function aoEdge(len, w, pos, fade, normal){
+  const g = new THREE.PlaneGeometry(len, w); g.translate(0, -w / 2, 0);
+  const y = fade.clone().negate(), x = new THREE.Vector3().crossVectors(y, normal);
+  g.applyMatrix4(new THREE.Matrix4().makeBasis(x, y, normal).setPosition(pos));
+  room.add(new THREE.Mesh(g, M.ao));
+}
 const HOT = {};   // hotspot key -> meshes that can be clicked
 // ### Registers a clickable object (a hotspot) for the marker and the rules.
 const hot = (key, ...meshes) => { (HOT[key] = HOT[key] || []).push(...meshes); meshes.forEach(m => { if (m.material !== M.steam) m.material = m.material.clone(); m.userData.hot = key; }); };
@@ -260,11 +357,11 @@ for (const x of [-3, -1, 1, 3]) box(.06, .12, .1, M.dullSteel, x, 2.78, -2.9);
 const hemi = new THREE.HemisphereLight(0xa9b8b0, 0x1a1c1b, .32); room.add(hemi);
 const mainLight = new THREE.SpotLight(0xe4f2e9, 3.2, 14, 1.3, .65, 1.6);
 mainLight.position.set(-.6, 2.86, .3); mainLight.target.position.set(-.6, 0, .3);
-mainLight.castShadow = true; mainLight.shadow.mapSize.set(COARSE ? 512 : 1024, COARSE ? 512 : 1024); mainLight.shadow.bias = -.0005; mainLight.shadow.radius = 4;
+mainLight.castShadow = true; mainLight.shadow.mapSize.set(COARSE ? 1024 : 2048, COARSE ? 1024 : 2048); mainLight.shadow.bias = -.0005; mainLight.shadow.radius = 4;
 room.add(mainLight, mainLight.target);
 const stallLight = new THREE.SpotLight(0xffe6c4, 2.1, 7, .95, .7, 1.8);
 stallLight.position.set(2.75, 2.86, -1.8); stallLight.target.position.set(2.75, 0, -1.9);
-stallLight.castShadow = !COARSE; stallLight.shadow.mapSize.set(512, 512); stallLight.shadow.bias = -.0008;
+stallLight.castShadow = true; stallLight.shadow.mapSize.set(COARSE ? 512 : 1024, COARSE ? 512 : 1024); stallLight.shadow.bias = -.0008; stallLight.shadow.radius = 3;
 room.add(stallLight, stallLight.target);
 const windowLight = new THREE.SpotLight(0x9cc4ff, .9, 8, .5, .8, 1.5);
 windowLight.position.set(0, 1.7, 3.3); windowLight.target.position.set(0, .6, 0); room.add(windowLight, windowLight.target);
@@ -412,19 +509,77 @@ box(.04, 1.9, 2.3, M.partition, SX0, 1.1, -1.85);
 box(.3, 1.9, .04, M.partition, SX0 + .15, 1.1, SZ1); box(.3, 1.9, .04, M.partition, 3.85, 1.1, SZ1);
 box(2.54, .06, .06, M.dullSteel, 2.75, 2.06, SZ1);
 for (const z of [-2.9, SZ1 + .05]) box(.06, .14, .06, M.dullSteel, SX0, .07, z);
-box(.62, .78, .24, M.steel, 3.25, .39, -2.86);
-box(.5, .36, .5, M.steel, 3.25, .18, -2.55);
-const bowl = cyl(.24, .2, .1, M.steel, 3.25, .41, -2.5, 24); bowl.scale.z = 1.2;
-cyl(.18, .18, .006, M.dark, 3.25, .462, -2.5, 24).scale.z = 1.2;
-box(.08, .06, .04, M.dullSteel, 3.25, .86, -2.75);
-const roll = cyl(.055, .055, .1, M.paper, 3.75, .7, -2.0, 14); roll.rotation.z = Math.PI / 2;
+// steel edge caps on the partitions and wall brackets that hold them
+box(.055, 1.9, .012, M.dullSteel, SX0, 1.1, SZ1 - .01); box(.012, 1.9, .05, M.dullSteel, SX0 + .3, 1.1, SZ1); box(.012, 1.9, .05, M.dullSteel, 3.7, 1.1, SZ1);
+for (const y of [.4, 1.1, 1.8]) box(.09, .05, .03, M.dullSteel, SX0, y, -2.985);
+for (const x of [SX0 + .15, 3.85]) box(.32, .12, .07, M.steel, x, .06, SZ1);   // pilaster shoes
+// the stall door stands open against the east wall: hinges, a slide latch and a coat hook
+{
+  const pivot = new THREE.Group(); pivot.position.set(3.7, 0, SZ1 + .025); pivot.rotation.y = 1.72; room.add(pivot);
+  const put = m => { m.castShadow = m.receiveShadow = true; pivot.add(m); return m; };
+  const bx = (w, h, d, mat, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); return put(m); };
+  bx(.86, 1.62, .03, M.partition, -.45, 1.04, 0);
+  bx(.86, .012, .036, M.dullSteel, -.45, 1.85, 0); bx(.86, .012, .036, M.dullSteel, -.45, .23, 0); bx(.012, 1.62, .036, M.dullSteel, -.88, 1.04, 0);
+  for (const y of [.42, 1.04, 1.66]){ const h = new THREE.Mesh(new THREE.CylinderGeometry(.011, .011, .12, 10), M.steel); h.position.set(-.005, y, .02); put(h); }
+  bx(.1, .035, .02, M.steel, -.8, 1.12, .028); bx(.025, .02, .03, M.steel, -.77, 1.12, .045);
+  bx(.03, .06, .015, M.steel, -.45, 1.62, -.024); const hook = new THREE.Mesh(new THREE.TorusGeometry(.022, .006, 6, 12, Math.PI), M.steel); hook.position.set(-.45, 1.58, -.045); hook.rotation.set(0, Math.PI / 2, Math.PI); put(hook);
+}
+box(.035, .06, .02, M.steel, SX0 + .3, 1.12, SZ1 + .03);   // the latch keeper on the other pilaster
+
+// ### The toilet: a one-piece stainless-steel prison unit bolted to the back wall. A rounded cabinet with a small wash basin,
+// ### a drinking spout and push buttons on top; a deep bowl with a rolled rim and water in it, no seat, security screws.
+const TOILET = { x: 3.25, z: -2.82, top: .958 }, BOWL_Z = -2.418, BOWL_SZ = 1.22;
+{
+  const T = TOILET;
+  const rounded = (s, x0, y0, x1, y1, r) => { s.moveTo(x0 + r, y0); s.lineTo(x1 - r, y0); s.quadraticCurveTo(x1, y0, x1, y0 + r); s.lineTo(x1, y1 - r); s.quadraticCurveTo(x1, y1, x1 - r, y1); s.lineTo(x0 + r, y1); s.quadraticCurveTo(x0, y1, x0, y1 - r); s.lineTo(x0, y0 + r); s.quadraticCurveTo(x0, y0, x0 + r, y0); };
+  const mesh = (geo, mat) => add(new THREE.Mesh(geo, mat));
+  // the cabinet, extruded upwards from its rounded footprint, with an oval opening for the basin (shape y becomes -z)
+  const cs = new THREE.Shape(); rounded(cs, -.3, -.16, .3, .16, .05);
+  const hole = new THREE.Path(); hole.absellipse(0, .01, .155, .112, 0, Math.PI * 2, true); cs.holes.push(hole);
+  const cg = new THREE.ExtrudeGeometry(cs, { depth: .93, bevelEnabled: true, bevelThickness: .014, bevelSize: .014, bevelSegments: 3, curveSegments: 18 });
+  cg.rotateX(-Math.PI / 2); cg.translate(T.x, .014, T.z); mesh(cg, M.steel);
+  // the basin set into the top, its drain and the drinking spout behind it
+  const lathe = (pts, seg, sx, sz, x, z) => { const g = new THREE.LatheGeometry(pts.map(([r, y]) => new THREE.Vector2(r, y)), seg); g.scale(sx, 1, sz); g.translate(x, 0, z); return mesh(g, M.bowl); };
+  lathe([[.0, .9], [.055, .905], [.08, .93], [.092, .955], [.1, .966], [.11, .964], [.112, .958]], 32, 1.42, 1, T.x, T.z - .01);
+  cyl(.018, .018, .003, M.dark, T.x, .902, T.z - .01, 16);
+  cyl(.014, .016, .035, M.chrome, T.x, T.top + .017, T.z - .135, 14);
+  const spout = cyl(.008, .008, .05, M.chrome, T.x, T.top + .038, T.z - .115, 10); spout.rotation.x = Math.PI / 2 - .5;
+  // push buttons: basin and spout on the top, flush on the front
+  for (const dx of [-.22, .22]){ cyl(.024, .024, .008, M.dullSteel, T.x + dx, T.top + .004, T.z + .12, 18); cyl(.016, .016, .012, M.chrome, T.x + dx, T.top + .012, T.z + .12, 18); }
+  const fz = T.z + .174; for (const [r, d, mat] of [[.034, .008, M.dullSteel], [.024, .02, M.chrome]]){ const b = cyl(r, r, d, mat, T.x + .19, .82, fz + d / 2, 20); b.rotation.x = Math.PI / 2; }
+  // the seams of the access panel on the front and its security screws
+  for (const [w, h, x, y] of [[.44, .006, 0, .9], [.44, .006, 0, .47], [.006, .43, -.22, .685], [.006, .43, .22, .685]]) box(w, h, .003, M.dark, T.x + x, y, fz + .001);
+  for (const x of [-.25, .25]) for (const y of [.08, .9]){ const s = cyl(.009, .009, .006, M.chrome, T.x + x, y, fz + .003, 6); s.rotation.x = Math.PI / 2; }
+  // the bowl and its pedestal in one turned piece: foot, waist, flaring sides, rolled rim, then down into the trap
+  lathe([[.175, 0], [.186, .012], [.186, .034], [.165, .06], [.158, .13], [.172, .22], [.2, .31], [.218, .37], [.228, .404], [.226, .424], [.212, .432], [.197, .426], [.19, .41],
+    [.184, .38], [.16, .32], [.12, .27], [.072, .236], [.0, .226]], 44, 1, BOWL_SZ, T.x, BOWL_Z);
+  box(.26, .24, .22, M.steel, T.x, .12, T.z + .28);   // the apron that joins bowl and cabinet
+  const water = new THREE.Mesh(new THREE.CircleGeometry(.137, 40), M.water); water.rotation.x = -Math.PI / 2; water.scale.y = BOWL_SZ; water.position.set(T.x, .29, BOWL_Z); water.receiveShadow = true; room.add(water);
+  cyl(.045, .045, .002, M.dark, T.x, .238, BOWL_Z - .03, 16);
+  for (const dx of [-.215, .215]) cyl(.014, .014, .012, M.chrome, T.x + dx, .006, BOWL_Z + .03, 6);   // floor bolts
+  // the cold-water supply: a stop valve on the wall and a chrome pipe into the side of the cabinet
+  cyl(.012, .012, .24, M.chrome, T.x + .43, .24, -2.95, 10).rotation.z = Math.PI / 2;
+  cyl(.03, .03, .07, M.dullSteel, T.x + .55, .24, -2.95, 12).rotation.x = Math.PI / 2;
+  const wheel = new THREE.Mesh(new THREE.TorusGeometry(.03, .006, 6, 16), M.red); wheel.position.set(T.x + .55, .24, -2.9); add(wheel);
+  // limescale and dirt on the floor round the foot, and the soft shadow under the unit
+  flat(.75, .95, M.blob, T.x, -2.55, .002); flat(.62, .62, M.stain, T.x, BOWL_Z, .004);
+  flat(.5, .34, M.puddle, T.x - .25, -1.98, .005);
+}
+// ### The toilet roll on a steel holder screwed to the east wall, with a strip of paper hanging down.
+{
+  box(.012, .1, .2, M.steel, 3.994, .74, -2.0);
+  for (const dz of [-.07, .07]) box(.07, .02, .012, M.steel, 3.955, .72, -2.0 + dz);
+  const roll = cyl(.055, .055, .11, M.paper, 3.915, .72, -2.0, 18); roll.rotation.x = Math.PI / 2;
+  const core = cyl(.021, .021, .112, new THREE.MeshStandardMaterial({ color: 0x8a6a45, roughness: .9 }), 3.915, .72, -2.0, 10); core.rotation.x = Math.PI / 2;
+  const tail = plane(.105, .16, M.paper, 3.861, .64, -2.0, -Math.PI / 2); tail.rotation.z = .03;
+}
 const graffiti = plane(1.05, .66, M.graffiti, SX0 + .025, 1.32, -1.9, Math.PI / 2);
 hot('read:graffiti', graffiti);
 // The crooked tile, the dark hole behind it and the car key hidden there
 const TILE_POS = new THREE.Vector3(2.62, .58, -2.988);
 plane(.15, .15, M.dark, TILE_POS.x, TILE_POS.y, -2.996);
-const tile = box(.15, .15, .018, new THREE.MeshStandardMaterial({ map: tileTex(1), roughness: .3 }), TILE_POS.x, TILE_POS.y, TILE_POS.z);
-tile.material.map.repeat.set(1 / 8, 1 / 8); tile.rotation.z = .07;
+const tile = box(.15, .15, .018, tileMat(1 / 8, 1 / 8), TILE_POS.x, TILE_POS.y, TILE_POS.z);
+tile.rotation.z = .07;
 // the car key: a brass blade, a black plastic head and a worn leather fob, lying in the hollow
 const carKey = new THREE.Group();
 const keyHead = new THREE.Mesh(new THREE.BoxGeometry(.03, .022, .008), new THREE.MeshStandardMaterial({ color: 0x1b1c1e, roughness: .5 }));
@@ -450,6 +605,55 @@ shaft.position.set(HATCH.x, -2.01, HATCH.z); room.add(shaft);
 for (let y = -.3; y > -3.9; y -= .3){ const r = new THREE.Mesh(new THREE.CylinderGeometry(.012, .012, .42, 8), M.dullSteel); r.rotation.z = Math.PI / 2; r.position.set(HATCH.x, y, HATCH.z - HS / 2 + .08); room.add(r); }
 const tunnelLight = new THREE.PointLight(0xffb066, 0, 5, 2); tunnelLight.position.set(HATCH.x, -3.4, HATCH.z); room.add(tunnelLight);
 
+// ### Details that make the washroom feel used and real: tiled skirting, soft shadows in every corner, a camera watching,
+// ### an air vent, the light switch and intercom by the door, a towel dispenser and a bin by the sinks, lamp housings.
+{
+  // dark glazed skirting tiles round the walls (not across the doorway)
+  box(W, .1, .02, M.cove, 0, .05, -D / 2 + .01); box(3.45, .1, .02, M.cove, -2.275, .05, D / 2 - .01); box(3.45, .1, .02, M.cove, 2.275, .05, D / 2 - .01);
+  box(.02, .1, D, M.cove, -W / 2 + .01, .05, 0); box(.02, .1, D, M.cove, W / 2 - .01, .05, 0);
+  // soft shadows: along the floor, under the ceiling, up every corner and where the partition meets the wall
+  const up = v3(0, 1, 0), down = v3(0, -1, 0);
+  for (const [y, n, w] of [[.0015, up, .42], [H - .0015, down, .5]]){
+    aoEdge(W, w, v3(0, y, -D / 2), v3(0, 0, 1), n); aoEdge(W, w, v3(0, y, D / 2), v3(0, 0, -1), n);
+    aoEdge(D, w, v3(-W / 2, y, 0), v3(1, 0, 0), n); aoEdge(D, w, v3(W / 2, y, 0), v3(-1, 0, 0), n);
+  }
+  aoEdge(2.3, .3, v3(SX0 + .02, .0015, -1.85), v3(1, 0, 0), up); aoEdge(2.3, .3, v3(SX0 - .02, .0015, -1.85), v3(-1, 0, 0), up);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]){
+    aoEdge(H, .35, v3(sx * W / 2, H / 2, sz * (D / 2 - .002)), v3(-sx, 0, 0), v3(0, 0, -sz));
+    aoEdge(H, .35, v3(sx * (W / 2 - .002), H / 2, sz * D / 2), v3(0, 0, -sz), v3(-sx, 0, 0));
+  }
+  for (const sx of [-1, 1]) aoEdge(1.9, .22, v3(SX0 + sx * .02, 1.1, -D / 2 + .002), v3(sx, 0, 0), v3(0, 0, 1));
+  flat(.9, 2.9, M.blob, -3.7, 0); flat(.7, .7, M.blob, 3.35, 2.45); flat(.8, .8, M.stain, 0, .3); flat(.9, .55, M.puddle, -3.2, .55, .005);
+  // the security camera high in the north-west corner, its red light blinking
+  const cctv = new THREE.Group(); cctv.position.set(-3.72, 2.66, -2.72); cctv.rotation.set(-.42, -Math.PI * .75, 0, 'YXZ'); room.add(cctv);
+  const part = (geo, mat, x, y, z, rx = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.x = rx; m.castShadow = m.receiveShadow = true; cctv.add(m); return m; };
+  part(new THREE.BoxGeometry(.13, .12, .3), M.plastic, 0, 0, 0); part(new THREE.BoxGeometry(.17, .015, .34), M.plastic, 0, .07, -.02);
+  part(new THREE.CylinderGeometry(.045, .045, .03, 18), M.dark, 0, 0, -.16, Math.PI / 2); part(new THREE.CylinderGeometry(.03, .03, .005, 18), M.mirror, 0, 0, -.176, Math.PI / 2);
+  part(new THREE.SphereGeometry(.008, 8, 6), M.led, .045, -.04, -.152);
+  box(.06, .06, .02, M.dullSteel, -3.88, 2.74, -2.99); box(.02, .06, .06, M.dullSteel, -3.99, 2.74, -2.88);
+  { const arm = cyl(.014, .014, .25, M.dullSteel, -3.8, 2.73, -2.8, 8); arm.rotation.set(Math.PI / 2, 0, Math.PI / 4); }
+  // a ventilation grille in the ceiling and one high on the wall above the toilet
+  box(.52, .02, .42, M.grille, 1.1, H - .01, 1.5); box(.56, .012, .46, M.dullSteel, 1.1, H - .003, 1.5);
+  box(.4, .25, .02, M.grille, 3.3, 2.5, -D / 2 + .012); box(.44, .29, .01, M.dullSteel, 3.3, 2.5, -D / 2 + .004);
+  // the light switch by the door with its conduit to the ceiling, the intercom on the other side
+  box(.08, .12, .035, M.dullSteel, -.85, 1.35, D / 2 - .018); box(.015, .035, .012, M.plastic, -.85, 1.35, D / 2 - .04);
+  cyl(.012, .012, H - 1.41, M.dullSteel, -.85, (H + 1.41) / 2, D / 2 - .015, 8);
+  for (const y of [1.9, 2.5]) box(.035, .02, .025, M.dullSteel, -.85, y, D / 2 - .013);
+  box(.17, .24, .02, M.steel, .88, 1.45, D / 2 - .011);
+  plane(.11, .11, M.speaker, .88, 1.5, D / 2 - .022, Math.PI);
+  { const b = cyl(.02, .02, .02, M.red, .88, 1.38, D / 2 - .025, 16); b.rotation.x = Math.PI / 2; }
+  // a paper-towel dispenser and a steel bin by the sinks
+  box(.12, .38, .3, M.steel, -3.93, 1.4, 2.05); box(.02, .012, .22, M.dark, -3.87, 1.22, 2.05);
+  cyl(.17, .15, .44, M.dullSteel, -3.68, .22, 2.25, 22); cyl(.155, .155, .004, M.dark, -3.68, .43, 2.25, 22);
+  { const r = new THREE.Mesh(new THREE.TorusGeometry(.17, .008, 6, 28), M.steel); r.rotation.x = Math.PI / 2; r.position.set(-3.68, .44, 2.25); add(r); }
+  flat(.55, .55, M.blob, -3.68, 2.25);
+  // the bucket's wire handle
+  { const hd = new THREE.Mesh(new THREE.TorusGeometry(.2, .006, 6, 24, Math.PI), M.dullSteel); hd.position.set(3.35, .33, 2.45); hd.rotation.set(-1.0, .5, 0); add(hd); }
+  // housings over both lamps and a cage over the stall lamp
+  box(1.42, .035, .2, M.dullSteel, -.6, H - .02, .3); box(.7, .035, .16, M.dullSteel, 2.75, H - .02, -1.8);
+  for (let i = 0; i < 3; i++) box(.012, .07, .15, M.dullSteel, 2.5 + i * .25, 2.94, -1.8);
+}
+
 // Environment map for the steel: a blurred stand-in of the room (tiled walls, dark floor, the bright tube), built once
 {
   const envScene = new THREE.Scene();
@@ -461,6 +665,52 @@ const tunnelLight = new THREE.PointLight(0xffb066, 0, 5, 2); tunnelLight.positio
   pmrem.dispose();
   scene.background = new THREE.Color(0x050607);
 }
+
+// ### Static meshes that share a material are merged into one mesh, so the room is drawn in a few dozen draw calls instead
+// ### of several hundred (and each shadow-casting light draws every caster once more). Objects that move or can be clicked
+// ### stay separate. Runs once, after the room is built.
+function mergeStatic(){
+  const keep = new Set([mop, carKey, doorPivot, lidPivot, hale.g, hall, haleShadow]), groups = new Map();
+  room.updateMatrixWorld(true);
+  (function walk(o){
+    for (const c of o.children){
+      if (keep.has(c)) continue;
+      if (c.isMesh && c.visible && !c.userData.hot && !Array.isArray(c.material) && !c.children.length){
+        const k = c.material.uuid + (c.castShadow ? ':c' : '') + (c.receiveShadow ? ':r' : '');
+        if (!groups.has(k)) groups.set(k, []);
+        groups.get(k).push(c);
+      }
+      walk(c);
+    }
+  })(room);
+  for (const list of groups.values()){
+    if (list.length < 2) continue;
+    const parts = list.map(m => {
+      const g = m.geometry.clone(); g.applyMatrix4(m.matrixWorld);
+      if (!g.attributes.normal) g.computeVertexNormals();
+      if (!g.index) g.setIndex([...Array(g.attributes.position.count).keys()]);
+      return g;
+    });
+    const nv = parts.reduce((a, g) => a + g.attributes.position.count, 0), ni = parts.reduce((a, g) => a + g.index.count, 0);
+    const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2), idx = new (nv > 65535 ? Uint32Array : Uint16Array)(ni);
+    let ov = 0, oi = 0;
+    for (const g of parts){
+      const n = g.attributes.position.count, ia = g.index.array;
+      pos.set(g.attributes.position.array, ov * 3); nor.set(g.attributes.normal.array, ov * 3);
+      if (g.attributes.uv) uv.set(g.attributes.uv.array, ov * 2);
+      for (let i = 0; i < ia.length; i++) idx[oi + i] = ia[i] + ov;
+      ov += n; oi += ia.length; g.dispose();
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    geo.setIndex(new THREE.BufferAttribute(idx, 1)); geo.computeBoundingSphere();
+    const merged = new THREE.Mesh(geo, list[0].material);
+    merged.castShadow = list[0].castShadow; merged.receiveShadow = list[0].receiveShadow; merged.renderOrder = list[0].renderOrder;
+    merged.matrixAutoUpdate = false; room.add(merged);
+    for (const m of list) m.parent.remove(m);
+  }
+}
+mergeStatic();
 
 // ---------- Camera: viewpoints and looking around ----------
 // ### Each scene has a viewpoint (where you stand and what you face). Walking to another scene glides the camera there.
@@ -510,7 +760,7 @@ canvas.addEventListener('pointermove', e => {
   if (drag){
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
     if (drag.moved > 6){ canvas.classList.add('dragging'); cam.yawOff = clamp(cam.yawOff + dx * .004, -1.3, 1.3); cam.pitchOff = clamp(cam.pitchOff - dy * .004, -.7, .7); $('lookHint').classList.add('gone'); }
-  } else hover(e);
+  } else pendingHover = e;
 });
 canvas.addEventListener('pointerup', e => { if (drag && drag.moved <= 6) clickAt(e); drag = null; canvas.classList.remove('dragging'); });
 canvas.addEventListener('pointercancel', () => { drag = null; canvas.classList.remove('dragging'); });
@@ -548,8 +798,10 @@ function updateMarkers(){
   for (const m of markerEls){
     tmp.copy(m.at).project(camera);
     const on = !busy && tmp.z < 1 && Math.abs(tmp.x) < 1.05 && Math.abs(tmp.y) < 1.05;
-    m.el.style.display = on ? '' : 'none';
-    if (on) m.el.style.transform = `translate(${((tmp.x + 1) / 2 * w - 14).toFixed(1)}px, ${((1 - tmp.y) / 2 * h - 14).toFixed(1)}px)`;
+    // only touch the page when a marker really moved, so a still view costs no layout work
+    const tf = on ? `translate(${((tmp.x + 1) / 2 * w - 14).toFixed(1)}px, ${((1 - tmp.y) / 2 * h - 14).toFixed(1)}px)` : '';
+    if (on !== m.on){ m.el.style.display = on ? '' : 'none'; m.on = on; }
+    if (on && tf !== m.tf){ m.el.style.transform = tf; m.tf = tf; }
   }
 }
 // ### Finds the hotspot under the pointer with a ray through the scene.
@@ -561,7 +813,7 @@ function pick(e){
   const hit = raycaster.intersectObjects(meshes, false)[0];
   return hit && hit.distance < 6 ? hit.object.userData.hot : null;
 }
-let hovered = null;
+let hovered = null, pendingHover = null;   // pointer moves are handled once per frame, not once per event
 // ### Highlights the hotspot under the pointer.
 function hover(e){
   if (!overlay.hidden) return;
@@ -616,6 +868,7 @@ function syncWorld(){
   carKey.visible = S.tileOpen && !S.inventory.includes('carkey');
   S.lock.forEach((d, i) => { if (wheelTex[i].userData !== d){ drawDigit(wheelTex[i], d); wheelTex[i].userData = d; } });
   if (!S.ending){ lidPivot.rotation.x = 0; tunnelLight.intensity = 0; }
+  shadowsMoved();
 }
 
 // ---------- HUD and cards ----------
@@ -893,13 +1146,14 @@ function startCine(){
 function stopCine(){
   overlay.classList.remove('cine'); $('lookHint').classList.remove('hush');
   if (cineT < 0) return;
-  cineT = -1; hall.visible = false; doorPivot.rotation.y = 0; haleFade(0); haleShadow.material.opacity = 0; doorLight.intensity = 0; shake = 0;
+  cineT = -1; hall.visible = false; doorPivot.rotation.y = 0; haleFade(0); haleShadow.material.opacity = 0; doorLight.intensity = 0; shake = 0; shadowsMoved();
   if (S.scene === 'intro') goView('intro', .9);
 }
 // ### One step of the scene: the door, the light and Hale follow the time; the sounds and words come once each.
 function updateCine(dt){
   if (cineT < 0) return;
   const t0 = cineT, t = cineT = Math.min(CINE_END + 1, cineT + dt), at = s => t0 < s && t >= s;
+  if (t !== t0) shadowsMoved();
   const k = clamp((t - 1.7) / .95, 0, 1), open = 1 - k * k;   // held open, then swung shut, faster and faster
   doorPivot.rotation.y = DOOR_OPEN * open;
   doorLight.intensity = 4 * open;
@@ -961,11 +1215,13 @@ function frame(now){
     tileVel += dt * 4; tile.position.y = Math.max(.01, tile.position.y - tileVel * dt); tile.position.z = Math.min(-2.75, tile.position.z + dt * .5);
     tile.rotation.x = Math.min(Math.PI / 2, tile.rotation.x + dt * 5);
     if (tile.position.y <= .01) tileVel = 0;
+    shadowsMoved();
   }
   // the hatch opens and the camera climbs down
   if (hatchAnim >= 0){
     hatchAnim += dt;
     lidPivot.rotation.x = -Math.min(1.9, hatchAnim * 1.6);
+    if (hatchAnim < 1.3) shadowsMoved();
     tunnelLight.intensity = Math.min(1.6, hatchAnim);
     if (hatchAnim > 1.3 && cam.t >= 1 && !endingShown && camTarget.pos.y > 0) goView('tunnel', 2.2);
     if (hatchAnim > 3.8 && !endingShown){ endingShown = true; showEnding(); }
@@ -974,8 +1230,27 @@ function frame(now){
   // dripping tap
   if (ac && !paused && (dripIn -= dt) < 0){ dripIn = 2.5 + Math.random() * 5; tone(1200 + Math.random() * 500, .08, 'sine', .025, 500); }
   if ((sayTimer -= dt) <= 0) $('say').classList.remove('show');
+  M.led.emissiveIntensity = (clock % 2) < .12 ? 3 : .15;   // the camera's red light
+  if (pendingHover){ hover(pendingHover); pendingHover = null; }
   updateMarkers();
+  if (shadowFrames > 0){ renderer.shadowMap.needsUpdate = true; shadowFrames--; }
   renderer.render(scene, camera);
+  adaptResolution(elapsed);
+}
+
+// ### The resolution follows the frame rate: when frames take too long the picture is drawn with fewer pixels, and when
+// ### there is room to spare for a few seconds it goes back up, never above the screen's own pixel density.
+const PR_MAX = Math.min(window.devicePixelRatio || 1, COARSE ? 1.5 : 2), PR_MIN = Math.min(PR_MAX, .75);
+let pixelRatio = PR_MAX, perfT = 0, perfN = 0, perfGood = 0;
+function adaptResolution(elapsed){
+  if (elapsed > .25 || document.hidden) return;   // a hitch (a tab switch, a card) says nothing about the graphics card
+  perfT += elapsed; perfN++;
+  if (perfT < 1) return;
+  const ft = perfT / perfN; perfT = perfN = 0;
+  let next = pixelRatio;
+  if (ft > 1 / 45){ next = Math.max(PR_MIN, pixelRatio - .25); perfGood = 0; }
+  else if (ft < 1 / 56 && ++perfGood >= 5){ next = Math.min(PR_MAX, pixelRatio + .25); perfGood = 0; }
+  if (next !== pixelRatio){ pixelRatio = next; renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth, innerHeight, false); }
 }
 
 function resize(){
