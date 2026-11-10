@@ -293,6 +293,15 @@ test('audit: everything placed in a run stands on the hills, and the keyboard ru
   assert.match(game, /car\.z = HW\.LEN - 0\.1/, 'the toll stops you without the clasp');
 });
 
+test('the working rules live in the project: AGENTS.md with run and test commands, CLAUDE.md pointing to it', () => {
+  const agents = read('AGENTS.md');
+  for (const cmd of ['npm start', 'npm test', 'npm run test:browser']) assert.ok(agents.includes(cmd), 'AGENTS.md lists ' + cmd);
+  for (const rule of [/reviews every pull request/, /Never weaken, skip, edit or delete a test/, /When `main` is red/, /Never put a key/]) assert.match(agents, rule);
+  assert.ok(read('CLAUDE.md').includes('[AGENTS.md](AGENTS.md)'), 'Claude Code reads the same rules');
+  assert.match(read('docs/course-guides.md'), /Open points for the team/);
+  assert.ok(read('.gitignore').split(/\r?\n/).map(s => s.trim()).includes('.env'), '.env is ignored before any secret exists');
+});
+
 test('audit: no page needs inline styles, which the policy now refuses', () => {
   for (const [name, src] of [['game', game], ['page', html], ['room', read('escape-room/src/room.js')], ['room page', escHtml]]){
     assert.doesNotMatch(src, /<style|\sstyle="/, name);
