@@ -603,7 +603,7 @@ damage += max(0, (impact − 4) · 1.0 · VEH.dmg)              <span class="c">
   </table>
   <p>Together they point to the Titanic and the code <b>1912</b>; “sailed only once” gives the missing digit to players who do not know the history. The code is the same every time. Every wrong code makes noise and costs 30 seconds; Hale warns at 5:00, 2:00, 1:00 and 0:30. The plot twist comes in Ending A: a note on the ladder (“Took you long enough. A car is waiting. — H.”) shows the guard wanted the detective out, which leads into the chase.</p>
   <h3>How it is built</h3>
-  <p>The structure is the one of the original Python project, rewritten in JavaScript: <code>rules.js</code> (211 lines) holds the story and the rules as pure functions, <code>room.js</code> (994 lines) only draws and turns clicks into actions.</p>
+  <p>The structure is the one of the original Python project, rewritten in JavaScript: <code>rules.js</code> (211 lines) holds the story and the rules as pure functions, <code>room.js</code> (1269 lines) only draws and turns clicks into actions.</p>
 <pre><span class="c">// rules.js: one plain object is the whole state</span>
 state = { scene, time, inventory, clues, tileOpen, steam, wedged, graceUsed, lock, wrongTries, ending, warned }
 perform(state, action, target)  →  { state, ok, message, cue }   <span class="c">// refused: the SAME state, nothing saved</span>
@@ -619,23 +619,24 @@ marker or object clicked  →  use(action, target)  →  act()  →  rules.perfo
     <tr><th class="num">Line</th><th>Section of room.js</th><th>Purpose</th></tr>
     <tr><td class="num">12</td><td>State and saving</td><td>The game state from rules.js, safe storage access, the saved game</td></tr>
     <tr><td class="num">28</td><td>Renderer, scene, camera</td><td>Renderer with WebGL check, shadows, filmic colour, fog</td></tr>
-    <tr><td class="num">51</td><td>Painted textures</td><td>Tiles, paint, concrete, diamond plate, graffiti with the clue, steamed mirror, sign, guard silhouette</td></tr>
-    <tr><td class="num">188</td><td>Materials</td><td>All surfaces, from glazed tiles to polished steel</td></tr>
-    <tr><td class="num">217</td><td>The washroom</td><td>Walls, door and window, sinks and mirror, mop and bucket, stall, toilet, tile, hatch, shaft, lights</td></tr>
-    <tr><td class="num">465</td><td>Camera</td><td>One viewpoint per scene, gliding between them, drag or arrow keys to look around</td></tr>
-    <tr><td class="num">518</td><td>Hotspots</td><td>Markers placed over objects, “Walk to” buttons, clicking objects in 3D</td></tr>
-    <tr><td class="num">583</td><td>Actions</td><td>use() and act(): everything goes through rules.perform(); syncWorld() moves the objects</td></tr>
-    <tr><td class="num">621</td><td>HUD and cards</td><td>Clock, items, clues, messages; briefing, continue, pause, clue, lock and ending cards</td></tr>
-    <tr><td class="num">816</td><td>Sound</td><td>The hum of the tube, dripping water, the running tap and short effects for each kind of action, all synthesised</td><td></td></tr>
-    <tr><td class="num">917</td><td>Endings</td><td>Hatch opens and the camera climbs down; or the door bursts open</td></tr>
-    <tr><td class="num">924</td><td>Loop</td><td>Clock (rules.tick), animations, markers, render</td></tr>
-    <tr><td class="num">987</td><td>Start</td><td>Continue a saved game or start the briefing</td></tr>
+    <tr><td class="num">57</td><td>Painted textures</td><td>Tiles (colour, relief and gloss), paint, concrete, brushed steel, partitions, ceiling, diamond plate, graffiti with the clue, steamed mirror, sign, soft shadows and floor stains</td></tr>
+    <tr><td class="num">261</td><td>Materials</td><td>All surfaces, from glazed tiles to polished steel</td></tr>
+    <tr><td class="num">304</td><td>The washroom</td><td>Walls, door and window, sinks and mirror, mop and bucket, stall with its open door, the steel prison toilet, tile, hatch, shaft, lights, room details (skirting, security camera, vents, switch, intercom, dispenser, bin); mergeStatic() joins the static meshes</td></tr>
+    <tr><td class="num">715</td><td>Camera</td><td>One viewpoint per scene, gliding between them, drag or arrow keys to look around</td></tr>
+    <tr><td class="num">768</td><td>Hotspots</td><td>Markers placed over objects, “Walk to” buttons, clicking objects in 3D</td></tr>
+    <tr><td class="num">835</td><td>Actions</td><td>use() and act(): everything goes through rules.perform(); syncWorld() moves the objects</td></tr>
+    <tr><td class="num">874</td><td>HUD and cards</td><td>Clock, items, clues, messages; briefing, continue, pause, clue, lock and ending cards</td></tr>
+    <tr><td class="num">1069</td><td>Sound</td><td>The hum of the tube, dripping water, the running tap and short effects for each kind of action, all synthesised</td><td></td></tr>
+    <tr><td class="num">1171</td><td>Endings</td><td>Hatch opens and the camera climbs down; or the door bursts open</td></tr>
+    <tr><td class="num">1178</td><td>Loop</td><td>Clock (rules.tick), animations, markers, render; the resolution follows the frame rate</td></tr>
+    <tr><td class="num">1262</td><td>Start</td><td>Continue a saved game or start the briefing</td></tr>
   </table>
   <h3>Design decisions</h3>
   <ul>
     <li><b>Markers are real buttons.</b> Each usable object gets a pulsing HTML button placed over it every frame, so the room works with a mouse, a keyboard and on touch screens, and the browser tests can click them. Clicking the 3D object itself does the same.</li>
     <li><b>Viewpoints instead of free walking.</b> Five fixed spots with free looking around keep the room readable and impossible to get stuck in.</li>
     <li><b>The clock keeps running</b> while reading clues and turning the lock; only the pause card stops it, and so does hiding the tab.</li>
+    <li><b>Fast on weak graphics cards.</b> Static meshes that share a material are merged (about 40 draw calls a frame instead of 140), the shadow maps are only redrawn while something moves, and the resolution drops when frames take longer than 22 ms.</li>
     <li><b>Saved after every accepted action</b>, and checked field by field when loaded, like the SQLite save slot of the original but in the browser.</li>
   </ul>
   <h3>Limits and next steps</h3>
