@@ -110,8 +110,10 @@ test('collisions: circles and boxes push out along the right normal', () => {
 
 test('damage: soft bumps are free, the truck takes 55 %, damage stays within 0-100', () => {
   assert.equal(Core.crashDamage(2.9, VEH.car), 0);
-  assert.equal(Core.crashDamage(13, VEH.car), 16);
-  assert.ok(Math.abs(Core.crashDamage(13, VEH.truck) - 16 * 0.55) < 1e-9);
+  assert.equal(Core.crashDamage(3.9, VEH.car), 0, 'a bump under about 14 km/h is free');
+  assert.equal(Core.crashDamage(13, VEH.car), 9);
+  assert.ok(Math.abs(Core.crashDamage(13, VEH.truck) - 9 * 0.55) < 1e-9);
+  assert.equal(Core.crashDamage(34, VEH.car), 30, 'a wall at 122 km/h costs the car 30 %, so it survives three such hits');
   assert.equal(Core.crashDamage(NaN, VEH.car), 0);
   // accepted and refused: one crash pays once, however many frames it touches
   const g = Core.newCrashGuard();

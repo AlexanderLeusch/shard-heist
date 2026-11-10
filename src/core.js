@@ -247,7 +247,10 @@
 
   // ---------- Damage ----------
   // ### Impacts under 3 m/s are free; above that damage grows linearly and is scaled by the vehicle (the truck takes 55 %).
-  const crashDamage = (impact, v) => Number.isFinite(impact) ? Math.max(0, (impact - 3) * 1.6 * v.dmg) : 0;
+  // ### A crash costs damage above CRASH_FREE m/s of closing speed (about 14 km/h), CRASH_FACTOR % per m/s beyond it, times the
+  // ### vehicle's damage factor. A wall at 122 km/h (34 m/s) costs the car 30 %, so it takes about four such hits to wreck it.
+  const CRASH_FREE = 4, CRASH_FACTOR = 1.0;
+  const crashDamage = (impact, v) => Number.isFinite(impact) ? Math.max(0, (impact - CRASH_FREE) * CRASH_FACTOR * v.dmg) : 0;
   // ### One crash is charged once. After a hit the vehicle keeps touching the wall for a few frames, and each of those frames reports
   // ### an impact. Contact within CRASH_QUIET seconds belongs to the same crash: only a harder hit costs more, and only the difference.
   const CRASH_QUIET = 0.35;
@@ -694,7 +697,7 @@
     isMode, isVeh, clamp, wrapAngle, mulberry32, shuffle, fmtTime, fmtTimeExact, frameDt,
     parsePick, parseBest, applyPick, actionAllowed,
     vehStats, zeroTo80, topSpeed, stepSpeed, collidePoint, HILL_BOX, HILL_GRID, hillHeight, hillMesh, gradeAt, slopeTop,
-    crashDamage, CRASH_QUIET, newCrashGuard, chargeCrash, addDamage, repairDamage, isWrecked, damageStage, damageLevel, smokeFor, actionHeld, TILT_DEAD, TILT_FULL, tiltSteer, parseSteer, snapShadow, QUALITY_SCALES, newQuality, stepQuality, parseVolume, volumeGain,
+    crashDamage, CRASH_FREE, CRASH_FACTOR, CRASH_QUIET, newCrashGuard, chargeCrash, addDamage, repairDamage, isWrecked, damageStage, damageLevel, smokeFor, actionHeld, TILT_DEAD, TILT_FULL, tiltSteer, parseSteer, snapShadow, QUALITY_SCALES, newQuality, stepQuality, parseVolume, volumeGain,
     PURSUIT, MAX_STARS, SPOT_RADIUS, HELI_AFTER, wantedStars, pursuit, helicopterDue, copTopSpeed, trackStep, inSpotlight, bustStep, edgeDistance,
     driveTime, runStars, isNewBest,
     newStory, beginAct, retryAct, finishOpen, storyEnding, dueRadio,
