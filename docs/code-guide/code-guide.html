@@ -112,7 +112,7 @@ pre .c{ color:#7fd4e2; }
     <div class="kpi"><b>0</b><span>image / sound files</span></div>
     <div class="kpi"><b>504 KB</b><span>game code size</span></div>
   </div>
-  <p class="mono" style="color:var(--muted)">Figures for room 2 (room-2-chase/: index.html, styles.css, js/). Room 1 is described in section 14. The test count covers both rooms: 118 unit and page tests and 19 browser tests. Tests add 1,822 lines.</p>
+  <p class="mono" style="color:var(--muted)">Figures for room 2 (room-2-chase/: index.html, styles.css, js/). Room 1 is described in section 14. The test count covers both rooms: 118 unit and page tests and 19 browser tests. Tests add 1,826 lines.</p>
   <h3>The three maps</h3>
   <table>
     <tr><th>Map</th><th>Layout</th><th>Goal</th><th class="num">Car top speed</th><th class="num">Police</th><th class="num">Time</th></tr>
@@ -156,7 +156,7 @@ pre .c{ color:#7fd4e2; }
     <tr><td>SVG in JS strings</td><td class="num">6</td><td class="num">0.1 %</td><td class="num">6,203</td><td class="num">1.2 %</td><td>Map pictures and fallback vehicle icons in the start menu</td></tr>
     <tr><td><b>Python</b></td><td class="num"><b>0</b></td><td class="num"><b>0 %</b></td><td class="num"><b>0</b></td><td class="num"><b>0 %</b></td><td>Not used</td></tr>
   </table>
-  <p class="mono" style="color:var(--muted)">Game code: 7,277 lines, 515,657 characters. The tests (1,822 lines), the dev server and SRI checker are JavaScript too; the CI pipeline is YAML. About 700 of the JavaScript lines are comments, including the “###” explanations.</p>
+  <p class="mono" style="color:var(--muted)">Game code: 7,277 lines, 515,657 characters. The tests (1,826 lines), the dev server and SRI checker are JavaScript too; the CI pipeline is YAML. About 700 of the JavaScript lines are comments, including the “###” explanations.</p>
   <h3>External code that is loaded, not written</h3>
   <table>
     <tr><th>Library</th><th>Language</th><th>Purpose</th></tr>
@@ -560,7 +560,7 @@ damage += max(0, (impact − 4) · 1.0 · VEH.dmg)              <span class="c">
     <tr><td><code>room-2/input.test.js</code></td><td class="num">9</td><td>Every menu action in its states, valid picks, valid saved data</td><td>Actions while driving, story actions without a story, unknown actions, picks like <code>constructor</code> or <code>__proto__</code>, tampered storage, implausible best times</td></tr>
     <tr><td><code>project/page.test.js</code></td><td class="num">37</td><td>Element ids, button actions, script order, dev server serves files; the same page checks for room 1</td><td>Unpinned or unhashed libraries, inline scripts, secrets in any file, <code>.git</code> requests, path traversal, wrong HTTP methods, one room loading the other’s files</td></tr>
     <tr><td><code>room-1/rules.test.js</code></td><td class="num">17</td><td>Both endings, the grace minute, clues, lock, saved games</td><td>Actions before the briefing or after an ending, no exit, items twice, car key before the tile is off, door without mop, wheels that do not exist, clock below zero, tampered saves</td></tr>
-    <tr><td><code>browser/browser.test.js</code></td><td class="num">18</td><td>Room 2: menu with previews, radio choice, vehicle choice, a run, pause, story act 1. Room 1: briefing, save and continue after reload, Ending A</td><td>Card buttons while driving, tampered saved data, blocked library, no WebGL; the car key before the tile is off, a wrong code</td></tr>
+    <tr><td><code>browser/browser.test.js</code></td><td class="num">19</td><td>Room 2: menu with previews, radio choice, vehicle choice, a run, pause, story act 1. Room 1: briefing, save and continue after reload, Ending A</td><td>Card buttons while driving, tampered saved data, blocked library, no WebGL; the car key before the tile is off, a wrong code</td></tr>
   </table>
   <div class="note gold"><b>Bugs the tests found (fixed):</b> saved data such as <code>{"mode":"constructor"}</code> passed the old check, because every JavaScript object inherits <code>constructor</code>; the next load would have crashed. And the throttle let the car run about 5 km/h above the top speed shown in the menu; it now stops at the limit.</div>
   <h3>Security</h3>
@@ -600,7 +600,7 @@ damage += max(0, (impact − 4) · 1.0 · VEH.dmg)              <span class="c">
   </table>
   <p>Together they point to the Titanic and the code <b>1912</b>; “sailed only once” gives the missing digit to players who do not know the history. The code is the same every time. Every wrong code makes noise and costs 30 seconds; Hale warns at 5:00, 2:00, 1:00 and 0:30. The plot twist comes in Ending A: a note on the ladder (“Took you long enough. A car is waiting. — H.”) shows the guard wanted the detective out, which leads into the chase.</p>
   <h3>How it is built</h3>
-  <p>The structure is the one of the original Python project, rewritten in JavaScript: <code>rules.js</code> (213 lines) holds the story and the rules as pure functions, <code>room.js</code> (1001 lines) only draws and turns clicks into actions.</p>
+  <p>The structure is the one of the original Python project, rewritten in JavaScript: <code>rules.js</code> (211 lines) holds the story and the rules as pure functions, <code>room.js</code> (994 lines) only draws and turns clicks into actions.</p>
 <pre><span class="c">// rules.js: one plain object is the whole state</span>
 state = { scene, time, inventory, clues, tileOpen, steam, wedged, graceUsed, lock, wrongTries, ending, warned }
 perform(state, action, target)  →  { state, ok, message, cue }   <span class="c">// refused: the SAME state, nothing saved</span>
@@ -619,14 +619,14 @@ marker or object clicked  →  use(action, target)  →  act()  →  rules.perfo
     <tr><td class="num">51</td><td>Painted textures</td><td>Tiles, paint, concrete, diamond plate, graffiti with the clue, steamed mirror, sign, guard silhouette</td></tr>
     <tr><td class="num">188</td><td>Materials</td><td>All surfaces, from glazed tiles to polished steel</td></tr>
     <tr><td class="num">217</td><td>The washroom</td><td>Walls, door and window, sinks and mirror, mop and bucket, stall, toilet, tile, hatch, shaft, lights</td></tr>
-    <tr><td class="num">470</td><td>Camera</td><td>One viewpoint per scene, gliding between them, drag or arrow keys to look around</td></tr>
-    <tr><td class="num">523</td><td>Hotspots</td><td>Markers placed over objects, “Walk to” buttons, clicking objects in 3D</td></tr>
-    <tr><td class="num">588</td><td>Actions</td><td>use() and act(): everything goes through rules.perform(); syncWorld() moves the objects</td></tr>
-    <tr><td class="num">627</td><td>HUD and cards</td><td>Clock, items, clues, messages; briefing, continue, pause, clue, lock and ending cards</td></tr>
-    <tr><td class="num">823</td><td>Sound</td><td>The hum of the tube, dripping water, the running tap and short effects for each kind of action, all synthesised</td><td></td></tr>
-    <tr><td class="num">924</td><td>Endings</td><td>Hatch opens and the camera climbs down; or the door bursts open</td></tr>
-    <tr><td class="num">931</td><td>Loop</td><td>Clock (rules.tick), animations, markers, render</td></tr>
-    <tr><td class="num">994</td><td>Start</td><td>Continue a saved game or start the briefing</td></tr>
+    <tr><td class="num">465</td><td>Camera</td><td>One viewpoint per scene, gliding between them, drag or arrow keys to look around</td></tr>
+    <tr><td class="num">518</td><td>Hotspots</td><td>Markers placed over objects, “Walk to” buttons, clicking objects in 3D</td></tr>
+    <tr><td class="num">583</td><td>Actions</td><td>use() and act(): everything goes through rules.perform(); syncWorld() moves the objects</td></tr>
+    <tr><td class="num">621</td><td>HUD and cards</td><td>Clock, items, clues, messages; briefing, continue, pause, clue, lock and ending cards</td></tr>
+    <tr><td class="num">816</td><td>Sound</td><td>The hum of the tube, dripping water, the running tap and short effects for each kind of action, all synthesised</td><td></td></tr>
+    <tr><td class="num">917</td><td>Endings</td><td>Hatch opens and the camera climbs down; or the door bursts open</td></tr>
+    <tr><td class="num">924</td><td>Loop</td><td>Clock (rules.tick), animations, markers, render</td></tr>
+    <tr><td class="num">987</td><td>Start</td><td>Continue a saved game or start the briefing</td></tr>
   </table>
   <h3>Design decisions</h3>
   <ul>
