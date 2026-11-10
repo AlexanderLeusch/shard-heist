@@ -52,6 +52,11 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-display);overflow
 .chip.ev{width:18px;height:18px}
 .chip.ev path{fill:none;stroke-linecap:round;stroke-linejoin:round}
 .chip.ev.on path{fill:none;stroke:var(--spark)}
+/* the witness, drawn like the evidence icons, lights up gold once she is in the car */
+.chip.wit{width:18px;height:18px}
+.chip.wit path{fill:none;stroke:var(--gold);stroke-linecap:round;stroke-linejoin:round;opacity:.55}
+.chip.wit.on path{fill:none;stroke:var(--gold);opacity:1}
+.chip.wit.on{filter:drop-shadow(0 0 5px var(--gold))}
 .count{font-family:var(--f-mono);font-size:13px;color:var(--muted);margin-left:4px;font-variant-numeric:tabular-nums}
 .prog{display:grid;gap:6px;margin-top:8px}
 .prog-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px}

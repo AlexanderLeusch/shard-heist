@@ -55,10 +55,13 @@ scene.fog = new THREE.FogExp2(FOG, 0.0031);
 renderer.setClearColor(FOG);
 const camera = new THREE.PerspectiveCamera(62, 1, 0.5, 1000);
 
+// ### The night sky: a gradient from the haze at the horizon to near black overhead. dawn (0 at night) adds the first light of
+// ### the morning for the finale: a warm glow low in the east-south-east that fades upwards.
 const skyMat = new THREE.ShaderMaterial({
-  uniforms: { top: { value: C(0x03050f) }, mid: { value: C(0x111735) }, horizon: { value: C(0x463352) }, fogc: { value: C(FOG) } },
+  uniforms: { top: { value: C(0x03050f) }, mid: { value: C(0x111735) }, horizon: { value: C(0x463352) }, fogc: { value: C(FOG) },
+    dawn: { value: 0 }, dawnCol: { value: C(0xff9a5a) }, dawnDir: { value: new THREE.Vector3(0.75, 0.04, 0.66).normalize() } },
   vertexShader: 'varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-  fragmentShader: 'uniform vec3 top; uniform vec3 mid; uniform vec3 horizon; uniform vec3 fogc; varying vec3 vP; void main(){ float t = vP.y; vec3 c = mix(horizon, mid, smoothstep(0.02, 0.22, t)); c = mix(c, top, smoothstep(0.22, 0.75, t)); c = mix(fogc, c, smoothstep(-0.03, 0.06, t)); gl_FragColor = linearToOutputTexel(vec4(c, 1.0)); }',
+  fragmentShader: 'uniform vec3 top; uniform vec3 mid; uniform vec3 horizon; uniform vec3 fogc; uniform float dawn; uniform vec3 dawnCol; uniform vec3 dawnDir; varying vec3 vP; void main(){ float t = vP.y; vec3 c = mix(horizon, mid, smoothstep(0.02, 0.22, t)); c = mix(c, top, smoothstep(0.22, 0.75, t)); float g = pow(max(dot(normalize(vP), dawnDir), 0.0), 4.0); c += dawn * dawnCol * (0.15 + 0.85 * g) * (1.0 - smoothstep(-0.02, 0.45, t)); c = mix(fogc, c, smoothstep(-0.03, 0.06, t)); gl_FragColor = linearToOutputTexel(vec4(c, 1.0)); }',
   side: THREE.BackSide, depthWrite: false, fog: false
 });
 const sky = new THREE.Mesh(new THREE.SphereGeometry(700, 24, 16), skyMat);
@@ -81,7 +84,8 @@ function tuneEnv(root){
   });
 }
 
-scene.add(new THREE.HemisphereLight(0x6f7cc8, 0x1b1b28, 0.52));
+const hemi = new THREE.HemisphereLight(0x6f7cc8, 0x1b1b28, 0.52);
+scene.add(hemi);
 // the "sun" is the moon: cold, weak, high; street lamps, windows and headlights do the rest
 const sun = new THREE.DirectionalLight(0xaabfff, 0.42);
 sun.castShadow = true;
@@ -89,6 +93,20 @@ sun.shadow.mapSize.set(COARSE ? 1024 : 2048, COARSE ? 1024 : 2048);
 Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 320 });
 sun.shadow.bias = -0.0006;
 scene.add(sun, sun.target);
+// ### The first light of the morning, only for the finale over the bridge. 0 is the night of the game, 1 the moment before the sun
+// ### comes up: the sky turns a deep blue with a warm glow in the east, the haze lifts and warms, and the light grows softly.
+// ### Kept faint on purpose: it is the very beginning of the sunrise, not the day.
+const NIGHT = { top: C(0x03050f), mid: C(0x111735), horizon: C(0x463352), fog: C(FOG), hemiSky: C(0x6f7cc8), hemiGround: C(0x1b1b28), hemiI: 0.52, sunC: C(0xaabfff), sunI: 0.42 };
+const DAWN = { top: C(0x0d1838), mid: C(0x34477e), horizon: C(0xc98a7a), fog: C(0x6c6280), hemiSky: C(0xa7b4e6), hemiGround: C(0x3a3036), hemiI: 0.85, sunC: C(0xffc49a), sunI: 0.8 };
+let dawn = 0;
+function setDawn(a){
+  dawn = a;
+  const U = skyMat.uniforms, mix = (k, out) => out.copy(NIGHT[k]).lerp(DAWN[k], a);
+  mix('top', U.top.value); mix('mid', U.mid.value); mix('horizon', U.horizon.value); mix('fog', U.fogc.value); U.dawn.value = a * 0.55;
+  mix('fog', scene.fog.color); renderer.setClearColor(scene.fog.color);
+  mix('hemiSky', hemi.color); mix('hemiGround', hemi.groundColor); hemi.intensity = NIGHT.hemiI + (DAWN.hemiI - NIGHT.hemiI) * a;
+  mix('sunC', sun.color); sun.intensity = NIGHT.sunI + (DAWN.sunI - NIGHT.sunI) * a;
+}
 const SUN_OFF = [-90, 60, -40];
 
 const glowTexture = (() => {
@@ -913,6 +931,81 @@ function surfaceMat(set, repeat, opts){
   m.userData.env = 0.9;
   return m;
 }
+// ### The river Tejo, the way real-time ocean shaders do it (three.js's ocean example, jbouny/ocean): long Gerstner swells move
+// ### the surface itself; shorter waves and fine ripples only tip the normal, pixel by pixel. What you see is a Fresnel mix: looking
+// ### down you see into the dark water, towards the horizon it turns into a mirror of the sky (the same colours as the sky dome, so
+// ### the morning of the finale shows up in the river by itself). The lights of the far bank are reflected as the long, trembling
+// ### streaks real night water makes, and the moon leaves a glitter path. The waves calm down towards the quay wall.
+function riverMaterial(){
+  const U = skyMat.uniforms;
+  return new THREE.ShaderMaterial({
+    uniforms: Object.assign(THREE.UniformsUtils.clone(THREE.UniformsLib.fog), {
+      time: { value: 0 }, top: U.top, mid: U.mid, horizon: U.horizon, dawn: U.dawn, dawnCol: U.dawnCol, dawnDir: U.dawnDir,
+      moonDir: { value: new THREE.Vector3(...SUN_OFF).normalize() }, deep: { value: C(0x020a12) }, lamp: { value: C(0xffb46a) }
+    }),
+    fog: true,
+    vertexShader: `
+      uniform float time;
+      varying vec3 vW;
+      #include <fog_pars_vertex>
+      // one Gerstner wave: direction d, wavelength L, steepness s; moves the point and returns nothing
+      void gerstner(inout vec3 p, vec3 w, vec2 d, float L, float s){
+        float k = 6.2831853 / L, c = sqrt(9.8 / k), f = k * (dot(d, w.xz) - c * time), a = s / k;
+        p.x += d.x * a * cos(f); p.z += d.y * a * cos(f); p.y += a * sin(f);
+      }
+      void main(){
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vec3 w = wp.xyz, p = vec3(0.0);
+        gerstner(p, w, normalize(vec2(-1.0, 0.3)), 28.0, 0.05);
+        gerstner(p, w, normalize(vec2(-0.6, -0.8)), 19.0, 0.04);
+        wp.xyz += p * smoothstep(157.0, 185.0, w.z);
+        vW = wp.xyz;
+        vec4 mvPosition = viewMatrix * wp;
+        gl_Position = projectionMatrix * mvPosition;
+        #include <fog_vertex>
+      }`,
+    fragmentShader: `
+      uniform float time, dawn;
+      uniform vec3 top, mid, horizon, dawnCol, dawnDir, moonDir, deep, lamp;
+      varying vec3 vW;
+      #include <fog_pars_fragment>
+      float h1(float n){ return fract(sin(n * 91.345) * 43758.5453); }
+      // the slope of one wave at w: d its direction, L its wavelength, s its steepness
+      vec2 slope(vec2 w, vec2 d, float L, float s){ float k = 6.2831853 / L, c = sqrt(9.8 / k); return d * s * cos(k * (dot(d, w) - c * time)); }
+      vec3 skyAt(vec3 r){
+        float t = max(r.y, 0.0);
+        vec3 c = mix(horizon, mid, smoothstep(0.02, 0.22, t)); c = mix(c, top, smoothstep(0.22, 0.75, t));
+        float g = pow(max(dot(r, dawnDir), 0.0), 4.0);
+        return c + dawn * dawnCol * (0.15 + 0.85 * g) * (1.0 - smoothstep(-0.02, 0.45, t));
+      }
+      void main(){
+        vec2 w = vW.xz;
+        float dist = length(cameraPosition - vW), calm = smoothstep(157.0, 175.0, vW.z), fine = calm / (1.0 + dist * 0.025);
+        vec2 s = slope(w, normalize(vec2(-1.0, 0.3)), 28.0, 0.05) + slope(w, normalize(vec2(-0.6, -0.8)), 19.0, 0.04);
+        s += (slope(w, normalize(vec2(-0.3, 1.0)), 7.3, 0.07) + slope(w, normalize(vec2(0.9, 0.45)), 4.1, 0.06) + slope(w, normalize(vec2(-0.95, -0.2)), 2.7, 0.05)) * (0.4 + 0.6 * fine);
+        // fine ripples in many directions, fading with distance so far water stays a smooth mirror instead of flickering
+        for (int i = 0; i < 6; i++){ float a = h1(float(i) + 1.0) * 6.2831853; s += slope(w, vec2(cos(a), sin(a)), 0.6 + h1(float(i) + 7.0) * 1.6, 0.11) * fine; }
+        vec3 n = normalize(vec3(-s.x, 1.0, -s.y));
+        vec3 v = normalize(cameraPosition - vW), r = reflect(-v, n);
+        r.y = abs(r.y);
+        float fres = 0.02 + 0.98 * pow(1.0 - max(dot(n, v), 0.0), 5.0);
+        vec3 col = mix(deep * (1.0 + dawn * 3.0), skyAt(r), fres);
+        // the far bank's windows and street lamps, about 680 m out: where the reflected ray meets that wall, sparse warm lights
+        if (r.z > 0.02){
+          vec3 hit = vW + r * ((680.0 - vW.z) / r.z);
+          // fewer, brighter lights than the windows themselves: the ripples stretch each one into its own trembling column
+          float cell = floor(hit.x / 11.0), yc = 6.0 + 24.0 * h1(cell + 3.1), on = step(0.5, h1(cell)) * (0.6 + 0.8 * h1(cell + 9.7));
+          float bump = (1.0 - smoothstep(0.6, 2.6, abs(fract(hit.x / 11.0) - 0.5) * 11.0)) * (1.0 - smoothstep(1.5, 6.0, abs(hit.y - yc)));
+          col += lamp * on * bump * (0.3 + 0.7 * fres) * 2.2;
+        }
+        // the glitter path of the moon, and of the first sun in the finale
+        col += vec3(0.75, 0.8, 1.0) * pow(max(dot(r, moonDir), 0.0), 420.0) * 3.0;
+        col += dawnCol * dawn * pow(max(dot(r, dawnDir), 0.0), 160.0) * 4.0;
+        gl_FragColor = linearToOutputTexel(vec4(col, 1.0));
+        #include <fog_fragment>
+      }`
+  });
+}
 // Soft additive light cones under lamps and in front of headlights
 const coneTex = (() => {
   const c = document.createElement('canvas'); c.width = 4; c.height = 128;
@@ -1479,10 +1572,8 @@ function buildCity(){
   trim.box(-700, 700, 0, 0.35, 151, 157, stoneCol);
   const pillars = mergeGeos([-6, 6].flatMap(x => [new THREE.CylinderGeometry(0.5, 0.6, 6, 12).translate(x, 3.3, 155), new THREE.BoxGeometry(1.5, 0.6, 1.5).translate(x, 6.5, 155)]));
   const colunas = new THREE.Mesh(pillars, stone); colunas.castShadow = true; grp.add(colunas);
-  const ripple = GRASS.normal.clone(); ripple.needsUpdate = true; ripple.repeat.set(70, 40);
-  const river = new THREE.Mesh(new THREE.PlaneGeometry(1400, 640), new THREE.MeshStandardMaterial({ color: 0x12304c, roughness: 0.24, metalness: 0.6, normalMap: ripple, normalScale: new THREE.Vector2(0.3, 0.3) }));
-  river.material.userData.env = 1.5;
-  river.rotation.x = -Math.PI / 2; river.position.set(0, 0.08, 157 + 320); river.receiveShadow = true;
+  const river = new THREE.Mesh(new THREE.PlaneGeometry(1400, 640, 280, 128).rotateX(-Math.PI / 2), riverMaterial());
+  river.position.set(0, 0.08, 157 + 320); river.userData.dynamic = true; river.frustumCulled = false;
   grp.add(river); CITY.water = river;
   radarRects.push({ x0: -300, x1: 300, z0: 157, z1: 340, c: 'rgba(70,140,230,.28)' });
 
@@ -1634,6 +1725,17 @@ function buildCity(){
     for (let x = -150; x < 150; x += 12.5){ steel.push(seg(x, main(x), x + 12.5, main(x + 12.5), 1.4)); steel.push(new THREE.BoxGeometry(0.5, main(x) - 42, 0.5).translate(x, (main(x) + 42) / 2, 0)); }
     for (const sx of [-1, 1]) steel.push(seg(sx * 150, 108, sx * 350, 42, 1.4));
     bridge.add(new THREE.Mesh(mergeGeos(steel), farMat(0x93422c)));
+    // the road on the deck, seen up close in the finale: asphalt, white lane lines and a steel railing on each side
+    const deckRoad = new THREE.Mesh(new THREE.BoxGeometry(700, 0.12, 8.6).translate(0, 42.06, 0), new THREE.MeshStandardMaterial({ color: 0x2a2c31, roughness: 0.9 }));
+    const lines = [];
+    for (let x = -345; x < 345; x += 9) lines.push(boxG(4.5, 0.02, 0.14, x, 42.13, 0), boxG(4.5, 0.02, 0.14, x, 42.13, 1.45), boxG(4.5, 0.02, 0.14, x, 42.13, -1.45));
+    lines.push(boxG(700, 0.02, 0.14, 0, 42.13, 3.9), boxG(700, 0.02, 0.14, 0, 42.13, -3.9));
+    const deckLines = new THREE.Mesh(mergeGeos(lines), new THREE.MeshStandardMaterial({ color: 0xd8dbe4, roughness: 0.7 }));
+    const rails = [boxG(700, 0.08, 0.1, 0, 43.1, 4.25), boxG(700, 0.08, 0.1, 0, 43.1, -4.25), boxG(700, 0.06, 0.08, 0, 42.6, 4.25), boxG(700, 0.06, 0.08, 0, 42.6, -4.25)];
+    for (let x = -345; x <= 345; x += 3) rails.push(boxG(0.08, 1.0, 0.08, x, 42.6, 4.25), boxG(0.08, 1.0, 0.08, x, 42.6, -4.25));
+    const deckRails = new THREE.Mesh(mergeGeos(rails), new THREE.MeshStandardMaterial({ color: 0x8e3a26, roughness: 0.5, metalness: 0.4 }));
+    bridge.add(deckRoad, deckLines, deckRails);
+    CITY.bridge = bridge;
     const lamps = [];
     for (let x = -345; x <= 345; x += 12) lamps.push(x, 43.5, 0);
     const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(lamps, 3));
@@ -1933,7 +2035,7 @@ function updateNpcs(dt){
     npcPools.set(i, n.x, n.z, n.h, g[0], n.moto ? 8 : 13, n.moto ? 2.6 : 4.6, n.on);
   });
   Object.values(npcFleets).forEach(f => f.commit()); npcHead.commit(); npcTail.commit(); npcStop.commit(); npcPools.commit();
-  if (CITY.water) CITY.water.material.normalMap.offset.x += dt * 0.012;
+  if (CITY.water) CITY.water.material.uniforms.time.value = clock;
 }
 // ### Returns the city traffic to its starting places for a new run.
 function resetNpcs(){ npcs.forEach(n => { n.on = false; }); npcs.forEach(n => spawnNpc(n, 25)); }
@@ -4236,6 +4338,8 @@ function renderChips(){
   ui.chips.innerHTML = items.map(it => it.ev
     ? `<svg class="chip ev${it.taken ? ' on' : ''}" viewBox="0 0 16 16" role="img" aria-label="${it.ev.name}${it.taken ? ', found' : ''}"><title>${it.ev.name}</title><path d="${EV_ICON[it.ev.key]}"/></svg>`
     : DIAMOND.replace('class="chip"', 'class="chip' + (it.taken ? ' on' : '') + '"')).join('') +
+    // the witness, the last thing to bring along in Lisbon: shown once she is waiting, lit once she is in the car
+    (mode === 'city' && (witness.active || witness.inCar) ? `<svg class="chip wit${witness.inCar ? ' on' : ''}" viewBox="0 0 16 16" role="img" aria-label="Witness${witness.inCar ? ', in the car' : ''}"><title>Witness: ${WITNESS.name}</title><path d="M6 4.5a2 2 0 1 0 4 0a2 2 0 1 0-4 0M3.5 14c0-3 2-5 4.5-5s4.5 2 4.5 5"/></svg>` : '') +
     `<span class="count">${collected}/${items.length}</span>`;
 }
 const pedal = { thr: 0, brk: 0 };
@@ -4319,7 +4423,11 @@ function updateHud(dt){
     if (km !== last.km){ ui.progKm.textContent = km + ' km'; ui.pfill.style.width = clamp(done / total, 0, 1) * 100 + '%'; last.km = km; }
   }
   if (gate && gate.active && mode === 'city'){ bars = 4; txt = 'Gate open'; gold = true; }
-  else {
+  else if (witness.active){
+    const R = M.radar, dist = Math.hypot(witness.x - car.x, witness.z - car.z);
+    bars = dist < R ? 4 : dist < R * 1.5 ? 3 : dist < R * 2.2 ? 2 : 1; gold = true;
+    txt = bars === 4 ? 'Witness in range' : bars === 3 ? 'Medium signal' : 'Weak signal';
+  } else {
     let dist = Infinity;
     items.forEach(it => { if (!it.taken && (mode === 'city' || it.s > routeProgress()[0] - 5)) dist = Math.min(dist, Math.hypot(it.x - car.x, it.z - car.z)); });
     const R = M.radar;
@@ -4401,6 +4509,21 @@ function drawRadar(){
     rx.fillStyle = '#55ecff';
     rx.beginPath(); rx.moveTo(sx, sy - 9); rx.lineTo(sx + 7, sy); rx.lineTo(sx, sy + 9); rx.lineTo(sx - 7, sy); rx.closePath(); rx.fill();
   }
+  if (witness.active){
+    // the witness: a gold figure, or a gold arrow at the rim while she is out of range
+    const [sx, sy, dist] = toScreen(witness.x, witness.z);
+    rx.fillStyle = '#ffc857';
+    if (dist > range * 0.92){
+      const ang = Math.atan2(sy - R, sx - R), rr = R - 18;
+      rx.save(); rx.translate(R + Math.cos(ang) * rr, R + Math.sin(ang) * rr); rx.rotate(ang);
+      rx.beginPath(); rx.moveTo(12, 0); rx.lineTo(-8, -10); rx.lineTo(-3, 0); rx.lineTo(-8, 10); rx.closePath(); rx.fill();
+      rx.restore();
+    } else {
+      rx.fillStyle = `rgba(255,200,87,${0.2 + pulse * 0.25})`; rx.beginPath(); rx.arc(sx, sy, 13 + pulse * 5, 0, Math.PI * 2); rx.fill();
+      rx.fillStyle = '#ffc857'; rx.beginPath(); rx.arc(sx, sy - 5, 3.5, 0, Math.PI * 2); rx.fill();
+      rx.beginPath(); rx.moveTo(sx - 6, sy + 8); rx.quadraticCurveTo(sx, sy - 6, sx + 6, sy + 8); rx.closePath(); rx.fill();
+    }
+  }
   if (gate && gate.active){
     const [sx, sy, dist] = toScreen(gate.x, gate.z);
     if (dist > range * 0.92){
@@ -4478,6 +4601,7 @@ function resetCar(){
 
 // ### Starts a free ride or a story act: resets the score, car and police.
 function startRun(m, v){
+  endFinale(); hideWitness();
   initAudio();
   tiltAsk();
   setVehicle(v || V.key);
@@ -4507,7 +4631,7 @@ function showOverview(){
   showCard(`
     <div class="eyebrow">${story ? 'Act 1 · The Evidence' : 'Lisbon · Baixa'} · ${V.name}</div>
     <h2>Where the evidence is</h2>
-    <p>Your friend hid six pieces of evidence in the Baixa. Collect all six, then escape through the Arco da Rua Augusta. While you drive, an arrow on the screen points to the nearest piece.</p>
+    <p>Your friend hid six pieces of evidence in the Baixa. Collect all six, pick up the witness who saw the real thief, then escape through the Arco da Rua Augusta. While you drive, an arrow on the screen points to the nearest piece, then to her.</p>
     <canvas class="ov-map" id="ovMap" width="640" height="640" role="img" aria-label="Map of the Baixa: ${items.map(it => it.ev.name).join(', ')}, the repair kits, your start and the gate"></canvas>
     <div class="actions">
       <button class="btn" data-action="resume">Start driving <small class="desk-only">Enter</small></button>
@@ -4541,12 +4665,13 @@ function drawOverview(cv){
     label(`${i + 1} · ${it.ev.name}`, x, y, '#55ecff');
   });
 }
-// ### The guide arrow: points at the nearest piece of evidence still out there, and at the gate once all six are in the car.
+// ### The guide arrow: points at the nearest piece of evidence still out there, then at the witness, and at the gate once she is in the car.
 function updateGuide(){
   let t = null, name = '';
   if (mode === 'city' && state === 'play'){
     let best = Infinity;
     for (const it of items) if (!it.taken){ const d = Math.hypot(it.x - car.x, it.z - car.z); if (d < best){ best = d; t = it; name = it.ev ? it.ev.name : 'Evidence'; } }
+    if (!t && witness.active){ t = witness; name = 'Witness · ' + WITNESS.name; }
     if (!t && gate && gate.active){ t = gate; name = 'Gate · Arco'; }
   }
   if (!t){ if (!ui.guide.hidden) ui.guide.hidden = true; last.guide = ''; return; }
@@ -4557,7 +4682,7 @@ function updateGuide(){
     last.guide = key;
     ui.guideName.textContent = name;
     ui.guideDist.textContent = d < 15 ? 'right here' : Math.round(d / 10) * 10 + ' m';
-    ui.guide.classList.toggle('gold', t === gate);
+    ui.guide.classList.toggle('gold', t === gate || t === witness);
   }
   if (Math.abs(deg - last.guideDeg) > 0.5){ last.guideDeg = deg; ui.guideArrow.style.transform = `rotate(${deg.toFixed(1)}deg)`; }
 }
@@ -4584,18 +4709,18 @@ function resume(){
   if (overviewOpen){ overviewOpen = false; toast('Follow the arrow to the evidence. Every police car is looking for inmate 4471.', '', 3600); }
 }
 
-// ### Picks up a shard or a piece of evidence, adds any bonus time, and opens the finish gate after the last one.
+// ### Picks up a shard or a piece of evidence, adds any bonus time. After the sixth piece in Lisbon the witness appears.
 function collect(it){
   it.taken = true; collected++;
   burst(it.x, it.group.position.y + 1.9, it.z, SPARK, 28);
   runGroup.remove(it.group);
   sfx.collect();
+  if (collected >= items.length && !M.linear) spawnWitness();
   renderChips();
   if (M.linear){ timeLeft += M.bonus; toast(`+${M.bonus} s · Shard ${collected} / ${items.length}`, 'gold', 1600); return; }
   if (collected >= items.length){
-    gate.active = true; gate.group.visible = true; gate.grow = 0;
     sfx.gate();
-    toast(`${it.ev.name}: ${it.ev.found} That is all the evidence. Escape through the Arco da Rua Augusta: follow the golden beam.`, 'gold', 6000);
+    toast(`${it.ev.name}: ${it.ev.found} One thing is still missing: a witness. ${WITNESS.name}, ${WITNESS.job}, saw the real thief. She is waiting for you, look for the golden light and stop next to her.`, 'gold', 7000);
   } else toast(`Evidence ${collected} / ${items.length} · ${it.ev.name}: ${it.ev.found}`, '', 4200);
 }
 // ### Picks up a repair kit: Core.repairDamage removes the damage.
@@ -4608,6 +4733,194 @@ function repair(kt){
   if (damage < 50) warnedDamage = false;
   sfx.repair();
   toast(`Repair kit: damage ${Math.round(before)}% → ${Math.round(damage)}%`, 'green', 2400);
+}
+// ### Opens the finish gate under the Arco (Lisbon) once everything is in the car.
+function openGate(text){
+  gate.active = true; gate.group.visible = true; gate.grow = 0;
+  sfx.gate();
+  toast(text, 'gold', 6500);
+}
+
+// ---------- The witness and the finale over the bridge ----------
+// ### The last piece of evidence in Lisbon is a person. Once the six pieces are in the car, Marta Silva, a night-shift nurse who
+// ### saw the real thief climb out of the museum window, waits on a pavement somewhere in the Baixa, waving, with a golden light
+// ### over her head and a gold mark on the radar. Stop next to her (closer than 7 m, slower than about 11 km/h) and she walks
+// ### to the car and gets in; drive off before she reaches it and she goes back to wait. With her on board the gate opens.
+const WITNESS = Object.freeze({ name: 'Marta Silva', job: 'a night-shift nurse', found: 'Marta Silva is in the car. She saw a man climb out of the museum window that night, and she will say so in court. That is the last piece of evidence. Escape through the Arco da Rua Augusta: follow the golden beam.' });
+const witness = (() => {
+  const g = new THREE.Group(), mat = c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.75 });
+  const coat = mat(0xb08a5a), dark = mat(0x23262e), skin = mat(0xd9a98a), hair = mat(0x3a2418), scarf = mat(0xa8323a);
+  const add = (geo, m, parent) => { const o = new THREE.Mesh(geo, m); o.castShadow = true; (parent || g).add(o); return o; };
+  add(mergeGeos([boxG(0.13, 0.5, 0.14, 0.1, 0.27, 0), boxG(0.13, 0.5, 0.14, -0.1, 0.27, 0)]), dark);
+  add(mergeGeos([boxG(0.14, 0.08, 0.26, 0.1, 0.04, 0.04), boxG(0.14, 0.08, 0.26, -0.1, 0.04, 0.04)]), mat(0x15161a));
+  add(mergeGeos([boxG(0.44, 0.62, 0.26, 0, 1.13, 0), boxG(0.48, 0.42, 0.3, 0, 0.7, 0), boxG(0.11, 0.56, 0.12, 0.28, 1.1, 0)]), coat);
+  add(new THREE.CylinderGeometry(0.1, 0.12, 0.1, 10).translate(0, 1.47, 0), scarf);
+  add(new THREE.SphereGeometry(0.115, 14, 10).translate(0, 1.62, 0.01), skin);
+  add(mergeGeos([new THREE.SphereGeometry(0.128, 14, 10).scale(1, 0.95, 1).translate(0, 1.66, -0.02), boxG(0.08, 0.2, 0.06, 0, 1.52, -0.12)]), hair);
+  add(boxG(0.08, 0.24, 0.2, -0.3, 0.86, 0.02), mat(0x5a2f22));
+  // the left arm waves: it hangs from the shoulder
+  const arm = new THREE.Group(); arm.position.set(-0.28, 1.4, 0); g.add(arm);
+  add(boxG(0.11, 0.56, 0.12, 0, -0.28, 0), coat, arm);
+  add(new THREE.SphereGeometry(0.055, 8, 6).translate(0, -0.58, 0), skin, arm);
+  const marker = glowSprite(GOLD, 2.4, 0.9); marker.position.y = 2.5; g.add(marker);
+  const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+  ring.position.y = 0.06; g.add(ring);
+  g.visible = false; scene.add(g);
+  return { g, arm, marker, ring, active: false, inCar: false, boarding: 0, x: 0, z: 0, h: 0, home: null };
+})();
+// ### Puts the witness on a pavement 70 to 200 m from the player, facing the street.
+function spawnWitness(){
+  const spots = shuffle(roadSpots.slice(), Math.random);
+  let pick = null;
+  for (const s of spots){
+    const side = Math.random() < 0.5 ? -1 : 1, x = s.axis === 'x' ? s.x : s.x + side * 8.3, z = s.axis === 'x' ? s.z + side * 8.3 : s.z;
+    const d = Math.hypot(x - car.x, z - car.z);
+    if (d < 70 || d > 200 || Math.abs(x) > LIMIT - 8 || Math.abs(z) > LIMIT - 8) continue;
+    pick = { x, z, h: s.axis === 'x' ? (side > 0 ? Math.PI : 0) : (side > 0 ? -Math.PI / 2 : Math.PI / 2) };
+    break;
+  }
+  if (!pick) pick = { x: 8.3, z: 100, h: -Math.PI / 2 };
+  Object.assign(witness, { active: true, inCar: false, boarding: 0, x: pick.x, z: pick.z, h: pick.h, home: pick });
+  witness.g.visible = true; witness.marker.visible = true; witness.ring.visible = true;
+  renderChips();
+}
+function hideWitness(){ Object.assign(witness, { active: false, inCar: false, boarding: 0 }); witness.g.visible = false; }
+// ### Waves, walks to the car when it stops next to her, and gets in.
+function updateWitness(dt, live){
+  const W = witness;
+  if (!W.active) return;
+  const d = Math.hypot(W.x - car.x, W.z - car.z), slow = Math.abs(car.speed) < 3;
+  if (live && !W.boarding && d < 7 && slow){ W.boarding = 0.001; toast(`${WITNESS.name} runs to your car.`, '', 1800); }
+  if (W.boarding){
+    if (d > 12 || !live){ Object.assign(W, { boarding: 0, x: W.home.x, z: W.home.z, h: W.home.h }); }
+    else {
+      W.boarding += dt;
+      // the passenger door, on the right of the car
+      const fx = Math.sin(car.heading), fz = Math.cos(car.heading), tx = car.x - fz * 1.4, tz = car.z + fx * 1.4, dx = tx - W.x, dz = tz - W.z, l = Math.hypot(dx, dz);
+      if (l > 0.2){ const step = Math.min(l, dt * 3.4); W.x += dx / l * step; W.z += dz / l * step; W.h = Math.atan2(dx, dz); }
+      if (l < 0.5 || W.boarding > 3){
+        W.active = false; W.inCar = true; W.g.visible = false;
+        sfx.collect(); burst(tx, car.y + 1.4, tz, GOLD, 24);
+        renderChips();
+        openGate(WITNESS.found);
+        return;
+      }
+    }
+  }
+  const walking = W.boarding > 0;
+  W.g.position.set(W.x, groundH(W.x, W.z) + (walking ? Math.abs(Math.sin(clock * 11)) * 0.04 : 0), W.z);
+  W.g.rotation.y = walking ? W.h : W.h + Math.sin(clock * 0.7) * 0.25;
+  W.arm.rotation.z = walking ? Math.sin(clock * 11) * 0.5 : -2.5 + Math.sin(clock * 7) * 0.45;
+  W.arm.rotation.x = walking ? Math.sin(clock * 11) * 0.6 : 0;
+  W.marker.position.y = 2.5 + Math.sin(clock * 2.4) * 0.15; W.marker.visible = !walking;
+  W.ring.material.opacity = 0.3 + 0.25 * Math.sin(clock * 3);
+}
+
+// ### The finale: through the gate the picture fades, and you are on the 25 de Abril bridge with Marta beside you, driving south
+// ### over the Tejo as the first light comes up behind the towers. The road is yours: no police, no helicopter, heroic music. Then
+// ### the result card. A black plane in front of the camera does the fades. In the story, this ends act 1 (the bridge leads out of
+// ### the city towards the highway); in a free ride it is the end of the run.
+const FINALE = Object.freeze({ fade: 0.8, start: -270, speed: 24, lane: 2.2, end: 14.2, dawnFrom: 1.2, dawnTo: 11.5, shot: 5 });
+const finale = { on: false, done: false, t: 0, placed: false, deckY: 42.12 };
+const fader = new THREE.Mesh(new THREE.PlaneGeometry(4, 4), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthTest: false, depthWrite: false, fog: false }));
+fader.position.z = -0.6; fader.renderOrder = 9999; fader.frustumCulled = false; camera.add(fader); scene.add(camera);
+function startFinale(){
+  state = 'finale';
+  Object.assign(finale, { on: true, done: false, t: 0, placed: false });
+  hud.classList.add('off');
+  held.clear(); Object.keys(keys).forEach(k => keys[k] = false);
+}
+// ### Ends the finale and its morning light: before a new run or the menu.
+function endFinale(){
+  finale.on = false; finale.done = false; fader.material.opacity = 0; setDawn(0);
+  if (anthem.out){ try { anthem.out.disconnect(); } catch (e) {} anthem.out = null; }
+}
+// a point on the bridge deck: along is metres along the bridge from its middle, side is metres to the right of its centre line
+function onBridge(along, side, up){ return CITY.bridge.localToWorld(new THREE.Vector3(along, finale.deckY + (up || 0), side)); }
+function updateFinale(dt){
+  const F = FINALE, f = finale;
+  f.t += dt;
+  const t = f.t;
+  if (!f.placed){
+    // through the gate, into the dark
+    car.x += Math.sin(car.heading) * car.speed * dt; car.z += Math.cos(car.heading) * car.speed * dt;
+    fader.material.opacity = Math.min(1, t / F.fade);
+    chaseCam(dt);
+    if (t < F.fade) return;
+    f.placed = true;
+    CITY.bridge.updateMatrixWorld(true);
+    const p = onBridge(F.start, F.lane), ahead = onBridge(F.start + 10, F.lane);
+    Object.assign(car, { x: p.x, z: p.z, y: p.y, heading: Math.atan2(ahead.x - p.x, ahead.z - p.z), speed: F.speed, steer: 0, pitch: 0, roll: 0, bodyPitch: 0, lift: 0, shake: 0 });
+    resetPolice(); clearEffects(); hideWitness();
+    playAnthem();
+    toast(`${WITNESS.name}: “I saw him climb out of that window. I will tell them everything.”`, 'gold', 5200);
+    setTimeout(() => { if (finale.on && !finale.done) toast('HALE: Across the bridge and you are out of the city. Well done, detective.', 'hale', 5200); }, 5600);
+  }
+  // across the bridge at a steady speed; after the last fade it rolls to a stop under the card
+  if (f.done) car.speed *= Math.exp(-dt * 0.9);
+  const fx = Math.sin(car.heading), fz = Math.cos(car.heading);
+  car.x += fx * car.speed * dt; car.z += fz * car.speed * dt; car.y = finale.deckY; car.wheelRot += car.speed * dt;
+  const sm = (a, b, x) => { const k = clamp((x - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); };
+  setDawn(sm(F.dawnFrom, F.dawnTo, t));
+  // two shots: low beside the car, over the water, cut before the first tower would come between; then high behind it, with the
+  // towers and the morning sky ahead
+  const rx = -fz, rz = fx;
+  if (t < F.shot){
+    // outside the railing, clear of the tower legs, a little above the road so the deck girder does not fill the picture
+    const k = (t - F.fade) / (F.shot - F.fade);
+    camera.position.set(car.x + rx * 7.8 + fx * (6 - k * 9), car.y + 2.2 + k * 0.8, car.z + rz * 7.8 + fz * (6 - k * 9));
+    camera.lookAt(car.x + fx * 1.5, car.y + 0.9, car.z + fz * 1.5);
+  } else {
+    const k = Math.min(1, (t - F.shot) / (F.end - F.shot));
+    // in the lane, so it passes between the legs of each tower instead of through them
+    camera.position.set(car.x - fx * (16 + k * 6) - rx, car.y + 5 + k * 5, car.z - fz * (16 + k * 6) - rz);
+    camera.lookAt(car.x + fx * 30, car.y + 4 + k * 6, car.z + fz * 30);
+  }
+  if (camera.fov !== 55){ camera.fov = 55; camera.updateProjectionMatrix(); }
+  // fade in on the bridge, out at the end, and in again under the result card
+  if (!f.done){
+    fader.material.opacity = t < F.fade * 2 ? 1 - (t - F.fade) / F.fade : t > F.end - F.fade ? Math.min(1, (t - (F.end - F.fade)) / F.fade) : 0;
+    if (t >= F.end){ f.done = true; f.doneAt = t; finish(); }
+  } else fader.material.opacity = Math.max(0, 1 - (t - f.doneAt) / F.fade);
+}
+
+// ### Heroic music for the finale, synthesised like the radio: a brass choir and strings on a rising progression in D major
+// ### (D, A, B minor, G, then D, G, A and a long D), a trumpet melody on top, timpani at each change, a roll and a cymbal into the
+// ### last chord, all in a little hall reverb. About 14 seconds. It plays on the music volume.
+const anthem = { out: null };
+function playAnthem(){
+  if (!audio || muted) return;
+  const ctx = audio.ctx, out = ctx.createGain(), comp = ctx.createDynamicsCompressor(), wet = ctx.createGain(), hall = ctx.createConvolver();
+  out.gain.value = 0.55; comp.threshold.value = -18; comp.ratio.value = 3; wet.gain.value = 0.35;
+  const ir = ctx.createBuffer(2, ctx.sampleRate * 2.4, ctx.sampleRate);
+  for (let c = 0; c < 2; c++){ const d = ir.getChannelData(c); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3); }
+  hall.buffer = ir;
+  out.connect(comp).connect(audio.musicVol); out.connect(hall).connect(wet).connect(audio.musicVol);
+  anthem.out = out;
+  const beat = 60 / 88, t0 = ctx.currentTime + 0.1;
+  const brass = (n, at, dur, v) => [-8, 0, 8].forEach(d => radioOsc('sawtooth', mtof(n), at, dur, v, out, { lp: 1900, detune: d, attack: 0.07, hold: true, release: 0.35 }));
+  const strings = (n, at, dur, v) => [-5, 5].forEach(d => radioOsc('sawtooth', mtof(n), at, dur, v, out, { lp: 2400, detune: d, attack: 0.25, hold: true, release: 0.6 }));
+  const timp = (n, at, v) => { radioOsc('sine', mtof(n), at, 0.9, v, out, { to: mtof(n) * 0.94, glide: 0.5, attack: 0.004 }); radioNoise('lowpass', 380, 0.8, at, 0.25, v * 0.6, out); };
+  const trumpet = (n, at, dur) => { radioOsc('sawtooth', mtof(n), at, dur, 0.09, out, { lp: 2800, attack: 0.03, hold: true, release: 0.2 }); radioOsc('square', mtof(n) * 1.002, at, dur, 0.04, out, { lp: 2200, attack: 0.03, hold: true, release: 0.2 }); };
+  // [bass, chord tones] for two beats each, then the last chord held
+  const prog = [[38, [57, 62, 66]], [33, [57, 61, 64]], [35, [59, 62, 66]], [31, [59, 62, 67]], [42, [57, 62, 66]], [31, [59, 62, 67]], [33, [57, 61, 64]]];
+  const melody = [[74, 1], [78, 1], [76, 1.5], [69, 0.5], [78, 1], [83, 1], [81, 1.5], [79, 0.5], [78, 1], [74, 1], [76, 1], [79, 1], [81, 1], [85, 1]];
+  // two beats of a timpani roll that swells into the first chord
+  for (let i = 0; i < 12; i++) timp(38, t0 + i * beat / 6, 0.05 + i * 0.02);
+  const s0 = t0 + 2 * beat;
+  prog.forEach(([b, ch], i) => {
+    const at = s0 + i * 2 * beat;
+    radioOsc('sawtooth', mtof(b + 12), at, 2 * beat, 0.12, out, { lp: 600, attack: 0.05, hold: true, release: 0.3 });
+    ch.forEach(n => { brass(n, at, 2 * beat * 0.95, 0.035); strings(n + 12, at, 2 * beat, 0.03); });
+    timp(b < 36 ? b + 12 : b, at, 0.32);
+  });
+  let mt = s0; melody.forEach(([n, d]) => { trumpet(n, mt, d * beat * 0.92); mt += d * beat; });
+  const end = s0 + prog.length * 2 * beat;
+  for (let i = 0; i < 8; i++) timp(33, end - beat + i * beat / 8, 0.12 + i * 0.03);
+  [26, 38, 50, 57, 62, 66, 69].forEach(n => brass(n + 12, end, 4 * beat, n < 40 ? 0.05 : 0.03));
+  [62, 66, 69, 74].forEach(n => strings(n + 12, end, 4.5 * beat, 0.03));
+  trumpet(86, end, 4 * beat);
+  timp(38, end, 0.5); radioNoise('highpass', 4800, 0.7, end, 3, 0.35, out);
 }
 
 // ### Applies a crash: damage from Core.crashDamage, sparks, sound and camera shake.
@@ -4627,6 +4940,8 @@ function crash(impact, add = Core.crashDamage(impact, V)){
 
 // ### Ends a run at the gate and shows the score and stars.
 function finish(){
+  // Lisbon ends with the drive over the bridge; updateFinale calls finish again when it is over
+  if (mode === 'city' && !finale.done) return startFinale();
   if (story) return storyFinish();
   state = 'done';
   const used = Core.driveTime(mode, M, timeLeft, collected);
@@ -4639,6 +4954,7 @@ function finish(){
   showCard(`
     <div class="eyebrow">${M.title} · ${V.name}</div>
     <h1>Clean <em>getaway</em></h1>
+    ${city ? `<p>With the six pieces of evidence in the glovebox and ${WITNESS.name} beside you, you cross the 25 de Abril bridge as the sky over the Tejo turns pale. Lisbon is behind you.</p>` : ''}
     <div class="stars">${[0, 1, 2].map(i => `<span class="${i < stars ? 'on' : ''}">${STAR}</span>`).join('')}</div>
     <div class="stats">
       <div class="stat"><span class="eyebrow">Drive time</span><b>${fmtTimeExact(used)}</b></div>
@@ -4737,6 +5053,8 @@ function renderVehDetail(){
 }
 // ### Builds the main menu: story mode, maps, vehicle, radio, graphics.
 function showMenu(){
+  // back from the bridge: the night returns and the car stands in the city again
+  if (finale.on){ endFinale(); hideWitness(); resetCar(); }
   state = 'menu';
   hud.classList.add('off');
   const bestNote = k => best[k] ? fmtTimeExact(best[k]) : 'no run yet';
@@ -5119,6 +5437,7 @@ function updatePickups(dt, live){
     it.ring.material.opacity = 0.3 + 0.25 * Math.sin(clock * 3 + it.phase);
     if (live){ const dx = it.x - car.x, dz = it.z - car.z; if (dx * dx + dz * dz < 3.8 * 3.8) collect(it); }
   }
+  updateWitness(dt, live);
   for (const kt of kits){
     if (kt.taken) continue;
     kt.cross.rotation.y += dt * 1.2;
@@ -5451,8 +5770,8 @@ function storyFinish(){
   if (story.act === 0){
     showCard(`
       <div class="eyebrow">Act 1 complete · The Scatter</div>
-      <h2>Six pieces of evidence</h2>
-      <p>The photos, the fingerprints, the torch, the lockpick, the clothes and the balaclava are safe in your glovebox. Together they show that someone else broke in. Hale on the radio: the necklace’s clasp is on a courier lorry heading out of the city to a fence.</p>
+      <h2>Six pieces of evidence and a witness</h2>
+      <p>The photos, the fingerprints, the torch, the lockpick, the clothes and the balaclava are safe in your glovebox. Together they show that someone else broke in. Marta Silva, who saw the thief climb out of the museum window, sits beside you as the first light comes up over the 25 de Abril bridge. Hale on the radio: the necklace’s clasp is on a courier lorry heading out of the city to a fence.</p>
       ${story.letter ? '<p>The sealed letter lies on the passenger seat. Its wax seal bears the Ashford crest.</p>' : ''}
       ${stats}
       <div class="actions"><button class="btn" data-action="next-act">Start Act 2: The Courier <small class="desk-only">Enter</small></button><button class="btn ghost" data-action="menu">Main menu</button></div>`);
@@ -5559,6 +5878,8 @@ function frame(now){
       if (state === 'play' && timeLeft <= 0){ timeLeft = 0; gameOver('time'); }
     }
     chaseCam(dt);
+  } else if (finale.on && !paused){
+    updateFinale(dt);
   } else if (!paused){
     if (state !== 'menu') coast(dt);
     updatePickups(dt, false);
