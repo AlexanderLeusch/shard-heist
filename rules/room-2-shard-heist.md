@@ -32,7 +32,7 @@ Percentages are relative to the map's top speed and to the car. The menu shows t
 | **Countryside** | Reach the village at the end of the road. Shards: **+4 s** each | 2:30 | 158 km/h | 148 km/h | 10 | 3 |
 
 - A shard is picked up within 3.8 m; a repair kit within 3.6 m, and only when you have damage.
-- Lisbon has traffic lights, other cars and three yellow trams. The trams only run on their tracks, a stone track bed with two rails set into the road: a clockwise loop through Rua da Conceição, Rua da Prata, the north side of the Praça do Comércio and Rua Áurea. As on real Lisbon streets, cars and the player can drive over the tracks. The trams stop at red lights and behind other vehicles. On the highway traffic drives both ways. On country roads there is oncoming traffic, and driving off the road cuts your top speed to 55 %.
+- Lisbon has traffic lights and its own traffic: 26 cars, 2 city buses, 4 motorcycles and three yellow trams. A 12 m bus never takes the tight right-hand turn; it goes straight on or turns left. The trams only run on their tracks, a stone track bed with two rails set into the road: a clockwise loop through Rua da Conceição, Rua da Prata, the north side of the Praça do Comércio and Rua Áurea. As on real Lisbon streets, cars and the player can drive over the tracks. The trams stop at red lights and behind other vehicles. On the highway traffic drives both ways: cars, lorries, coaches and motorcycles. On country roads there is oncoming traffic of the same kinds, and driving off the road cuts your top speed to 55 %.
 - Each map has an edge you cannot cross. When you near it the screen turns red and a "turn back" arrow appears. In Lisbon the outer streets are part of the map, so there this only happens when you head for the edge.
 
 ## The city map: Lisbon's Baixa
@@ -89,7 +89,7 @@ The Baixa is the centre of Lisbon, rebuilt as a street grid after the 1755 earth
 | First police car | after 4 seconds; in the countryside once you are about 170 m along the road |
 | **Wanted stars** | 1 to 5, shown under the clock. A new star every fifth of the time limit or of the way to the end (shards in the city, distance on the open roads), whichever is further along. Each wrecked police car counts as 4 % more. Stars never fall. |
 | New police car | until the number for your stars is reached, see the table below |
-| Ramming | every hard hit lowers a police car's health by impact × your ramming power × 0.09; a police car is wrecked when its health is gone and comes back after the time in the table below |
+| Ramming | every hard hit lowers a police car's health by impact × your ramming power × 0.09; a police car is wrecked when its health is gone. The wreck stays where it stopped, its lights dead, dented, sagging and smoking, and the car comes back clean after the time in the table below |
 | Far behind | a police car more than 140 m away drives 20 % faster; one more than 230 m away in the city, or 320 m on the open roads, is sent back near you with full health |
 | Hills | police slow down uphill and speed up downhill as you do; other traffic keeps its speed |
 | **Bust meter** | fills while a police car is **within 9 m** and you are **slower than 4.5 m/s** (about 16 km/h): full in 2.2 s. Otherwise it drains (empty from full in 3 s). |

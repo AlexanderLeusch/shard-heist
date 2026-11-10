@@ -40,7 +40,7 @@ a{color:var(--accent)}
 <tr><td>Both rooms: every setting and option</td><td>settings.md</td><td><code>src/core.js</code>, <code>escape-room/src/rules.js</code> (checks of stored values)</td><td><code>tests/rules.test.js</code>, <code>tests/escape-rules.test.js</code>, <code>tests/browser.test.js</code></td></tr>
 </table>
 <h2>The whole game in one paragraph</h2>
-<p>You were the detective on the Ashford necklace case. Now you are inmate 4471, convicted of stealing it. <b>Room 1:</b> you have ten minutes in a prison washroom to find the code for a hatch in the floor. If you get out (Ending A), a note shows that the guard wanted you out, and a car is waiting at the end of the tunnel. <b>Room 2:</b> the police chase begins. You drive a getaway vehicle through Lisbon's Baixa, on the highway and across the countryside, collecting star shards while up to four police cars and a helicopter hunt you.</p>
+<p>In April 2012 the Starfall necklace, lent by the Ashford family to Lisbon's naval museum for the centenary of the Titanic, vanished from its case. You were the detective on the case, until the trail ended at your own door. Now you are inmate 4471, convicted of stealing it. <b>Room 1:</b> you have ten minutes in a prison washroom to find the code for a hatch in the floor. If you get out (Ending A), a note shows that the guard wanted you out, and a car is waiting at the end of the tunnel. <b>Room 2:</b> the police chase begins. You drive a getaway vehicle through Lisbon's Baixa, on the highway and across the countryside, collecting star shards while up to four police cars and a helicopter hunt you.</p>
 <h2>One night, one look</h2>
 <ul><li><b>Time:</b> both rooms are set on the same night: room 1 around 02:15, room 2 from about 02:30.</li><li><b>Design:</b> both rooms share one design system: the same background, glass panels, fonts, buttons and cards. Each room keeps its own accent colour: <b>orange</b> in the prison, <b>cyan</b> on the run. Hale's radio messages in room 2 are orange because he comes from room 1.</li><li>A test (<code>tests/page.test.js</code>) checks that the shared design tokens and the story links between the rooms stay in place.</li></ul>
 <h2>How the two rooms will connect (planned, not built)</h2>
@@ -54,8 +54,6 @@ a{color:var(--accent)}
 <tr><td><b>Hotspot</b></td><td>Something you can use in a scene, shown as a pulsing marker or a "Walk to" button.</td></tr>
 <tr><td><b>Tick</b></td><td>One step of the clock, many times per second.</td></tr>
 </table>
-<p>test sarah</p>
-<p>hallo by louisa</p>
 </section>
 <section id="room-1-escape-room">
 <h1>Room 1 · Plot Twist: Cell Block D</h1>
@@ -63,7 +61,8 @@ a{color:var(--accent)}
 <h2>Goal</h2>
 <p>Open the hatch in the floor of the toilet stall and climb out <b>before the clock reaches zero</b>.</p>
 <h2>Story</h2>
-<ol><li><b>Briefing.</b> You were the detective on the Ashford necklace case. Tonight you are inmate 4471, convicted of stealing the necklace: someone framed you.</li><li>Officer Hale walks you to washroom 2. In a short scene in the room you turn round to the open door, see him in the corridor light, and watch him swing the door shut and lock it. Through the door he says: "Your ten minutes have begun. Not a second more." He waits outside.</li><li>Inmates whisper about a hatch in the floor of this washroom, locked with a four-digit code that is hidden somewhere in the room.</li></ol>
+<p>The briefing is a short series of cards; <b>Next</b> and <b>Back</b> move between them.</p>
+<ol><li><b>The front page.</b> <i>The Lisbon Times</i> of Monday 16 April 2012: the <b>Starfall necklace</b>, lent by the Ashford family to the Museu de Marinha for an exhibition marking 100 years since the Titanic sank, vanished from its glass case on the night of the centenary. No alarm sounded, and a detective was put on the case.</li><li><b>Who you are.</b> Three weeks ago you were that detective. The trail ended at your own door: the necklace's velvet box was hidden in your car. Tonight you are <b>inmate 4471</b>, convicted of the theft: someone framed you. Your oldest friend on the force kept digging and found the proof that clears your name, but the people who framed you came after him. Before he disappeared from Lisbon, he hid the evidence across the city, in places only you would know to look.</li><li><b>The door.</b> Officer Hale walks you to washroom 2. In a short scene in the room you turn round to the open door, see him in the corridor light, and watch him swing the door shut and lock it. Through the door he says: "Your ten minutes have begun. Not a second more." He waits outside.</li><li><b>The rumour.</b> Inmates whisper about a hatch in the floor of this washroom, locked with a four-digit code that is hidden somewhere in the room.</li><li><b>How to play:</b> the controls.</li></ol>
 <p>The clock only starts when the player presses <b>Start the clock</b> after the briefing.</p>
 <h2>Time</h2>
 <table><tr><th>Rule</th><th>Value</th></tr>
@@ -87,7 +86,7 @@ a{color:var(--accent)}
 <table><tr><th>Item</th><th>Where</th><th>What it does</th></tr>
 <tr><td><b>Spoon</b></td><td>Soap dish at the sinks</td><td>Needed to pry the crooked tile off the wall</td></tr>
 <tr><td><b>Mop</b></td><td>Bucket by the door</td><td>Optional. Used at the door ("Jam the door with the mop") it is placed under the door handle and leaves your inventory. This buys the extra minute.</td></tr>
-<tr><td><b>Car key</b></td><td>In a hollow behind the crooked tile, once the spoon has pried it off</td><td>A car key on a worn leather fob. Someone hid it there for you.</td></tr>
+<tr><td><b>Car key</b></td><td>In a hollow behind the crooked tile, once the spoon has pried it off</td><td>Optional. A car key on a worn leather fob that someone hid there for you, a hint at the car waiting after Ending A. It opens nothing in this room.</td></tr>
 </table>
 <h2>Clues and the code</h2>
 <table><tr><th>Clue</th><th>How to find it</th><th>Text</th></tr>
@@ -95,7 +94,7 @@ a{color:var(--accent)}
 <tr><td><b>Graffiti</b></td><td>Read the scratches on the stall wall</td><td>"She was unsinkable. She sailed only once. The year opens the floor."</td></tr>
 <tr><td><b>Scratches by the door</b></td><td>Read the words scratched into the wall beside the door</td><td>"The 'unsinkable' went down on her first voyage. 15 April 19▒2. More than 1,500 lost."</td></tr>
 </table>
-<ul><li>The code is <b>1912</b>, the year the Titanic sank. It is the <b>same in every game</b> (open: should it change between games?).</li><li>Players who do not know the history can still solve it: "sailed only once" gives the missing digit 1.</li><li>Every clue you read is kept in your clue notes (3 at most). Reading a clue again does not count twice.</li></ul>
+<ul><li>The code is <b>1912</b>, the year the Titanic sank. It is the <b>same in every game</b> (open: should it change between games?).</li><li>Players who do not know the history can still solve it: "sailed only once" gives the missing digit 1.</li><li>Every clue you read is kept in your clue notes (3 at most). Reading a clue again does not count twice.</li><li>The spoon is still needed: the crooked tile hides the car key, not a clue.</li></ul>
 <h2>The lock</h2>
 <ul><li>Four wheels, each showing 0–9. Up after 9 is 0, down after 0 is 9.</li><li>You can only turn the wheels and try the code while kneeling at the hatch.</li><li><b>Try the code:</b></li></ul>
 <p>  - Right code: the hatch opens, Ending A.   - Wrong code: "Clunk. The lock holds." Hale hears the noise, and you lose 30 seconds. The number of wrong codes is counted.</p>
@@ -153,7 +152,7 @@ a{color:var(--accent)}
 <tr><td><b>Highway</b></td><td>Reach the finish <b>4 km</b> ahead. Shards are optional: <b>+4 s</b> each</td><td>1:50</td><td>200 km/h</td><td>187 km/h</td><td>12</td><td>2</td></tr>
 <tr><td><b>Countryside</b></td><td>Reach the village at the end of the road. Shards: <b>+4 s</b> each</td><td>2:30</td><td>158 km/h</td><td>148 km/h</td><td>10</td><td>3</td></tr>
 </table>
-<ul><li>A shard is picked up within 3.8 m; a repair kit within 3.6 m, and only when you have damage.</li><li>Lisbon has traffic lights, other cars and three yellow trams. The trams only run on their tracks, a stone track bed with two rails set into the road: a clockwise loop through Rua da Conceição, Rua da Prata, the north side of the Praça do Comércio and Rua Áurea. As on real Lisbon streets, cars and the player can drive over the tracks. The trams stop at red lights and behind other vehicles. On the highway traffic drives both ways. On country roads there is oncoming traffic, and driving off the road cuts your top speed to 55 %.</li><li>Each map has an edge you cannot cross. When you near it the screen turns red and a "turn back" arrow appears. In Lisbon the outer streets are part of the map, so there this only happens when you head for the edge.</li></ul>
+<ul><li>A shard is picked up within 3.8 m; a repair kit within 3.6 m, and only when you have damage.</li><li>Lisbon has traffic lights and its own traffic: 26 cars, 2 city buses, 4 motorcycles and three yellow trams. A 12 m bus never takes the tight right-hand turn; it goes straight on or turns left. The trams only run on their tracks, a stone track bed with two rails set into the road: a clockwise loop through Rua da Conceição, Rua da Prata, the north side of the Praça do Comércio and Rua Áurea. As on real Lisbon streets, cars and the player can drive over the tracks. The trams stop at red lights and behind other vehicles. On the highway traffic drives both ways: cars, lorries, coaches and motorcycles. On country roads there is oncoming traffic of the same kinds, and driving off the road cuts your top speed to 55 %.</li><li>Each map has an edge you cannot cross. When you near it the screen turns red and a "turn back" arrow appears. In Lisbon the outer streets are part of the map, so there this only happens when you head for the edge.</li></ul>
 <h2>The city map: Lisbon's Baixa</h2>
 <p>The Baixa is the centre of Lisbon, rebuilt as a street grid after the 1755 earthquake. The map is a simplified version of it: the blocks are square, and the grid has 7 streets each way. The real Baixa has a few more, so some are left out. The real Baixa is also flat; the hills on this map are a game decision.</p>
 <table><tr><th>Direction</th><th>Streets, in their real order</th></tr>
@@ -189,7 +188,7 @@ a{color:var(--accent)}
 <tr><td>First police car</td><td>after 4 seconds; in the countryside once you are about 170 m along the road</td></tr>
 <tr><td><b>Wanted stars</b></td><td>1 to 5, shown under the clock. A new star every fifth of the time limit or of the way to the end (shards in the city, distance on the open roads), whichever is further along. Each wrecked police car counts as 4 % more. Stars never fall.</td></tr>
 <tr><td>New police car</td><td>until the number for your stars is reached, see the table below</td></tr>
-<tr><td>Ramming</td><td>every hard hit lowers a police car's health by impact × your ramming power × 0.09; a police car is wrecked when its health is gone and comes back after the time in the table below</td></tr>
+<tr><td>Ramming</td><td>every hard hit lowers a police car's health by impact × your ramming power × 0.09; a police car is wrecked when its health is gone. The wreck stays where it stopped, its lights dead, dented, sagging and smoking, and the car comes back clean after the time in the table below</td></tr>
 <tr><td>Far behind</td><td>a police car more than 140 m away drives 20 % faster; one more than 230 m away in the city, or 320 m on the open roads, is sent back near you with full health</td></tr>
 <tr><td>Hills</td><td>police slow down uphill and speed up downhill as you do; other traffic keeps its speed</td></tr>
 <tr><td><b>Bust meter</b></td><td>fills while a police car is <b>within 9 m</b> and you are <b>slower than 4.5 m/s</b> (about 16 km/h): full in 2.2 s. Otherwise it drains (empty from full in 3 s).</td></tr>
