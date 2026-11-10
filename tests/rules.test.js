@@ -490,6 +490,15 @@ test('hills: smooth and bounded on every map, level at the Arco, the river and t
   assert.equal(Core.hillHeight('nowhere', 3, 3), 0);
 });
 
+test('Lisbon holds the six pieces of evidence that prove the detective innocent, each once', () => {
+  assert.deepEqual(Core.EVIDENCE.map(e => e.key), ['photos', 'prints', 'torch', 'lockpick', 'clothes', 'balaclava']);
+  assert.equal(Core.MODES.city.shards, Core.EVIDENCE.length, 'one of each in the city, and the gate opens after the last');
+  assert.equal(new Set(Core.EVIDENCE.map(e => e.name)).size, 6, 'six different names');
+  for (const e of Core.EVIDENCE) assert.ok(e.found.length > 20 && Object.isFrozen(e), e.key + ' explains what it proves, and cannot be changed');
+  assert.ok(Object.isFrozen(Core.EVIDENCE));
+  assert.equal(Core.MODES.highway.mission, 'Bonus Shards', 'the open roads keep their bonus shards');
+});
+
 test('slopes: uphill is slower, downhill faster, a heavy truck feels it most, and brakes still hold', () => {
   const VEH = Core.VEH, idle = { up: false, down: false, brake: false };
   const pull = (grade, v) => { let s = 0; for (let t = 0; t < 12; t += 1 / 60) s = Core.stepSpeed(s, { ...idle, up: true }, 1 / 60, Core.slopeTop(34 * v.speed, grade, v), v, grade); return s; };

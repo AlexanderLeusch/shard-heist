@@ -27,14 +27,29 @@ Percentages are relative to the map's top speed and to the car. The menu shows t
 
 | Map | Goal | Time | Car top speed | Police top speed | Shards | Repair kits |
 |---|---|---|---|---|---|---|
-| **Lisbon · Baixa** | Collect **all 8 shards**, then drive through the golden gate that appears under the Arco da Rua Augusta | 3:00 | 122 km/h | 119 km/h | 8 | 3 |
+| **Lisbon · Baixa** | Collect **all 6 pieces of evidence**, then drive through the golden gate that appears under the Arco da Rua Augusta | 3:00 | 122 km/h | 119 km/h | 6 pieces of evidence | 3 |
 | **Highway** | Reach the finish **4 km** ahead. Shards are optional: **+4 s** each | 1:50 | 200 km/h | 187 km/h | 12 | 2 |
 | **Countryside** | Reach the village at the end of the road. Shards: **+4 s** each | 2:30 | 158 km/h | 148 km/h | 10 | 3 |
 
-- A shard is picked up within 3.8 m; a repair kit within 3.6 m, and only when you have damage.
+- A shard or a piece of evidence is picked up within 3.8 m; a repair kit within 3.6 m, and only when you have damage.
 - Lisbon has traffic lights, 26 other cars, two white city buses, four motorcycles and three yellow trams. The trams only run on their tracks, a stone track bed with two rails set into the road: a clockwise loop through Rua da Conceição, Rua da Prata, the north side of the Praça do Comércio and Rua Áurea. As on real Lisbon streets, cars and the player can drive over the tracks. The buses are 12 m long, so at a crossing they go straight on or turn left in the wide arc, never right into the tight corner (unless that is the only way left at the edge of the map). Everything stops at red lights and keeps its distance to the back of the vehicle ahead, so nobody runs into the long tail of a bus or a tram. On the highway traffic drives both ways: cars, SUVs, lorries, three coaches and six motorcycles; lorries and coaches keep to the middle and slow lanes. On country roads there is oncoming traffic, with one coach and three motorcycles among it, and driving off the road cuts your top speed to 55 %.
 - **Other vehicles at night:** every vehicle throws its headlights on the road ahead, so a car waiting at a dark crossing can be seen from far away. Its bright brake lights are on while it slows down or stands. You can crash into buses and motorcycles like into any other vehicle.
 - Each map has an edge you cannot cross. When you near it the screen turns red and a "turn back" arrow appears. In Lisbon the outer streets are part of the map, so there this only happens when you head for the edge.
+
+## The evidence in Lisbon
+
+In Lisbon you do not collect star shards. Your oldest friend on the force found out who really broke into the naval museum and hid the proof across the Baixa (room 1 tells this in its briefing). There are six pieces, one of each, in random places every run. Each floats above the street with a glow, and the panel at the top left shows one icon per piece that lights up when it is in the car.
+
+| Evidence | What it proves |
+|---|---|
+| **Photos** | A figure at the museum window at 01:40 on the night of the theft, while you were at home |
+| **Fingerprints** | Fingerprints and DNA traces from the display case, and they are not yours |
+| **Torch** | The thief's torch, dropped in the museum garden, with paint from the window frame on it |
+| **Lockpick** | The museum's lock was opened with these picks, not forced |
+| **Clothes** | The dark clothes from the photos, with glass splinters from the display case in the seams |
+| **Balaclava** | The balaclava from the photos, with hairs inside that are not yours |
+
+With all six in the car, the gate under the Arco da Rua Augusta opens. The highway and the countryside keep their **bonus shards** (+4 s each).
 
 ## The city map: Lisbon's Baixa
 
@@ -89,7 +104,7 @@ The Baixa is the centre of Lisbon, rebuilt as a street grid after the 1755 earth
 | Rule | Value |
 |---|---|
 | First police car | after 4 seconds; in the countryside once you are about 170 m along the road |
-| **Wanted stars** | 1 to 5, shown under the clock. A new star every fifth of the time limit or of the way to the end (shards in the city, distance on the open roads), whichever is further along. Each wrecked police car counts as 4 % more. Stars never fall. |
+| **Wanted stars** | 1 to 5, shown under the clock. A new star every fifth of the time limit or of the way to the end (evidence in the city, distance on the open roads), whichever is further along. Each wrecked police car counts as 4 % more. Stars never fall. |
 | New police car | until the number for your stars is reached, see the table below |
 | Ramming | every hard hit lowers a police car's health by impact × your ramming power × 0.09; a police car is wrecked when its health is gone and comes back after the time in the table below |
 | **Police wreck** | stays where it stopped: lights out, dented and dull, sagging to one side and smoking for about 14 s. Traffic stops behind it, and you and the police can crash into it. It is cleared when you are more than 260 m away, or after 30 s once you are more than 70 m away. When that car is sent back into the chase, it comes back clean |
@@ -142,14 +157,14 @@ All of it is composed and synthesised by the game, with no music files. The tune
 
 | Act | Map | Goal | Special rule |
 |---|---|---|---|
-| **1 · The Scatter** | Lisbon | Recover the 8 shards, then the gate | An optional **sealed letter** is hidden in a park. It is **not shown on the radar**. |
+| **1 · The Evidence** | Lisbon | Recover the 6 pieces of evidence, then the gate | An optional **sealed letter** is hidden in a park. It is **not shown on the radar**. |
 | **2 · The Courier** | Highway | Catch the gold-marked courier lorry (get within 9 m) to take the **clasp**, then the finish | The **toll at the finish only opens with the clasp**: without it you stop there |
 | **3 · Homecoming** | Countryside | Drive back to the Ashford mansion | Officer Hale waits on the right verge 70 m before the finish and calls out when you are close. The confrontation decides the ending |
 
 | Ending | When |
 |---|---|
 | **A · The truth** | You found the letter: it proves Lady Ashford staged the theft. Hale gives you your badge back. |
-| **B · Back in 4471** | No letter: Lady Ashford hands you to the police, and you go back to cell 4471. |
+| **B · Back in 4471** | No letter: the evidence alone, brought by an escaped convict, is not believed. Lady Ashford hands you to the police, and you go back to cell 4471. |
 | **C · Caught** | Busted, wrecked or out of time in any act: back to Cell Block D. You can retry that act. |
 
 **Retrying an act:** a letter found during the failed attempt does **not** count. A letter found in an earlier, finished act does.

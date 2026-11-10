@@ -14,7 +14,7 @@
   // ### acceleration and handling multipliers, damage taken (dmg), ramming power (ram) and the collision circles (samples, r).
   // ### Change a number here and the whole game, including the stat bars in the menu, follows it.
   const MODES = {
-    city: { key: 'city', title: 'Lisbon · Baixa', eyebrow: 'Baixa · Lisbon', mission: 'Star Shards', max: 34, police: 33, time: 180, gaugeMax: 180, redline: 140, radar: 70, shards: 8, kits: 3, store: 'shard-heist-city-best' },
+    city: { key: 'city', title: 'Lisbon · Baixa', eyebrow: 'Baixa · Lisbon', mission: 'Evidence', max: 34, police: 33, time: 180, gaugeMax: 180, redline: 140, radar: 70, shards: 6, kits: 3, store: 'shard-heist-city-best' },
     highway: { key: 'highway', title: 'Highway', eyebrow: 'Highway', mission: 'Bonus Shards', max: 55.6, police: 52, time: 110, gaugeMax: 290, redline: 230, radar: 110, shards: 12, kits: 2, bonus: 4, store: 'shard-heist-highway-best', linear: true },
     country: { key: 'country', title: 'Countryside', eyebrow: 'Country roads', mission: 'Bonus Shards', max: 44, police: 41, time: 150, gaugeMax: 240, redline: 190, radar: 90, shards: 10, kits: 3, bonus: 4, store: 'shard-heist-country-best', linear: true }
   };
@@ -90,6 +90,18 @@
 
   // ### Two keys can do the same thing (W and the up arrow): the action stays on until the last of them is released.
   const actionHeld = (held, action) => [...held].some(code => KEY_MAP[code] === action);
+
+  // ### In Lisbon the player does not collect star shards but the evidence that proves the detective innocent. The detective's
+  // ### oldest friend on the force found out who really broke into the naval museum and hid the proof across the Baixa. Each
+  // ### piece is collected once; with all six in the car, the gate under the Arco opens. MODES.city.shards counts them.
+  const EVIDENCE = Object.freeze([
+    Object.freeze({ key: 'photos', name: 'Photos', found: 'Photos of the break-in: a figure at the museum window, at 01:40 on the night of the theft. You were at home.' }),
+    Object.freeze({ key: 'prints', name: 'Fingerprints', found: 'Fingerprints and DNA traces from the display case. They are not yours.' }),
+    Object.freeze({ key: 'torch', name: 'Torch', found: 'The thief’s torch, dropped in the museum garden. Paint from the window frame is still on it.' }),
+    Object.freeze({ key: 'lockpick', name: 'Lockpick', found: 'A set of lockpicks. The museum’s lock was opened with them, not forced.' }),
+    Object.freeze({ key: 'clothes', name: 'Clothes', found: 'The dark clothes seen in the photos, with glass splinters from the display case in the seams.' }),
+    Object.freeze({ key: 'balaclava', name: 'Balaclava', found: 'The balaclava from the photos. There are hairs inside it, and they are not yours.' })
+  ]);
 
   // ---------- The city map: Lisbon's Baixa ----------
   // ### The Baixa was rebuilt as a street grid after the 1755 earthquake, so it fits the game's 7 x 7 grid of roads. The names
@@ -694,7 +706,7 @@
 
   return Object.freeze({
     MODES, VEH, REV_SPEED, REPAIR_AMOUNT, MAX_DT, STORY_ACTS, KEY_MAP, BAIXA, streetAt, TRAM_LOOP, tramNext,
-    isMode, isVeh, clamp, wrapAngle, mulberry32, shuffle, fmtTime, fmtTimeExact, frameDt,
+    EVIDENCE, isMode, isVeh, clamp, wrapAngle, mulberry32, shuffle, fmtTime, fmtTimeExact, frameDt,
     parsePick, parseBest, applyPick, actionAllowed,
     vehStats, zeroTo80, topSpeed, stepSpeed, collidePoint, HILL_BOX, HILL_GRID, hillHeight, hillMesh, gradeAt, slopeTop,
     crashDamage, CRASH_FREE, CRASH_FACTOR, CRASH_QUIET, newCrashGuard, chargeCrash, addDamage, repairDamage, isWrecked, damageStage, damageLevel, smokeFor, actionHeld, TILT_DEAD, TILT_FULL, tiltSteer, parseSteer, snapShadow, QUALITY_SCALES, newQuality, stepQuality, parseVolume, volumeGain,

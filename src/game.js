@@ -3391,6 +3391,71 @@ const kitMat = new THREE.MeshStandardMaterial({ color: 0xd8ffe9, emissive: GREEN
 const kitBar1 = new THREE.BoxGeometry(1.6, 0.5, 0.5), kitBar2 = new THREE.BoxGeometry(0.5, 1.6, 0.5);
 let runGroup = null, items = [], kits = [], gate = null;
 
+// ### The six pieces of evidence in Lisbon, each a small model that floats and turns where the star shards would be. They are
+// ### about one and a half times life size, and slightly self-lit, so they can be seen from the car at night.
+const printTexture = (() => {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 160;
+  const g = c.getContext('2d'); g.fillStyle = '#f4f1e8'; g.fillRect(0, 0, 128, 160);
+  g.strokeStyle = '#2a2f3a'; g.lineWidth = 2.2;
+  for (let k = 1; k < 14; k++){ g.beginPath(); g.ellipse(64, 70, 4 + k * 3.4, 6 + k * 4.4, 0.15, Math.PI * 0.05 * (k % 3), Math.PI * (1.9 + 0.05 * (k % 2))); g.stroke(); }
+  g.fillStyle = '#b3262c'; g.fillRect(0, 138, 128, 22); g.fillStyle = '#fff'; g.font = '700 15px "Segoe UI", sans-serif'; g.fillText('EVIDENCE', 26, 154);
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
+})();
+const photoTexture = (() => {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 100;
+  const g = c.getContext('2d'); g.fillStyle = '#f7f5ef'; g.fillRect(0, 0, 128, 100);
+  const sky = g.createLinearGradient(0, 8, 0, 78); sky.addColorStop(0, '#1d2a44'); sky.addColorStop(1, '#3b3a4a'); g.fillStyle = sky; g.fillRect(8, 8, 112, 70);
+  g.fillStyle = '#c9a94a'; g.fillRect(70, 22, 30, 40); g.fillStyle = '#0d0f14'; g.fillRect(76, 30, 12, 28); g.beginPath(); g.arc(82, 30, 5, 0, Math.PI * 2); g.fill();
+  const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t;
+})();
+function evidenceModel(key){
+  const g = new THREE.Group(), lit = (color, extra) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.6, emissive: color, emissiveIntensity: 0.22 }, extra || {}));
+  const add = (geo, mat, x, y, z, rx, ry, rz) => { const m = new THREE.Mesh(geo, mat); m.position.set(x || 0, y || 0, z || 0); m.rotation.set(rx || 0, ry || 0, rz || 0); m.castShadow = true; g.add(m); return m; };
+  if (key === 'photos'){
+    // three prints fanned out
+    [-0.32, 0, 0.32].forEach((r, i) => add(new THREE.BoxGeometry(0.62, 0.48, 0.015), new THREE.MeshStandardMaterial({ map: photoTexture, emissive: 0xffffff, emissiveMap: photoTexture, emissiveIntensity: 0.45, roughness: 0.5 }), (i - 1) * 0.14, (i - 1) * -0.03, i * 0.02, 0, 0, r));
+  } else if (key === 'prints'){
+    // a fingerprint card in a clear evidence bag, with a DNA swab
+    add(new THREE.BoxGeometry(0.5, 0.64, 0.012), new THREE.MeshStandardMaterial({ map: printTexture, emissive: 0xffffff, emissiveMap: printTexture, emissiveIntensity: 0.45, roughness: 0.5 }));
+    add(new THREE.BoxGeometry(0.62, 0.8, 0.05), new THREE.MeshStandardMaterial({ color: 0xd8f0ff, transparent: true, opacity: 0.22, roughness: 0.1, depthWrite: false }), 0, -0.04, 0);
+    add(new THREE.CylinderGeometry(0.012, 0.012, 0.55, 6), lit(0xe8e8e8), 0.36, -0.1, 0.05, 0, 0, 0.5);
+    add(new THREE.SphereGeometry(0.035, 8, 6).scale(1, 1.6, 1), lit(0xffffff, { emissiveIntensity: 0.5 }), 0.49, 0.13, 0.05);
+  } else if (key === 'torch'){
+    const body = new THREE.Group(); body.rotation.set(0, 0, Math.PI / 2 - 0.25); g.add(body);
+    const b = (geo, mat, y) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; m.castShadow = true; body.add(m); };
+    b(new THREE.CylinderGeometry(0.075, 0.075, 0.62, 14), lit(0x1c1d21, { roughness: 0.7, emissiveIntensity: 0.15 }), 0);
+    b(new THREE.CylinderGeometry(0.13, 0.085, 0.2, 16), lit(0x9aa2ab, { metalness: 0.7, roughness: 0.3 }), 0.4);
+    b(new THREE.CircleGeometry(0.12, 18).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xfff3c4 }), 0.505);
+    b(new THREE.BoxGeometry(0.05, 0.08, 0.03), lit(0xb3262c), 0.1);
+  } else if (key === 'lockpick'){
+    // a tension wrench and a hook pick on a small leather wallet
+    add(new THREE.BoxGeometry(0.7, 0.04, 0.42), lit(0x5a3a26, { roughness: 0.8 }), 0, -0.2, 0, 0.35, 0, 0);
+    const steel = lit(0xc9d1d9, { metalness: 0.8, roughness: 0.25, emissiveIntensity: 0.35 });
+    add(new THREE.BoxGeometry(0.62, 0.025, 0.025), steel, 0, 0.02, 0);
+    add(new THREE.BoxGeometry(0.025, 0.09, 0.025), steel, 0.31, 0.055, 0);
+    add(new THREE.BoxGeometry(0.2, 0.06, 0.05), lit(0x202226), -0.24, 0.02, 0);
+    add(new THREE.BoxGeometry(0.46, 0.02, 0.02), steel, 0.02, -0.09, 0.07);
+    add(new THREE.BoxGeometry(0.02, 0.12, 0.02), steel, -0.2, -0.04, 0.07);
+  } else if (key === 'clothes'){
+    // a folded dark hoodie and trousers, as found in a bag
+    const cloth = lit(0x46536b, { roughness: 0.95, emissiveIntensity: 0.45 });
+    add(new THREE.BoxGeometry(0.78, 0.16, 0.56), lit(0x3a3f4a, { roughness: 0.95, emissiveIntensity: 0.45 }), 0, -0.14, 0);
+    add(new THREE.BoxGeometry(0.72, 0.15, 0.52), cloth, 0.02, 0.02, 0.01, 0, 0.06, 0);
+    add(new THREE.TorusGeometry(0.15, 0.04, 8, 18, Math.PI), cloth, 0.02, 0.1, -0.2, -Math.PI / 2, 0, 0);
+    add(new THREE.BoxGeometry(0.06, 0.02, 0.3), lit(0x8a8f99), 0.12, 0.1, 0.05);
+  } else {
+    // the balaclava: a knitted head shape with one slit for the eyes
+    add(new THREE.SphereGeometry(0.3, 20, 16).scale(0.92, 1.18, 1), lit(0x34363e, { roughness: 1, emissiveIntensity: 0.5 }));
+    add(new THREE.BoxGeometry(0.34, 0.08, 0.1), new THREE.MeshBasicMaterial({ color: 0x050506 }), 0, 0.07, 0.25);
+    add(new THREE.TorusGeometry(0.19, 0.022, 6, 24).scale(1, 0.32, 1), lit(0x8d909a, { emissiveIntensity: 0.5 }), 0, 0.07, 0.24);
+    add(new THREE.CylinderGeometry(0.24, 0.28, 0.14, 18), lit(0x34363e, { roughness: 1, emissiveIntensity: 0.5 }), 0, -0.38, 0);
+  }
+  if (key === 'photos' || key === 'prints' || key === 'lockpick') g.rotation.x = -0.6;
+  g.scale.setScalar(1.5);
+  const turn = new THREE.Group(); turn.add(g);
+  return turn;
+}
+
 function glowSprite(color, size, opacity){
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: opacity || 1 }));
   s.scale.setScalar(size);
@@ -3434,12 +3499,13 @@ function placeRun(){
 
   chosen.forEach((s, i) => {
     const g = new THREE.Group(); g.position.set(s.x, groundH(s.x, s.z) + (s.park ? 0.12 : 0), s.z);
-    const gem = new THREE.Mesh(gemGeo, gemMat); gem.position.y = 1.9; gem.castShadow = true;
+    const ev = mode === 'city' ? Core.EVIDENCE[i % Core.EVIDENCE.length] : null;
+    const gem = ev ? evidenceModel(ev.key) : new THREE.Mesh(gemGeo, gemMat); gem.position.y = 1.9; gem.castShadow = true;
     const glow = glowSprite(SPARK, 7, 0.95); glow.position.y = 1.9;
     const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: SPARK, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
     ring.position.y = 0.06;
     g.add(gem, glow, ring); runGroup.add(g);
-    items.push({ x: s.x, z: s.z, s: s.s, group: g, gem, glow, ring, taken: false, phase: i * 1.7 });
+    items.push({ x: s.x, z: s.z, s: s.s, group: g, gem, glow, ring, ev, taken: false, phase: i * 1.7 });
   });
   kitSpots.forEach((s, i) => {
     const g = new THREE.Group(); g.position.set(s.x, groundH(s.x, s.z), s.z);
@@ -4116,6 +4182,15 @@ const ui = {
   pursuit: $('pursuit'), edge: $('edgeWarn'), edgeBanner: $('ewBanner'), edgeArrow: $('ewArrow'), purState: $('purState'), cops: [...$('cops').children], stars: $('stars'), bustPct: $('bustPct'), bfill: $('bfill')
 };
 const DIAMOND = '<svg class="chip" viewBox="0 0 16 16"><path d="M8 1.5 14.5 8 8 14.5 1.5 8Z"/></svg>';
+// ### One small line icon per piece of evidence, for the panel at the top left; it lights up when the piece is in the car.
+const EV_ICON = {
+  photos: 'M2 4h9v8H2zM5 2h9v8M3.5 10l2.5-3 2 2 1.5-1.5 1.5 2.5',
+  prints: 'M8 2.5c-3 0-5 2.2-5 5M8 2.5c3 0 5 2.2 5 5v1M5.5 13c-.5-1.5-.5-3 0-4.5C6.2 6.6 9.8 6.6 10.5 8.5c.5 1.5.4 3-.2 4.5M8 8.5v5M3 10.5c.2 1 .5 1.8 1 2.5',
+  torch: 'M2 6.5h7v3H2zM9 5l4-2v10l-4-2zM14.5 6v4',
+  lockpick: 'M1.5 9.5h9l2-2.5M1.5 9.5v-2h3v2M5 12.5h8M13 12.5v-2',
+  clothes: 'M5.5 2 2 4.5l1.5 2.5L5 6v8h6V6l1.5 1 1.5-2.5L10.5 2c-.5 1.2-1.4 1.8-2.5 1.8S6 3.2 5.5 2z',
+  balaclava: 'M8 1.5c3 0 5 2.6 5 6v4.5c0 1.5-2.2 2.5-5 2.5s-5-1-5-2.5V7.5c0-3.4 2-6 5-6zM4.5 7h7v2.3h-7z'
+};
 const STAR = '<svg viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.2 1.3-6.6L2.5 9.3l6.6-.8z"/></svg>';
 
 const G = { cx: 80, cy: 80, r: 66, a0: 135, sweep: 270, max: 160 };
@@ -4157,7 +4232,9 @@ function toast(text, tone, ms, important){
   }, ms || 2600);
 }
 function renderChips(){
-  ui.chips.innerHTML = items.map(it => DIAMOND.replace('class="chip"', 'class="chip' + (it.taken ? ' on' : '') + '"')).join('') +
+  ui.chips.innerHTML = items.map(it => it.ev
+    ? `<svg class="chip ev${it.taken ? ' on' : ''}" viewBox="0 0 16 16" role="img" aria-label="${it.ev.name}${it.taken ? ', found' : ''}"><title>${it.ev.name}</title><path d="${EV_ICON[it.ev.key]}"/></svg>`
+    : DIAMOND.replace('class="chip"', 'class="chip' + (it.taken ? ' on' : '') + '"')).join('') +
     `<span class="count">${collected}/${items.length}</span>`;
 }
 const pedal = { thr: 0, brk: 0 };
@@ -4246,7 +4323,7 @@ function updateHud(dt){
     items.forEach(it => { if (!it.taken && (mode === 'city' || it.s > routeProgress()[0] - 5)) dist = Math.min(dist, Math.hypot(it.x - car.x, it.z - car.z)); });
     const R = M.radar;
     bars = dist < R ? 4 : dist < R * 1.5 ? 3 : dist < R * 2.2 ? 2 : 1;
-    txt = bars === 4 ? 'Shard in range' : bars === 3 ? 'Medium signal' : 'Weak signal';
+    txt = bars === 4 ? (mode === 'city' ? 'Evidence in range' : 'Shard in range') : bars === 3 ? 'Medium signal' : 'Weak signal';
     if (M.linear && dist === Infinity){ bars = 4; txt = 'Finish ahead'; gold = true; }
   }
   const key = bars + txt + gold;
@@ -4417,17 +4494,19 @@ function startRun(m, v){
   hud.classList.remove('off');
   hideOverlay();
   state = 'play';
-  if (mode === 'city') toast('Grab 8 star shards, then escape through the Arco da Rua Augusta. Every police car is looking for inmate 4471.', '', 4200);
+  if (mode === 'city') toast('Find the 6 pieces of evidence that prove you innocent, then escape through the Arco da Rua Augusta. Every police car is looking for inmate 4471.', '', 4500);
   else if (mode === 'country') toast('Follow the country road to the village. Shards add +4 s. Watch the oncoming traffic.', '', 4500);
   else toast(`Reach the finish 4 km ahead. Shards add +${M.bonus} s. Police incoming.`, '', 4500);
 }
+// what is collected on this map
+const what = () => mode === 'city' ? 'pieces of evidence' : 'shards';
 // ### Pauses the run and shows the pause card.
 function pause(){
   state = 'pause';
   showCard(`
     <div class="eyebrow">${M.title} · ${V.name}</div>
     <h2>Paused</h2>
-    <p>${collected} of ${items.length} shards, ${fmtTime(timeLeft)} left, damage at ${Math.round(damage)}%, bust meter at ${Math.round(bust * 100)}%.</p>
+    <p>${collected} of ${items.length} ${what()}, ${fmtTime(timeLeft)} left, damage at ${Math.round(damage)}%, bust meter at ${Math.round(bust * 100)}%.</p>
     <div class="actions">
       <button class="btn" data-action="resume">Resume</button>
       <button class="btn ghost" data-action="${story ? 'retry-act' : 'again'}">Restart</button>
@@ -4439,7 +4518,7 @@ function pause(){
 // ### Goes back to driving after a pause.
 function resume(){ hideOverlay(); state = 'play'; initAudio(); }
 
-// ### Picks up a shard, adds any bonus time, and opens the finish gate after the last one.
+// ### Picks up a shard or a piece of evidence, adds any bonus time, and opens the finish gate after the last one.
 function collect(it){
   it.taken = true; collected++;
   burst(it.x, it.group.position.y + 1.9, it.z, SPARK, 28);
@@ -4450,8 +4529,8 @@ function collect(it){
   if (collected >= items.length){
     gate.active = true; gate.group.visible = true; gate.grow = 0;
     sfx.gate();
-    toast('All shards found! Escape through the Arco da Rua Augusta: follow the golden beam.', 'gold', 4500);
-  } else toast(`Star shard ${collected} / ${items.length}`, '', 1800);
+    toast(`${it.ev.name}: ${it.ev.found} That is all the evidence. Escape through the Arco da Rua Augusta: follow the golden beam.`, 'gold', 6000);
+  } else toast(`Evidence ${collected} / ${items.length} · ${it.ev.name}: ${it.ev.found}`, '', 4200);
 }
 // ### Picks up a repair kit: Core.repairDamage removes the damage.
 function repair(kt){
@@ -4518,10 +4597,10 @@ function gameOver(reason){
   if (reason === 'wrecked'){ const fx = Math.sin(car.heading), fz = Math.cos(car.heading); burst(car.x + fx, car.y + 1.2, car.z + fz, SPARKS, 36, 0.9); }
   const title = reason === 'busted' ? 'Busted!' : reason === 'wrecked' ? 'Vehicle wrecked' : "Time's up";
   const text = reason === 'busted'
-    ? `The police boxed you in with ${collected} of ${items.length} shards. Keep moving: the bust meter only fills while you are slow and a cop is right next to you.`
+    ? `The police boxed you in with ${collected} of ${items.length} ${what()}. Keep moving: the bust meter only fills while you are slow and a cop is right next to you.`
     : reason === 'wrecked'
-      ? `Damage hit 100% with ${collected} of ${items.length} shards collected. Grab the green repair kits and avoid head-on hits.`
-      : `You found ${collected} of ${items.length} shards. ${mode === 'city' ? 'The signal bars under the radar tell you whether you are getting closer.' : (mode === 'country' ? 'Overtake on the straights and keep an eye on oncoming traffic.' : 'Stay in the fast left lane where you can.')}`;
+      ? `Damage hit 100% with ${collected} of ${items.length} ${what()} collected. Grab the green repair kits and avoid head-on hits.`
+      : `You found ${collected} of ${items.length} ${what()}. ${mode === 'city' ? 'The signal bars under the radar tell you whether you are getting closer.' : (mode === 'country' ? 'Overtake on the straights and keep an eye on oncoming traffic.' : 'Stay in the fast left lane where you can.')}`;
   showCard(`
     <div class="eyebrow">${M.title} · ${V.name}</div>
     <h2>${title}</h2>
@@ -4599,13 +4678,13 @@ function showMenu(){
     <div class="m-top">
       <div class="m-brand"><span class="m-dot"></span>Escaped · Inmate 4471 · 02:30</div>
       <h1 class="m-logo">Shard<br><em>Heist</em></h1>
-      <p class="m-lede">You are out of Cell Block D, and every police car in town knows it. Grab the star shards, ram the police, outrun them or lose them in traffic, then escape through the gate.</p>
+      <p class="m-lede">You are out of Cell Block D, and every police car in town knows it. Find the evidence that proves you innocent, grab the bonus shards on the open road, ram the police, outrun them or lose them in traffic, then escape through the gate.</p>
     </div>
-    <button class="story-card" data-action="story"><span class="sc-eyebrow">Story mode · after the tunnel · 3 acts · 3 endings</span><b>The Necklace Job</b><span>You escaped. Now prove who framed you: recover the Starfall necklace across the city, the highway and the countryside, with Officer Hale on the radio.</span><em>Play the story →</em></button>
+    <button class="story-card" data-action="story"><span class="sc-eyebrow">Story mode · after the tunnel · 3 acts · 3 endings</span><b>The Necklace Job</b><span>You escaped. Now prove who framed you: the evidence in the city, the necklace’s clasp on the highway, the truth in the countryside, with Officer Hale on the radio.</span><em>Play the story →</em></button>
     <section class="m-sec">
       <div class="m-label"><span>01</span>Free ride · Map</div>
       <div class="maps">
-        <button class="map" data-pick="mode" data-val="city" aria-pressed="${sel.mode === 'city'}">${MAP_THUMB.city}<span><b>Lisbon · Baixa</b><small>8 shards · 3:00 · trams</small></span></button>
+        <button class="map" data-pick="mode" data-val="city" aria-pressed="${sel.mode === 'city'}">${MAP_THUMB.city}<span><b>Lisbon · Baixa</b><small>6 pieces of evidence · 3:00 · trams</small></span></button>
         <button class="map" data-pick="mode" data-val="highway" aria-pressed="${sel.mode === 'highway'}">${MAP_THUMB.highway}<span><b>Highway</b><small>4 km · traffic both ways</small></span></button>
         <button class="map" data-pick="mode" data-val="country" aria-pressed="${sel.mode === 'country'}">${MAP_THUMB.country}<span><b>Countryside</b><small>Hills · farms · village</small></span></button>
       </div>
@@ -5050,13 +5129,13 @@ function applyGfx(){
 let story = null, courier = null;
 const STORY = {
   acts: [
-    { mode: 'city', title: 'The Scatter', goal: 'Recover the eight star shards hidden in Lisbon’s Baixa.' },
+    { mode: 'city', title: 'The Evidence', goal: 'Recover the six pieces of evidence hidden in Lisbon’s Baixa.' },
     { mode: 'highway', title: 'The Courier', goal: 'Catch the gold-marked courier lorry and take the clasp.' },
     { mode: 'country', title: 'Homecoming', goal: 'Drive back to the Ashford mansion.' }
   ],
   // [seconds into the act, text, tone]: Hale's lines are orange (tone 'hale'), police dispatch is red
   radio: [
-    [[5, 'HALE: You made it out. Eight shards of the Starfall necklace are hidden in the Baixa. Find them before the police find you.', 'hale'],
+    [[5, 'HALE: You made it out. Your friend hid six pieces of evidence in the Baixa: photos, fingerprints, a torch, a lockpick, clothes and a balaclava. They show who really broke in. Find them before the police find you.', 'hale'],
      [9, 'DISPATCH: All units, inmate 4471 has escaped from Cell Block D. %V. Approach with caution.', 'red'],
      [32, 'HALE: Ashford’s people used the parks as dead drops. Look there. Not everything shows up on your radar.', 'hale'],
      [58, 'DISPATCH: Escaped inmate still in the Baixa. Roadblocks on the waterfront.', 'red'],
@@ -5080,7 +5159,7 @@ function showStoryIntro(){
     <div class="eyebrow">Story mode · After the tunnel · 02:30</div>
     <h1>The Necklace <em>Job</em></h1>
     <p>The tunnel under Cell Block D ends in a lock-up garage. Officer Hale’s note was true: a vehicle is waiting, the keys in the ignition, a radio on the seat.</p>
-    <p>Three weeks ago you were framed for stealing the Starfall necklace. Tonight it has been broken into eight star shards and scattered across Lisbon’s Baixa. Hale believes you but cannot prove it. You can, if you recover the necklace before the police recover you.</p>
+    <p>Three weeks ago you were framed for stealing the Starfall necklace. Your oldest friend on the force found out who really broke into the museum and hid the proof across Lisbon’s Baixa: photos, fingerprints and DNA, and the thief’s torch, lockpick, clothes and balaclava. Hale believes you but cannot prove it. You can, if you recover the evidence before the police recover you.</p>
     <div class="acts">${STORY.acts.map((a, i) => `<div><span>Act ${i + 1}</span><b>${a.title}</b><small>${a.goal}</small></div>`).join('')}</div>
     <p class="note">Hale helps over the radio. Look carefully: not everything you need shows up on the radar.</p>
     <div class="actions">
@@ -5306,8 +5385,8 @@ function storyFinish(){
   if (story.act === 0){
     showCard(`
       <div class="eyebrow">Act 1 complete · The Scatter</div>
-      <h2>Eight shards, one necklace</h2>
-      <p>The shards are safe in your glovebox, but the necklace is not complete. Hale on the radio: the clasp is on a courier lorry heading out of the city to a fence.</p>
+      <h2>Six pieces of evidence</h2>
+      <p>The photos, the fingerprints, the torch, the lockpick, the clothes and the balaclava are safe in your glovebox. Together they show that someone else broke in. Hale on the radio: the necklace’s clasp is on a courier lorry heading out of the city to a fence.</p>
       ${story.letter ? '<p>The sealed letter lies on the passenger seat. Its wax seal bears the Ashford crest.</p>' : ''}
       ${stats}
       <div class="actions"><button class="btn" data-action="next-act">Start Act 2: The Courier <small class="desk-only">Enter</small></button><button class="btn ghost" data-action="menu">Main menu</button></div>`);
@@ -5333,13 +5412,13 @@ function showEnding(){
   showCard(good ? `
     <div class="eyebrow">Finale · Ending A of 3 · The truth</div>
     <h1>Case <em>closed</em></h1>
-    <p>The whole house is gathered in the hall, and Officer Hale stands at the door. You lay the shards and the clasp on the table, then unfold the letter. It is in Lady Ashford’s hand: <i>“Break it. Scatter it. Pin it on the detective.”</i></p>
-    <p>Next to the insurance claim, it leaves no doubt. The butler confesses that he only followed orders. Lady Ashford is led out in handcuffs, and the Starfall necklace is whole again. Hale hands you back your badge: “Took you long enough.”</p>
+    <p>The whole house is gathered in the hall, and Officer Hale stands at the door. You lay the evidence and the clasp on the table, then unfold the letter. It is in Lady Ashford’s hand: <i>“Take it. Hide the box in the detective’s car. Pin it on the detective.”</i></p>
+    <p>Next to the insurance claim, it leaves no doubt. The fingerprints and the hairs in the balaclava are the butler’s, and he confesses that he only followed orders. Lady Ashford is led out in handcuffs, and the rest of the Starfall necklace turns up in her safe. Hale hands you back your badge: “Took you long enough.”</p>
     ${stats}
     <div class="actions"><button class="btn" data-action="story">Play the story again <small class="desk-only">Enter</small></button><button class="btn ghost" data-action="menu">Main menu</button></div>` : `
     <div class="eyebrow">Finale · Ending B of 3 · Framed</div>
     <h1>Back in <em>4471</em></h1>
-    <p>You lay the shards and the clasp on the table. “Thank you, inmate 4471,” says Lady Ashford, and turns to the officers behind you. “There is your thief. Broke out of prison, too.”</p>
+    <p>You lay the evidence and the clasp on the table. “Evidence brought by an escaped convict proves nothing,” says Lady Ashford, and turns to the officers behind you. “There is your thief. Broke out of prison, too.”</p>
     <p>Without proof, the insurance claim is just paper. By morning you are back in cell 4471, and Hale cannot help you twice. Somewhere in the Baixa, a sealed letter is still waiting in a park.</p>
     ${stats}
     <div class="actions"><button class="btn" data-action="story">Try for the true ending <small class="desk-only">Enter</small></button><button class="btn ghost" data-action="menu">Main menu</button></div>`);
@@ -5354,7 +5433,7 @@ function storyGameOver(reason){
   const text = reason === 'busted'
     ? 'The police box you in. From the back of the squad car you hear the radio: “Inmate 4471 in custody. Lady Ashford has been informed.” Next stop: Cell Block D.'
     : reason === 'wrecked'
-      ? 'Your vehicle gives up. By the time the smoke clears, blue lights surround you. The shards go into an evidence bag, and you go back to cell 4471.'
+      ? 'Your vehicle gives up. By the time the smoke clears, blue lights surround you. Your evidence goes into a police bag, and you go back to cell 4471.'
       : 'You ran out of time. The fence has the necklace, and Cell Block D has its inmate back.';
   showCard(`
     <div class="eyebrow">Act ${story.act + 1} · ${A.title} · Ending C of 3</div>

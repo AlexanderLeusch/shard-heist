@@ -48,6 +48,10 @@ body{background:var(--bg);color:var(--ink);font-family:var(--f-display);overflow
 .chip path{fill:transparent;stroke:var(--muted);stroke-width:1.5;transition:fill .3s,stroke .3s}
 .chip.on path{fill:var(--spark);stroke:var(--spark)}
 .chip.on{filter:drop-shadow(0 0 5px var(--spark))}
+/* the evidence icons are drawn with lines only, so they light up in the line colour instead of filling */
+.chip.ev{width:18px;height:18px}
+.chip.ev path{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.chip.ev.on path{fill:none;stroke:var(--spark)}
 .count{font-family:var(--f-mono);font-size:13px;color:var(--muted);margin-left:4px;font-variant-numeric:tabular-nums}
 .prog{display:grid;gap:6px;margin-top:8px}
 .prog-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px}

@@ -157,7 +157,8 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       assert.equal(await evaluate("document.querySelectorAll('.acts > div').length"), 3);
       await click('[data-action="act"]');
       await waitFor(playing, 30000, 'act 1 to start');
-      assert.match(await text('#missionEye'), /Act 1 · The Scatter/);
+      assert.match(await text('#missionEye'), /Act 1 · The Evidence/);
+      assert.equal(await evaluate("[...document.querySelectorAll('#chips .chip.ev')].map(c => c.getAttribute('aria-label')).join()"), 'Photos,Fingerprints,Torch,Lockpick,Clothes,Balaclava', 'six pieces of evidence to find in Lisbon');
       assert.deepEqual(errors, []);
     });
 
