@@ -5,14 +5,14 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
-const Core = require('../src/core.js');
-const { createServer, resolvePath, ROOT } = require('../scripts/serve.js');
+const Core = require('../../room-2-chase/js/core.js');
+const { createServer, resolvePath, ROOT } = require('../../tools/serve.js');
 
 const read = f => fs.readFileSync(path.join(ROOT, f), 'utf8');
-const html = read('index.html');
+const html = read('room-2-chase/index.html');
 // Tests below read the source text. Comments are removed first: a test must not pass because of a comment.
 const uncommented = t => t.replace(/^\s*\/\/.*$/gm, '').replace(/(\s)\/\/ .*$/gm, '$1');
-const rawGame = read('src/game.js'), game = uncommented(rawGame);
+const rawGame = read('room-2-chase/js/game.js'), game = uncommented(rawGame);
 const scripts = [...html.matchAll(/<script\b([^>]*)><\/script>/g)].map(m => m[1]);
 
 test('every element the game looks up by id exists in index.html', () => {
@@ -36,12 +36,12 @@ test('every data-action on a card is a known action', () => {
 
 test('scripts load in the right order: error screen, libraries, rules, game', () => {
   const srcs = scripts.map(a => a.match(/src="([^"]+)"/)[1]);
-  assert.equal(srcs[0], 'src/boot.js');
-  assert.equal(srcs.at(-2), 'src/core.js');
-  assert.equal(srcs.at(-1), 'src/game.js');
+  assert.equal(srcs[0], 'js/boot.js');
+  assert.equal(srcs.at(-2), 'js/core.js');
+  assert.equal(srcs.at(-1), 'js/game.js');
   assert.ok(srcs.slice(1, -2).every(s => s.startsWith('https://')));
   assert.ok(!/<script>\s*\S/.test(html), 'no inline scripts, so the CSP can forbid them');
-  for (const f of srcs.filter(s => !s.startsWith('http'))) assert.ok(fs.existsSync(path.join(ROOT, f)), f);
+  for (const f of srcs.filter(s => !s.startsWith('http'))) assert.ok(fs.existsSync(path.join(ROOT, 'room-2-chase', f)), f);
 });
 
 test('every external library is pinned to one exact version and checked with an SRI hash', () => {
@@ -68,7 +68,7 @@ test('the Content Security Policy only allows this site and the two CDNs to run 
 
 test('no credentials or secrets anywhere in the repository', () => {
   const patterns = [/AKIA[0-9A-Z]{16}/, /gh[pousr]_[A-Za-z0-9]{30,}/, /sk-[A-Za-z0-9]{20,}/, /-----BEGIN [A-Z ]*PRIVATE KEY-----/, /(api[_-]?key|secret|password|token)\s*[:=]\s*['"][^'"]{8,}['"]/i];
-  // Every file git tracks, so local folders such as plot-twist/.venv (installed packages, ignored by git) do not count
+  // Every file git tracks, so local folders such as original-solo-project/.venv (installed packages, ignored by git) do not count
   // A downloaded ZIP has no git: then walk the folder and leave out what git would ignore
   const walk = (dir, out = []) => { for (const e of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })){ if (/^(\.git|\.venv|node_modules|__pycache__)$/.test(e.name)) continue; const p = path.posix.join(dir, e.name); if (e.isDirectory()) walk(p, out); else out.push(p); } return out; };
   let tracked;
@@ -88,14 +88,14 @@ test('the project has no npm dependencies to keep up to date', () => {
 });
 
 test('error messages are written as text, never as HTML', () => {
-  const boot = read('src/boot.js');
+  const boot = read('room-2-chase/js/boot.js');
   assert.ok(boot.includes("$('fatalText').textContent = text"));
   assert.ok(!/innerHTML/.test(boot));
 });
 
 test('dev server: serves the game files and refuses paths outside the project', () => {
   assert.equal(resolvePath('/'), path.join(ROOT, 'index.html'));
-  assert.equal(resolvePath('/src/core.js?v=2'), path.join(ROOT, 'src', 'core.js'));
+  assert.equal(resolvePath('/room-2-chase/js/core.js?v=2'), path.join(ROOT, 'room-2-chase', 'js', 'core.js'));
   for (const hidden of ['/.git/config', '/.github/workflows/ci.yml', '/src/../.git/HEAD', '/%2e%2e/.git/config', '/....//index.html']) assert.equal(resolvePath(hidden), 403, hidden);
   // climbing out with ../ (plain, URL-encoded or with backslashes) is clamped to the project folder
   for (const p of ['/../../etc/passwd.html', '/%2e%2e/%2e%2e/secret.html', '/..%5c..%5cwindows.html']){
@@ -120,7 +120,7 @@ test('dev server: answers over HTTP with the right status codes', async () => {
     assert.equal(ok.statusCode, 200);
     assert.match(ok.headers['content-type'], /text\/html/);
     assert.equal(ok.headers['x-content-type-options'], 'nosniff');
-    assert.equal((await get('/src/game.js')).statusCode, 200);
+    assert.equal((await get('/room-2-chase/js/game.js')).statusCode, 200);
     assert.equal((await get('/missing.js')).statusCode, 404);
     assert.equal((await get('/.git/config')).statusCode, 403);
     assert.equal((await get('/', 'POST')).statusCode, 405);
@@ -129,19 +129,19 @@ test('dev server: answers over HTTP with the right status codes', async () => {
 });
 
 // ---------- Room 1: the escape-room page ----------
-const escHtml = read('escape-room/index.html');
-const escRoom = read('escape-room/src/room.js');
+const escHtml = read('room-1-escape/index.html');
+const escRoom = read('room-1-escape/js/room.js');
 const escScripts = [...escHtml.matchAll(/<script\b([^>]*)><\/script>/g)].map(m => m[1]);
 
 test('escape room: scripts load in order, the library is pinned and SRI-checked, no inline scripts', () => {
   const srcs = escScripts.map(a => a.match(/src="([^"]+)"/)[1]);
-  assert.deepEqual(srcs, ['src/boot.js', 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', 'src/rules.js', 'src/room.js']);
+  assert.deepEqual(srcs, ['js/boot.js', 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js', 'js/rules.js', 'js/room.js']);
   const lib = escScripts[1];
   assert.match(lib, /integrity="sha384-[A-Za-z0-9+/]{64}"/);
   assert.match(lib, /crossorigin="anonymous"/);
   assert.equal(lib.match(/integrity="([^"]+)"/)[1], scripts.find(a => a.includes('three.min.js')).match(/integrity="([^"]+)"/)[1], 'same file, same hash as room 2');
   assert.ok(!/<script>\s*\S/.test(escHtml));
-  for (const f of srcs.filter(s => !s.startsWith('http'))) assert.ok(fs.existsSync(path.join(ROOT, 'escape-room', f)), f);
+  for (const f of srcs.filter(s => !s.startsWith('http'))) assert.ok(fs.existsSync(path.join(ROOT, 'room-1-escape', f)), f);
 });
 
 test('escape room: the security policy only allows this site and the one CDN to run scripts', () => {
@@ -158,12 +158,12 @@ test('escape room: every element the room looks up by id exists in its page', ()
   const runtime = new Set(['lockUi', 'tries']);
   const wanted = new Set([...escRoom.matchAll(/\$\('([A-Za-z0-9_-]+)'\)/g)].map(m => m[1]));
   assert.ok(wanted.size > 10);
-  for (const id of wanted) assert.ok(ids.has(id) || runtime.has(id), `#${id} is missing from escape-room/index.html`);
+  for (const id of wanted) assert.ok(ids.has(id) || runtime.has(id), `#${id} is missing from room-1-escape/index.html`);
 });
 
 test('escape room: the two rooms stay separate (no file of one room loads the other)', () => {
   assert.ok(!/\.\.\//.test(escHtml), 'room 1 does not load files from room 2');
-  assert.ok(!/escape-room/.test(html), 'room 2 does not load files from room 1');
+  assert.ok(!/room-1-escape/.test(html), 'room 2 does not load files from room 1');
   assert.ok(!/ShardCore|src\/core\.js/.test(escRoom));
 });
 
@@ -175,11 +175,11 @@ test('escape room: texts from the story are inserted as text, not as HTML', () =
 // ---------- Both rooms: one design system ----------
 test('both rooms share one design system: the same tokens and the same fonts', () => {
   const tokens = css => Object.fromEntries([...css.match(/:root\{([\s\S]*?)\}/)[1].matchAll(/--([\w-]+):([^;]+);/g)].map(m => [m[1], m[2].trim()]));
-  const a = tokens(read('styles.css')), b = tokens(read('escape-room/styles.css'));
+  const a = tokens(read('room-2-chase/styles.css')), b = tokens(read('room-1-escape/styles.css'));
   for (const k of ['bg', 'ink', 'muted', 'glass', 'glass-strong', 'line', 'f-display', 'f-body', 'f-mono']) assert.equal(a[k], b[k], `--${k} differs between the rooms`);
   assert.ok(a.spark && b.orange, 'each room keeps its own accent (cyan in room 2, orange in room 1)');
   // the same two typefaces ship with each room, with their licence, and no page asks a font service
-  for (const [page, css, dir] of [[html, read('styles.css'), 'fonts'], [escHtml, read('escape-room/styles.css'), 'escape-room/fonts']]){
+  for (const [page, css, dir] of [[html, read('room-2-chase/styles.css'), 'room-2-chase/fonts'], [escHtml, read('room-1-escape/styles.css'), 'room-1-escape/fonts']]){
     assert.doesNotMatch(page, /fonts\.(googleapis|gstatic)\.com/, 'no font service');
     for (const [file, licence] of [['big-shoulders-display.woff2', 'OFL-BigShouldersDisplay.txt'], ['jetbrains-mono.woff2', 'OFL-JetBrainsMono.txt']]){
       assert.ok(css.includes('url("fonts/' + file + '")'), dir + ': ' + file + ' is used');
@@ -187,11 +187,11 @@ test('both rooms share one design system: the same tokens and the same fonts', (
       assert.match(read(dir + '/' + licence), /SIL Open Font License, Version 1\.1/, dir + ': the licence ships with the font');
     }
   }
-  assert.deepEqual(fs.readFileSync(path.join(ROOT, 'fonts/big-shoulders-display.woff2')), fs.readFileSync(path.join(ROOT, 'escape-room/fonts/big-shoulders-display.woff2')), 'both rooms use the very same file');
+  assert.deepEqual(fs.readFileSync(path.join(ROOT, 'room-2-chase/fonts/big-shoulders-display.woff2')), fs.readFileSync(path.join(ROOT, 'room-1-escape/fonts/big-shoulders-display.woff2')), 'both rooms use the very same file');
 });
 
 test('the story runs on from room 1 into room 2', () => {
-  const rules = require('../escape-room/src/rules.js');
+  const rules = require('../../room-1-escape/js/rules.js');
   assert.match(rules.ENDINGS.A.text, /car is waiting/, 'room 1 ends with the getaway car');
   assert.match(game, /Cell Block D/, 'room 2 starts after the escape from Cell Block D');
   assert.match(game, /inmate 4471/, 'the police hunt the same inmate');
@@ -277,9 +277,9 @@ test('the radio is synthesised, wired to a key and a button, and its stored choi
   assert.doesNotMatch(game, /new Audio\(|\.(mp3|ogg|wav|m4a)\b/, 'no audio files anywhere');
 });
 
-test('the printable rules are built from rules/*.md and are up to date', () => {
-  const { buildRulesHtml, markdown } = require('../scripts/build-rules.js');
-  assert.equal(fs.readFileSync(path.join(ROOT, 'docs/rules.html'), 'utf8'), buildRulesHtml(), 'run npm run docs');
+test('the printable rules are built from docs/rules/*.md and are up to date', () => {
+  const { buildRulesHtml, markdown } = require('../../tools/build-rules.js');
+  assert.equal(fs.readFileSync(path.join(ROOT, 'docs/rules/rules.html'), 'utf8'), buildRulesHtml(), 'run npm run docs');
   assert.match(markdown('| a | b |\n|---|---|\n| 1 | **2** |'), /<td><b>2<\/b><\/td>/);
   assert.equal(markdown('<script>'), '<p>&lt;script&gt;</p>', 'text stays text');
 });
@@ -303,7 +303,7 @@ test('the working rules live in the project: AGENTS.md with run and test command
 });
 
 test('audit: no page needs inline styles, which the policy now refuses', () => {
-  for (const [name, src] of [['game', game], ['page', html], ['room', read('escape-room/src/room.js')], ['room page', escHtml]]){
+  for (const [name, src] of [['game', game], ['page', html], ['room', read('room-1-escape/js/room.js')], ['room page', escHtml]]){
     assert.doesNotMatch(src, /<style|\sstyle="/, name);
     assert.doesNotMatch(src, /setAttribute\('style'/, name);
   }

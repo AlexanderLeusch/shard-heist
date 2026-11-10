@@ -32,12 +32,12 @@ jobs:
         env:
           CHROME_PATH: /usr/bin/google-chrome
 
-  plot-twist:
-    # The original Plot Twist project (Python/Streamlit) in plot-twist/: its pytest checks and a dependency audit
+  original-solo-project:
+    # The original Plot Twist project (Python/Streamlit) in original-solo-project/: its pytest checks and a dependency audit
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: plot-twist
+        working-directory: original-solo-project
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
@@ -51,7 +51,7 @@ jobs:
           uvx --from pip-audit==2.10.1 pip-audit -r "$RUNNER_TEMP/requirements.txt" --disable-pip --no-deps
 
   deploy:
-    needs: [test, plot-twist]
+    needs: [test, original-solo-project]
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
@@ -63,7 +63,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Collect the files the game needs
-        run: mkdir _site && cp -r index.html styles.css src fonts escape-room _site/
+        run: mkdir _site && cp -r index.html room-1-escape room-2-chase _site/
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

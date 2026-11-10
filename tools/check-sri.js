@@ -1,4 +1,4 @@
-// Downloads every external script named in index.html and checks it against its Subresource Integrity hash.
+// Downloads every external script named in the pages of both rooms and checks it against its Subresource Integrity hash.
 // ### Run with `npm run test:sri` (needs internet). If a CDN ever served a different file, the browser would refuse it and
 // ### the game would show its error screen; this script finds that before a player does.
 const fs = require('fs');
@@ -6,8 +6,9 @@ const path = require('path');
 const crypto = require('crypto');
 
 async function main(){
-  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
-  const tags = [...html.matchAll(/<script src="(https:[^"]+)" integrity="(sha384-[^"]+)"/g)];
+  const html = ['room-2-chase/index.html', 'room-1-escape/index.html'].map(p => fs.readFileSync(path.join(__dirname, '..', p), 'utf8')).join('\n');
+  // the same file can appear in both pages; each is checked once
+  const tags = [...new Map([...html.matchAll(/<script src="(https:[^"]+)" integrity="(sha384-[^"]+)"/g)].map(m => [m[1], m])).values()];
   if (!tags.length) throw new Error('no external scripts with integrity hashes found');
   let bad = 0;
   for (const [, url, want] of tags){

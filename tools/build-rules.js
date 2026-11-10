@@ -1,6 +1,6 @@
-// Builds docs/rules.html from the rules in rules/*.md, so the rules have one source and a printable form.
+// Builds docs/rules/rules.html from the rules in docs/rules/*.md, so the rules have one source and a printable form.
 // ### No packages are needed: this small converter handles what the rules use (headings, tables, lists, quotes, bold, italics,
-// ### code and links). A test checks that docs/rules.html is up to date. To make the PDF, open the page and print it to PDF.
+// ### code and links). A test checks that docs/rules/rules.html is up to date. To make the PDF, open the page and print it to PDF.
 const fs = require('fs');
 const path = require('path');
 
@@ -69,7 +69,7 @@ th,td{padding:4pt 6pt;border:1px solid var(--line);vertical-align:top}
 code{font:8.8pt Consolas,monospace;background:var(--soft);padding:0 2pt;border-radius:2pt}
 a{color:var(--accent)}`;
 function buildRulesHtml(){
-  const sections = PARTS.map(f => `<section id="${f.replace('.md', '')}">\n${markdown(fs.readFileSync(path.join(ROOT, 'rules', f), 'utf8'))}\n</section>`);
+  const sections = PARTS.map(f => `<section id="${f.replace('.md', '')}">\n${markdown(fs.readFileSync(path.join(ROOT, 'docs', 'rules', f), 'utf8'))}\n</section>`);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -79,14 +79,14 @@ function buildRulesHtml(){
 </style>
 </head>
 <body>
-<div class="cover"><h1>Shard Heist</h1><p>The game rules, for both rooms. Built from <code style="background:none;color:inherit">rules/*.md</code>.</p></div>
+<div class="cover"><h1>Shard Heist</h1><p>The game rules, for both rooms. Built from <code style="background:none;color:inherit">docs/rules/*.md</code>.</p></div>
 ${sections.join('\n')}
 </body>
 </html>
 `;
 }
 if (require.main === module){
-  fs.writeFileSync(path.join(ROOT, 'docs', 'rules.html'), buildRulesHtml());
-  console.log('docs/rules.html written');
+  fs.writeFileSync(path.join(ROOT, 'docs', 'rules', 'rules.html'), buildRulesHtml());
+  console.log('docs/rules/rules.html written');
 }
 module.exports = { buildRulesHtml, markdown };

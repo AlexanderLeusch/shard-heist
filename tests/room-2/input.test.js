@@ -1,8 +1,8 @@
 // ### Unit tests for input validation: saved data, menu choices and keys that are not allowed.
-// Player input: menu actions, menu picks, keys and stored data (src/core.js)
+// Player input: menu actions, menu picks, keys and stored data (room-2-chase/js/core.js)
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const Core = require('../src/core.js');
+const Core = require('../../room-2-chase/js/core.js');
 
 const STATES = ['menu', 'play', 'pause', 'done', 'over'];
 const allowedIn = (action, story) => STATES.filter(state => Core.actionAllowed(action, { state, story }));

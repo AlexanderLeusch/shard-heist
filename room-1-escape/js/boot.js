@@ -1,4 +1,4 @@
-// Escape room boot: the error screen (a copy of src/boot.js, so room 1 works on its own). Loaded before every other script.
+// Escape room boot: the error screen (a copy of room-2-chase/js/boot.js, so room 1 works on its own). Loaded before every other script.
 // ### If a library cannot load (offline, blocked CDN, failed integrity check), the browser has no WebGL, or the game throws
 // ### an error it did not expect, the player sees a clear card with what happened and a Reload button instead of a frozen
 // ### or black page. Load failures can only be fixed by reloading; runtime errors also offer "Keep playing".

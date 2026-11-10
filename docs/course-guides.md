@@ -6,7 +6,7 @@
 
 | Requirement | Status | Where / how |
 |---|---|---|
-| Deployed at a public URL | ✅ | https://alexanderleusch.github.io/shard-heist/ and `/escape-room/`, GitHub Pages |
+| Deployed at a public URL | ✅ | https://alexanderleusch.github.io/shard-heist/ (start page), `/room-1-escape/`, `/room-2-chase/`, GitHub Pages |
 | Repository is public, `main` holds the deployed code | ✅ | Pages is deployed only from `main`, by CI |
 | No keys or passwords in the repository | ✅ | The game has no secrets; a test scans every file; GitHub secret scanning and push protection are on |
 | `README.md` has the deployed URL | ✅ | Top of the README |
@@ -15,7 +15,7 @@
 | Every member contributes code to the repository | ⚠️ | Commits by Alexander, Marco, Jasper and Louisa. Sarah's changes arrive through her pull requests, but their commits carry the author name "Claude": set `git config user.name` / `user.email` so they count under her name |
 | Team of 3 to 4 students | ⚠️ | Five people have write access; if all five are members, clear it with the teaching staff |
 | Live demo at the deployed URL | ✅ | Nothing to wake up: static hosting does not sleep |
-| Walkthrough: data, tests, unavailable API | ✅ | README: "Security", "Testing", "When something is unavailable"; `rules/settings.md` lists all stored data |
+| Walkthrough: data, tests, unavailable API | ✅ | README: "Security", "Testing", "When something is unavailable"; `docs/rules/settings.md` lists all stored data |
 
 ## Choosing a stack
 
@@ -25,7 +25,7 @@
 | The stack fits the interface (games need more than Streamlit) | ✅ | 3D games with real-time input; README "Why it is built this way" |
 | Every member can explain it | ⚠️ | No framework and no build step keep it small; every member should read README, AGENTS.md and the Code Guide |
 | Stack, run and test commands recorded in `AGENTS.md` | ✅ | `AGENTS.md` |
-| No last-minute stack switch, no second stack | ✅ | One stack; `plot-twist/` is the original project, kept for reference and tested by CI |
+| No last-minute stack switch, no second stack | ✅ | One stack; `original-solo-project/` is the original project, kept for reference and tested by CI |
 
 ## Storing data
 
@@ -33,7 +33,7 @@
 |---|---|---|
 | What must survive, who shares it, its shape | ✅ | Settings and the escape-room save, per browser, in `localStorage`; nothing is shared between players |
 | No credentials, tests never touch real data | ✅ | No database; tests run on fixed values in Node and on a fresh browser profile |
-| Storage choice and how to reset it recorded | ✅ | `rules/settings.md` (table of stored values, reset by clearing site data), `AGENTS.md` |
+| Storage choice and how to reset it recorded | ✅ | `docs/rules/settings.md` (table of stored values, reset by clearing site data), `AGENTS.md` |
 | Stored data is validated | ✅ | `parsePick`, `parseBest`, `parseRadio`, `parseSteer`, `parseVolume`, `restore` |
 
 ## Hosting and deploying

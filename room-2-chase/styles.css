@@ -1,6 +1,6 @@
 /* ### STYLES: design tokens (colours, fonts) on :root, then the HUD panels, cockpit, touch pads, menu cards and the
    ### showroom start screen. Everything is pure CSS; the 3D view itself is drawn on the <canvas>. */
-/* Shared design system with room 1 (escape-room/styles.css): same tokens for background, glass, lines and fonts,
+/* Shared design system with room 1 (room-1-escape/styles.css): same tokens for background, glass, lines and fonts,
    same buttons, cards and error screen. Each room keeps its own accent: orange in the prison, cyan on the run.
    Layout: full-bleed 3D world at night, glass HUD in the corners, pursuit panel under the clock, cockpit bottom-right, one centered card for menus. Single dark look by choice. */
 /* ### FONTS: both typefaces ship with the game (fonts/, SIL Open Font License, see the OFL files there), so no font service is
@@ -419,3 +419,22 @@ kbd{font-family:var(--f-mono);font-size:12px;color:var(--ink);background:rgba(25
 .card{border-radius:18px}
 .fatal-card{border-radius:18px}
 .fatal-card h2{text-transform:uppercase;font-size:32px;font-weight:800}
+
+/* ### START PAGE (index.html at the top of the site): it uses this stylesheet too. Two cards, one per room, in playing order. */
+body.start{overflow:auto;touch-action:auto;user-select:auto;-webkit-user-select:auto;min-height:100vh;background:radial-gradient(ellipse at 20% 0%,rgba(85,236,255,.12),transparent 55%),radial-gradient(ellipse at 90% 100%,rgba(255,122,26,.12),transparent 50%),var(--bg)}
+.start-wrap{box-sizing:border-box;max-width:980px;margin:0 auto;padding:clamp(24px,6vw,64px) 20px;display:grid;gap:28px}
+.start-head{display:grid;gap:12px;max-width:640px}
+.start-head .m-logo{margin:0;font-size:clamp(64px,10vw,120px);line-height:.84;font-weight:800;letter-spacing:-.045em;text-transform:uppercase}
+.start-head .m-logo em{font-style:normal;color:transparent;-webkit-text-stroke:2px var(--spark)}
+.start-head p{margin:0;color:var(--muted);font-family:var(--f-body);font-size:16px;line-height:1.55}
+.start-rooms{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.start-room{display:grid;gap:10px;align-content:start;padding:22px;border-radius:18px;border:1px solid var(--line);background:var(--glass-strong);color:var(--ink);text-decoration:none;transition:transform .15s,border-color .15s}
+.start-room b{font-size:28px;line-height:1.05;letter-spacing:.01em;text-transform:uppercase}
+.start-room span:not(.eyebrow){font-family:var(--f-body);font-size:15px;line-height:1.5;color:var(--muted)}
+.start-room em{font-style:normal;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-top:6px}
+.start-room.r1{border-color:rgba(255,122,26,.45)}
+.start-room.r1 em{color:#ff7a1a}
+.start-room.r2 em{color:var(--spark)}
+.start-room:hover,.start-room:focus-visible{transform:translateY(-2px);border-color:var(--ink);outline:none}
+.start-foot{margin:0;font-family:var(--f-body);font-size:13px;color:var(--muted)}
+.start-foot a{color:var(--ink)}

@@ -1,4 +1,4 @@
-// Shard Heist: the game (rendering, worlds, AI, sound, HUD, story mode). The rules it plays by live in src/core.js.
+// Shard Heist: the game (rendering, worlds, AI, sound, HUD, story mode). The rules it plays by live in room-2-chase/js/core.js.
 (() => {
 'use strict';
 if (typeof THREE === 'undefined' || typeof ShardCore === 'undefined'){
@@ -10,7 +10,7 @@ const Core = ShardCore;
 (() => { const setHex = THREE.Color.prototype.setHex; THREE.Color.prototype.setHex = function(hex){ setHex.call(this, hex); return this.convertSRGBToLinear(); }; })();
 
 // ---------- Modes & vehicles ----------
-// ### The tuning tables (MODES for the maps, VEH for the vehicles) and every game rule live in src/core.js, where the
+// ### The tuning tables (MODES for the maps, VEH for the vehicles) and every game rule live in room-2-chase/js/core.js, where the
 // ### tests can reach them. Change a number there and the whole game, including the stat bars in the menu, follows it.
 const { MODES, VEH, REV_SPEED, REPAIR_AMOUNT } = Core;
 let mode = 'city', M = MODES.city, V = VEH.car;

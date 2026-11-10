@@ -6,9 +6,9 @@ The game has two rooms that are played one after the other. Until the group conn
 
 | Room | Document | Code with the rules | Tests |
 |---|---|---|---|
-| 1 · Plot Twist: Cell Block D (escape room) | [room-1-escape-room.md](room-1-escape-room.md) | `escape-room/src/rules.js` | `tests/escape-rules.test.js` |
-| 2 · Shard Heist (police chase) | [room-2-shard-heist.md](room-2-shard-heist.md) | `src/core.js` (rules), `src/game.js` (pickups, police AI) | `tests/rules.test.js`, `tests/story.test.js`, `tests/input.test.js` |
-| Both rooms: every setting and option | [settings.md](settings.md) | `src/core.js`, `escape-room/src/rules.js` (checks of stored values) | `tests/rules.test.js`, `tests/escape-rules.test.js`, `tests/browser.test.js` |
+| 1 · Plot Twist: Cell Block D (escape room) | [room-1-escape-room.md](room-1-escape-room.md) | `room-1-escape/js/rules.js` | `tests/room-1/rules.test.js` |
+| 2 · Shard Heist (police chase) | [room-2-shard-heist.md](room-2-shard-heist.md) | `room-2-chase/js/core.js` (rules), `room-2-chase/js/game.js` (pickups, police AI) | `tests/room-2/rules.test.js`, `tests/room-2/story.test.js`, `tests/room-2/input.test.js` |
+| Both rooms: every setting and option | [settings.md](settings.md) | `room-2-chase/js/core.js`, `room-1-escape/js/rules.js` (checks of stored values) | `tests/room-2/rules.test.js`, `tests/room-1/rules.test.js`, `tests/browser/browser.test.js` |
 
 ## The whole game in one paragraph
 
@@ -18,7 +18,7 @@ In April 2012 the Starfall necklace, lent by the Ashford family to Lisbon's nava
 
 - **Time:** both rooms are set on the same night: room 1 around 02:15, room 2 from about 02:30.
 - **Design:** both rooms share one design system: the same background, glass panels, fonts, buttons and cards. Each room keeps its own accent colour: **orange** in the prison, **cyan** on the run. Hale's radio messages in room 2 are orange because he comes from room 1.
-- A test (`tests/page.test.js`) checks that the shared design tokens and the story links between the rooms stay in place.
+- A test (`tests/project/page.test.js`) checks that the shared design tokens and the story links between the rooms stay in place.
 
 ## How the two rooms will connect (planned, not built)
 

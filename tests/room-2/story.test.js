@@ -1,8 +1,8 @@
 // ### Unit tests for the story mode: acts, retries, the hidden letter, the three endings and the radio messages.
-// Story mode "The Necklace Job": acts, items, endings and retries (src/core.js)
+// Story mode "The Necklace Job": acts, items, endings and retries (room-2-chase/js/core.js)
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const Core = require('../src/core.js');
+const Core = require('../../room-2-chase/js/core.js');
 
 // Plays through the story the way game.js does: begin an act, maybe pick things up, finish or fail
 function playthrough(steps){

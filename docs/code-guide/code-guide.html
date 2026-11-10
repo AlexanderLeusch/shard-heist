@@ -103,16 +103,16 @@ pre .c{ color:#7fd4e2; }
   <h2>The game at a glance</h2>
   <p><b>Shard Heist</b> is a 3D police-chase game that runs entirely in the browser as a static website: one page, one stylesheet and three scripts. The player picks a map (Lisbon's Baixa, Highway or Countryside) and a getaway vehicle (Car, Motorcycle or Truck), collects glowing star shards, escapes up to four police cars and a helicopter, and reaches a finish gate before the clock runs out. Five wanted stars make the chase harder over time. All three maps have hills that slow the player down or speed them up. Crashes cause visible damage; repair kits remove it; police can bust the player when they box the vehicle in. Seven radio stations play while driving, all synthesised by the game. The story mode <b>The Necklace Job</b> is an option in the same main menu (section 10).</p>
   <div class="kpis">
-    <div class="kpi"><b>7,258</b><span>lines of game code</span></div>
+    <div class="kpi"><b>7,277</b><span>lines of game code</span></div>
     <div class="kpi"><b>6,662</b><span>lines of JavaScript</span></div>
     <div class="kpi"><b>252</b><span>named functions</span></div>
     <div class="kpi"><b>25</b><span>code sections</span></div>
-    <div class="kpi"><b>136</b><span>automated tests</span></div>
+    <div class="kpi"><b>137</b><span>automated tests</span></div>
     <div class="kpi"><b>0</b><span>npm dependencies</span></div>
     <div class="kpi"><b>0</b><span>image / sound files</span></div>
-    <div class="kpi"><b>502 KB</b><span>game code size</span></div>
+    <div class="kpi"><b>504 KB</b><span>game code size</span></div>
   </div>
-  <p class="mono" style="color:var(--muted)">Figures for room 2 (index.html, styles.css, src/). Room 1 is described in section 14. The test count covers both rooms: 118 unit and page tests and 18 browser tests. Tests add 1,812 lines.</p>
+  <p class="mono" style="color:var(--muted)">Figures for room 2 (room-2-chase/: index.html, styles.css, js/). Room 1 is described in section 14. The test count covers both rooms: 118 unit and page tests and 19 browser tests. Tests add 1,822 lines.</p>
   <h3>The three maps</h3>
   <table>
     <tr><th>Map</th><th>Layout</th><th>Goal</th><th class="num">Car top speed</th><th class="num">Police</th><th class="num">Time</th></tr>
@@ -140,8 +140,8 @@ pre .c{ color:#7fd4e2; }
   <h2>Languages in the code</h2>
   <p>The game contains <b>no Python at all</b>. A web browser can only run JavaScript natively, so all logic is JavaScript. The other languages describe appearance (CSS), page structure (HTML), GPU programs (GLSL) and vector graphics (SVG).</p>
   <div class="bars">
-    <div class="bar"><span>JavaScript</span><div class="track"><div class="fill" style="width:91.8%;background:#e0b100"></div></div><span class="val">91.8 %</span></div>
-    <div class="bar"><span>CSS</span><div class="track"><div class="fill" style="width:5.8%;background:#7a5cff"></div></div><span class="val">5.8 %</span></div>
+    <div class="bar"><span>JavaScript</span><div class="track"><div class="fill" style="width:91.5%;background:#e0b100"></div></div><span class="val">91.5 %</span></div>
+    <div class="bar"><span>CSS</span><div class="track"><div class="fill" style="width:6.0%;background:#7a5cff"></div></div><span class="val">6.0 %</span></div>
     <div class="bar"><span>HTML (incl. inline SVG)</span><div class="track"><div class="fill" style="width:1.9%;background:#e2603b"></div></div><span class="val">1.9 %</span></div>
     <div class="bar"><span>GLSL (shaders)</span><div class="track"><div class="fill" style="width:0.4%;background:#0e8aa0"></div></div><span class="val">0.4 %</span></div>
     <div class="bar"><span>SVG in JS strings</span><div class="track"><div class="fill" style="width:0.1%;background:#1f8a4c"></div></div><span class="val">0.1 %</span></div>
@@ -149,14 +149,14 @@ pre .c{ color:#7fd4e2; }
   </div>
   <table>
     <tr><th>Language</th><th class="num">Lines</th><th class="num">Share</th><th class="num">Characters</th><th class="num">Share</th><th>Role in the game</th></tr>
-    <tr><td>JavaScript</td><td class="num">6,662</td><td class="num">91.8 %</td><td class="num">458,289</td><td class="num">89.2 %</td><td>All logic: rules (core.js), worlds, vehicles, AI, physics, audio, HUD, menus, error screen</td></tr>
-    <tr><td>CSS</td><td class="num">421</td><td class="num">5.8 %</td><td class="num">35,973</td><td class="num">7.0 %</td><td>Look of the HUD, cockpit, menus, warnings, error screen</td></tr>
-    <tr><td>HTML</td><td class="num">140</td><td class="num">1.9 %</td><td class="num">10,665</td><td class="num">2.1 %</td><td>Page skeleton, HUD panels, gauge and icons (inline SVG), script order, security policy</td></tr>
+    <tr><td>JavaScript</td><td class="num">6,662</td><td class="num">91.5 %</td><td class="num">458,313</td><td class="num">88.9 %</td><td>All logic: rules (core.js), worlds, vehicles, AI, physics, audio, HUD, menus, error screen</td></tr>
+    <tr><td>CSS</td><td class="num">440</td><td class="num">6.0 %</td><td class="num">37,867</td><td class="num">7.3 %</td><td>Look of the HUD, cockpit, menus, warnings, error screen</td></tr>
+    <tr><td>HTML</td><td class="num">140</td><td class="num">1.9 %</td><td class="num">10,674</td><td class="num">2.1 %</td><td>Page skeleton, HUD panels, gauge and icons (inline SVG), script order, security policy</td></tr>
     <tr><td>GLSL</td><td class="num">29</td><td class="num">0.4 %</td><td class="num">2,600</td><td class="num">0.5 %</td><td>Sky gradient, force field and the damage dents (run on the GPU)</td></tr>
     <tr><td>SVG in JS strings</td><td class="num">6</td><td class="num">0.1 %</td><td class="num">6,203</td><td class="num">1.2 %</td><td>Map pictures and fallback vehicle icons in the start menu</td></tr>
     <tr><td><b>Python</b></td><td class="num"><b>0</b></td><td class="num"><b>0 %</b></td><td class="num"><b>0</b></td><td class="num"><b>0 %</b></td><td>Not used</td></tr>
   </table>
-  <p class="mono" style="color:var(--muted)">Game code: 7,258 lines, 513,730 characters. The tests (1,812 lines), the dev server and SRI checker are JavaScript too; the CI pipeline is YAML. About 700 of the JavaScript lines are comments, including the “###” explanations.</p>
+  <p class="mono" style="color:var(--muted)">Game code: 7,277 lines, 515,657 characters. The tests (1,822 lines), the dev server and SRI checker are JavaScript too; the CI pipeline is YAML. About 700 of the JavaScript lines are comments, including the “###” explanations.</p>
   <h3>External code that is loaded, not written</h3>
   <table>
     <tr><th>Library</th><th>Language</th><th>Purpose</th></tr>
@@ -190,7 +190,7 @@ pre .c{ color:#7fd4e2; }
   <h3>What helps readability</h3>
   <ul>
     <li>Clear section headers with <code>###</code> explanations at the top of each of the 25 sections and above each important function.</li>
-    <li>The rules are pure functions in <code>src/core.js</code> with automated tests, separate from rendering and audio.</li>
+    <li>The rules are pure functions in <code>room-2-chase/js/core.js</code> with automated tests, separate from rendering and audio.</li>
     <li>All tuning lives in a few tables (<code>MODES</code>, <code>VEH</code> and <code>ENGINES</code> in core.js, <code>STORY</code> in game.js); the menu stats are computed from them.</li>
     <li>Each map is a “world” object with the same shape: group, colliders, radar shapes.</li>
   </ul>
@@ -207,7 +207,7 @@ pre .c{ color:#7fd4e2; }
 <section>
   <div class="eyebrow">04 · Architecture</div>
   <h2>Architecture and frame loop</h2>
-  <p>The site has five files that load in a fixed order: <code>index.html</code> (HUD, menus, error screen), <code>styles.css</code>, <code>src/boot.js</code> (error screen, loaded first), then three.js, <code>src/core.js</code> (the rules as pure functions) and <code>src/game.js</code> (one closure with the rest of the game). At start-up the script generates textures and the city, builds the vehicles and police, sets up the renderer, pre-compiles all shaders and shows the menu. The highway and countryside are built only when first selected.</p>
+  <p>The site has five files that load in a fixed order: <code>index.html</code> (HUD, menus, error screen), <code>styles.css</code>, <code>room-2-chase/js/boot.js</code> (error screen, loaded first), then three.js, <code>room-2-chase/js/core.js</code> (the rules as pure functions) and <code>room-2-chase/js/game.js</code> (one closure with the rest of the game). At start-up the script generates textures and the city, builds the vehicles and police, sets up the renderer, pre-compiles all shaders and shows the menu. The highway and countryside are built only when first selected.</p>
   <figure>
     <svg viewBox="0 0 640 300" width="100%" font-family="Segoe UI, sans-serif" font-size="11">
       <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#5b6275"/></marker></defs>
@@ -263,7 +263,7 @@ composer.render()  or  renderer.render(scene, camera)               <span class=
 <section>
   <div class="eyebrow">05 · Code map</div>
   <h2>All 25 sections</h2>
-  <p>Line numbers refer to the current <code>src/game.js</code>. Each section starts with a <code>// ---------- Name ----------</code> header followed by <code>// ###</code> lines that explain it, and each important function has a <code>// ###</code> line above it. The tuning tables and the rules (driving, damage, police pressure, scoring, story, input checks) are in <code>src/core.js</code>; the error screen is in <code>src/boot.js</code>.</p>
+  <p>Line numbers refer to the current <code>room-2-chase/js/game.js</code>. Each section starts with a <code>// ---------- Name ----------</code> header followed by <code>// ###</code> lines that explain it, and each important function has a <code>// ###</code> line above it. The tuning tables and the rules (driving, damage, police pressure, scoring, story, input checks) are in <code>room-2-chase/js/core.js</code>; the error screen is in <code>room-2-chase/js/boot.js</code>.</p>
   <table>
     <tr><th class="num">Line</th><th>Section</th><th>Purpose</th><th>Key functions</th></tr>
     <tr><td class="num">12</td><td>Modes &amp; vehicles</td><td>Takes the tables and rules from core.js; safe storage access</td><td><code>Core</code>, <code>readStore</code>, <code>sel</code></td></tr>
@@ -292,7 +292,7 @@ composer.render()  or  renderer.render(scene, camera)               <span class=
     <tr><td class="num">5,508</td><td>Story mode</td><td>Three acts, radio timeline, letter, courier lorry, endings</td><td><code>startStoryAct</code>, <code>updateStory</code>, <code>showEnding</code>, <code>warmUp</code></td></tr>
     <tr><td class="num">5,838</td><td>Loop</td><td>Resize handling and the frame loop</td><td><code>frame</code>, <code>resize</code></td></tr>
   </table>
-  <h3>src/core.js: the rules</h3>
+  <h3>room-2-chase/js/core.js: the rules</h3>
   <table>
     <tr><th>Group</th><th>Functions</th></tr>
     <tr><td>Tables</td><td><code>MODES</code>, <code>VEH</code>, <code>BAIXA</code>, <code>streetAt</code>, <code>KEY_MAP</code>, <code>REV_SPEED</code>, <code>REPAIR_AMOUNT</code></td></tr>
@@ -461,7 +461,7 @@ damage += max(0, (impact − 4) · 1.0 · VEH.dmg)              <span class="c">
     <li><code>STORY</code> holds the acts and a timeline of narrator and police-radio lines per act; <code>updateStory()</code> plays them as HUD messages and names the player’s vehicle in the radio calls.</li>
     <li><code>startStoryAct(i)</code> reuses <code>startRun()</code> for the act’s map, then adds the letter (<code>placeEnvelope</code>) or the courier lorry (<code>setupCourier</code>).</li>
     <li><code>finish()</code> and <code>gameOver()</code> hand over to <code>storyFinish()</code> and <code>storyGameOver()</code> when a story is running; <code>showEnding()</code> picks Ending A or B from <code>story.letter</code>.</li>
-    <li>The rules are in <code>core.js</code> and tested in <code>tests/story.test.js</code>: <code>beginAct</code> (only acts 1–3), <code>retryAct</code>, <code>finishOpen</code> (the toll needs the clasp), <code>storyEnding</code> (A or B) and <code>dueRadio</code> (each radio line once).</li>
+    <li>The rules are in <code>core.js</code> and tested in <code>tests/room-2/story.test.js</code>: <code>beginAct</code> (only acts 1–3), <code>retryAct</code>, <code>finishOpen</code> (the toll needs the clasp), <code>storyEnding</code> (A or B) and <code>dueRadio</code> (each radio line once).</li>
     <li>The courier lorry drives in the right lane with the same car-following rule as traffic, stops before the toll, and is collidable; traffic treats it as an obstacle.</li>
   </ul>
   <div class="note gold"><b>Design rule carried over from the original project:</b> the letter is optional but decides the ending. Players who only follow the obvious path reach Ending B; players who explore reach the truth.</div>
@@ -471,14 +471,14 @@ damage += max(0, (impact − 4) · 1.0 · VEH.dmg)              <span class="c">
 <section>
   <div class="eyebrow">11 · Tuning</div>
   <h2>Tuning guide</h2>
-  <h3>Vehicles (<code>VEH</code> in src/core.js)</h3>
+  <h3>Vehicles (<code>VEH</code> in room-2-chase/js/core.js)</h3>
   <table>
     <tr><th>Vehicle</th><th class="num">speed</th><th class="num">accel</th><th class="num">handling</th><th class="num">dmg</th><th class="num">ram</th><th>Collision circles</th><th>Menu bars (S·A·H·D·R)</th></tr>
     <tr><td>Car (muscle coupe)</td><td class="num">1.00</td><td class="num">1.00</td><td class="num">1.00</td><td class="num">1.00</td><td class="num">1.0</td><td>2 × r 1.2 m</td><td class="mono">4 · 4 · 4 · 3 · 2</td></tr>
     <tr><td>Motorcycle (superbike)</td><td class="num">1.12</td><td class="num">1.30</td><td class="num">1.40</td><td class="num">1.00</td><td class="num">0.4</td><td>2 × r 0.8 m</td><td class="mono">5 · 5 · 5 · 3 · 1</td></tr>
     <tr><td>Truck (tractor unit)</td><td class="num">0.78</td><td class="num">0.70</td><td class="num">0.72</td><td class="num">0.55</td><td class="num">2.4</td><td>3 × r 1.4 m</td><td class="mono">3 · 3 · 3 · 5 · 5</td></tr>
   </table>
-  <h3>Maps (<code>MODES</code> in src/core.js)</h3>
+  <h3>Maps (<code>MODES</code> in room-2-chase/js/core.js)</h3>
   <table>
     <tr><th>Map</th><th class="num">max (m/s)</th><th class="num">police (m/s)</th><th class="num">time (s)</th><th class="num">shards</th><th class="num">kits</th><th class="num">radar (m)</th><th class="num">bonus (s)</th></tr>
     <tr><td>City</td><td class="num">34</td><td class="num">33</td><td class="num">180</td><td class="num">8</td><td class="num">3</td><td class="num">70</td><td class="num">–</td></tr>
@@ -530,7 +530,7 @@ damage += max(0, (impact − 4) · 1.0 · VEH.dmg)              <span class="c">
     <tr><td>Load real glTF vehicle models and recorded engine loops</td><td>Large jump in realism</td><td class="num">Medium</td></tr>
     <tr><td>Lane changes and overtaking for traffic</td><td>More natural traffic, better chases</td><td><span class="pill high">High</span></td></tr>
   </table>
-  <div class="note"><b>Where to start reading.</b> Begin with <code>src/core.js</code> and its tests, then <code>ENGINES</code> and <code>frame()</code> at the very end of <code>game.js</code>, then follow <code>startRun()</code> into <code>placeRun()</code>, <code>updateCar()</code> and <code>updatePolice()</code>. The <code>###</code> comment block at the top of each section tells you what it does before you read the code.</div>
+  <div class="note"><b>Where to start reading.</b> Begin with <code>room-2-chase/js/core.js</code> and its tests, then <code>ENGINES</code> and <code>frame()</code> at the very end of <code>game.js</code>, then follow <code>startRun()</code> into <code>placeRun()</code>, <code>updateCar()</code> and <code>updatePolice()</code>. The <code>###</code> comment block at the top of each section tells you what it does before you read the code.</div>
 </section>
 
 <!-- 13 -->
@@ -540,26 +540,27 @@ damage += max(0, (impact − 4) · 1.0 · VEH.dmg)              <span class="c">
   <h3>Repository</h3>
   <table>
     <tr><th>Path</th><th>Contents</th></tr>
-    <tr><td><code>escape-room/</code></td><td>Room 1, self-contained: page, styles, error screen, rules and 3D room (section 14)</td></tr>
-    <tr><td><code>plot-twist/</code></td><td>The original Plot Twist project in Python/Streamlit (added by Marco, not deployed)</td></tr>
-    <tr><td><code>index.html</code>, <code>styles.css</code></td><td>Room 2: page structure and styling; scripts load in a fixed order</td></tr>
-    <tr><td><code>src/boot.js</code></td><td>Error screen for load failures, missing WebGL, lost graphics and unexpected errors</td></tr>
-    <tr><td><code>src/core.js</code></td><td>Tuning tables and all game rules as pure functions</td></tr>
-    <tr><td><code>src/game.js</code></td><td>3D worlds, vehicles, AI, sound, HUD, story scenes (25 sections)</td></tr>
-    <tr><td><code>tests/</code></td><td>Node tests for the rules and the page; headless-browser test of the real game</td></tr>
-    <tr><td><code>scripts/</code></td><td>Local dev server, library integrity checker, builder of the rules document</td></tr>
-    <tr><td><code>docs/</code>, <code>rules/</code></td><td>This guide and the rules, in HTML and PDF; the rules are written in <code>rules/*.md</code> and built with <code>npm run docs</code></td></tr>
+    <tr><td><code>index.html</code></td><td>The start page: the two rooms in playing order, no script</td></tr>
+    <tr><td><code>room-1-escape/</code></td><td>Room 1, self-contained: page, styles, error screen, rules and 3D room in <code>js/</code>, fonts (section 14)</td></tr>
+    <tr><td><code>original-solo-project/</code></td><td>The original Plot Twist project in Python/Streamlit (added by Marco, not deployed)</td></tr>
+    <tr><td><code>room-2-chase/</code></td><td>Room 2: <code>index.html</code> and <code>styles.css</code> (page and styling, also used by the start page), scripts in <code>js/</code>, fonts</td></tr>
+    <tr><td><code>room-2-chase/js/boot.js</code></td><td>Error screen for load failures, missing WebGL, lost graphics and unexpected errors</td></tr>
+    <tr><td><code>room-2-chase/js/core.js</code></td><td>Tuning tables and all game rules as pure functions</td></tr>
+    <tr><td><code>room-2-chase/js/game.js</code></td><td>3D worlds, vehicles, AI, sound, HUD, story scenes (25 sections)</td></tr>
+    <tr><td><code>tests/</code></td><td>One folder per part: <code>room-1/</code>, <code>room-2/</code>, <code>project/</code> (pages, security, documents) and <code>browser/</code> (headless-browser test of both rooms)</td></tr>
+    <tr><td><code>tools/</code></td><td>Local dev server, library integrity checker, builder of the rules document</td></tr>
+    <tr><td><code>docs/</code></td><td><code>rules/</code> (the rules, written in Markdown and built into HTML and PDF with <code>npm run docs</code>), <code>code-guide/</code> (this guide), <code>course-guides.md</code></td></tr>
     <tr><td><code>.github/workflows/ci.yml</code></td><td>Test on every push to main and every pull request; deploy to GitHub Pages only when all tests pass</td></tr>
   </table>
   <h3>Tests</h3>
   <table>
     <tr><th>File</th><th class="num">Tests</th><th>Accepted</th><th>Rejected and edge cases</th></tr>
-    <tr><td><code>rules.test.js</code></td><td class="num">47</td><td>Top speeds, 0–80 times, stat bars, collisions, damage, stars, best times; wanted stars, helicopter timing, searchlight; hills and slopes; gearbox, engine, idle and rotor loops; brake lights; damage stages; radio bars by genre</td><td>Gas and brake together, 0 s and 3 s frames, negative frame time, NaN impact, damage outside 0–100, coasting to exactly 0, a stopped vehicle on a hill, unknown stations such as <code>constructor</code></td></tr>
-    <tr><td><code>story.test.js</code></td><td class="num">8</td><td>Three acts in order, Ending A with the letter, Ending B without</td><td>Acts outside 1–3, toll without the clasp, letter found in a failed attempt, radio lines repeating</td></tr>
-    <tr><td><code>input.test.js</code></td><td class="num">9</td><td>Every menu action in its states, valid picks, valid saved data</td><td>Actions while driving, story actions without a story, unknown actions, picks like <code>constructor</code> or <code>__proto__</code>, tampered storage, implausible best times</td></tr>
-    <tr><td><code>page.test.js</code></td><td class="num">37</td><td>Element ids, button actions, script order, dev server serves files; the same page checks for room 1</td><td>Unpinned or unhashed libraries, inline scripts, secrets in any file, <code>.git</code> requests, path traversal, wrong HTTP methods, one room loading the other’s files</td></tr>
-    <tr><td><code>escape-rules.test.js</code></td><td class="num">17</td><td>Both endings, the grace minute, clues, lock, saved games</td><td>Actions before the briefing or after an ending, no exit, items twice, car key before the tile is off, door without mop, wheels that do not exist, clock below zero, tampered saves</td></tr>
-    <tr><td><code>browser.test.js</code></td><td class="num">18</td><td>Room 2: menu with previews, radio choice, vehicle choice, a run, pause, story act 1. Room 1: briefing, save and continue after reload, Ending A</td><td>Card buttons while driving, tampered saved data, blocked library, no WebGL; the car key before the tile is off, a wrong code</td></tr>
+    <tr><td><code>room-2/rules.test.js</code></td><td class="num">47</td><td>Top speeds, 0–80 times, stat bars, collisions, damage, stars, best times; wanted stars, helicopter timing, searchlight; hills and slopes; gearbox, engine, idle and rotor loops; brake lights; damage stages; radio bars by genre</td><td>Gas and brake together, 0 s and 3 s frames, negative frame time, NaN impact, damage outside 0–100, coasting to exactly 0, a stopped vehicle on a hill, unknown stations such as <code>constructor</code></td></tr>
+    <tr><td><code>room-2/story.test.js</code></td><td class="num">8</td><td>Three acts in order, Ending A with the letter, Ending B without</td><td>Acts outside 1–3, toll without the clasp, letter found in a failed attempt, radio lines repeating</td></tr>
+    <tr><td><code>room-2/input.test.js</code></td><td class="num">9</td><td>Every menu action in its states, valid picks, valid saved data</td><td>Actions while driving, story actions without a story, unknown actions, picks like <code>constructor</code> or <code>__proto__</code>, tampered storage, implausible best times</td></tr>
+    <tr><td><code>project/page.test.js</code></td><td class="num">37</td><td>Element ids, button actions, script order, dev server serves files; the same page checks for room 1</td><td>Unpinned or unhashed libraries, inline scripts, secrets in any file, <code>.git</code> requests, path traversal, wrong HTTP methods, one room loading the other’s files</td></tr>
+    <tr><td><code>room-1/rules.test.js</code></td><td class="num">17</td><td>Both endings, the grace minute, clues, lock, saved games</td><td>Actions before the briefing or after an ending, no exit, items twice, car key before the tile is off, door without mop, wheels that do not exist, clock below zero, tampered saves</td></tr>
+    <tr><td><code>browser/browser.test.js</code></td><td class="num">18</td><td>Room 2: menu with previews, radio choice, vehicle choice, a run, pause, story act 1. Room 1: briefing, save and continue after reload, Ending A</td><td>Card buttons while driving, tampered saved data, blocked library, no WebGL; the car key before the tile is off, a wrong code</td></tr>
   </table>
   <div class="note gold"><b>Bugs the tests found (fixed):</b> saved data such as <code>{"mode":"constructor"}</code> passed the old check, because every JavaScript object inherits <code>constructor</code>; the next load would have crashed. And the throttle let the car run about 5 km/h above the top speed shown in the menu; it now stops at the limit.</div>
   <h3>Security</h3>
@@ -575,14 +576,14 @@ damage += max(0, (impact − 4) · 1.0 · VEH.dmg)              <span class="c">
   <h3>Deployment</h3>
 <pre>git push (main)
   └─ test job:   npm test  →  npm run test:sri  →  npm run test:browser (headless Chrome)
-       └─ deploy job (only if all pass):  copy index.html, styles.css, src/, escape-room/  →  GitHub Pages</pre>
+       └─ deploy job (only if all pass):  copy index.html, styles.css, src/, room-1-escape/  →  GitHub Pages</pre>
 </section>
 
 <!-- 14 -->
 <section>
   <div class="eyebrow">14 · Room 1</div>
   <h2>Plot Twist: Cell Block D</h2>
-  <p>The first room of the game is a 3D escape room that rebuilds the course project <i>Plot Twist</i> as a prison break. The detective from the Ashford necklace case has been convicted of the theft and is now <b>inmate 4471</b>. Officer Hale locks them in washroom 2 for ten minutes. A hatch in the floor of the toilet stall is held shut by a four-digit lock; the code is hidden in the room. It lives in <code>escape-room/</code>, shares no files with the chase, and is played at <code>/shard-heist/escape-room/</code>.</p>
+  <p>The first room of the game is a 3D escape room that rebuilds the course project <i>Plot Twist</i> as a prison break. The detective from the Ashford necklace case has been convicted of the theft and is now <b>inmate 4471</b>. Officer Hale locks them in washroom 2 for ten minutes. A hatch in the floor of the toilet stall is held shut by a four-digit lock; the code is hidden in the room. It lives in <code>room-1-escape/</code>, shares no files with the chase, and is played at <code>/shard-heist/room-1-escape/</code>.</p>
   <table>
     <tr><th>Brief requirement</th><th>In the escape room</th></tr>
     <tr><td>At least 5 scenes</td><td>The door, the sinks, the stall, the hatch, the tunnel</td></tr>
@@ -639,7 +640,7 @@ marker or object clicked  →  use(action, target)  →  act()  →  rules.perfo
     <li><b>Not yet connected</b> to room 2. Planned: the Ending A card gets a button that opens the chase.</li>
     <li><b>Open decisions:</b> 10 or 15 minutes (<code>TIME_LIMIT</code>), and whether the code should change between games (now always 1912).</li>
     <li>Ending B and the grace minute are tested in the rules tests only, not in the browser test.</li>
-    <li>The Python original in <code>plot-twist/</code> is a separate program with its own pytest tests and is not deployed.</li>
+    <li>The Python original in <code>original-solo-project/</code> is a separate program with its own pytest tests and is not deployed.</li>
   </ul>
 </section>
 

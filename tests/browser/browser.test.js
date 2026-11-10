@@ -8,7 +8,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawn, execFileSync } = require('child_process');
-const { createServer } = require('../scripts/serve.js');
+const { createServer } = require('../../tools/serve.js');
 
 function findChrome(){
   const list = [process.env.CHROME_PATH,
@@ -57,7 +57,7 @@ async function startDriving(label){
 }
 async function load(){
   errors.length = 0;
-  await send('Page.navigate', { url: base });
+  await send('Page.navigate', { url: base + 'room-2-chase/' });
   await waitFor(menuReady, LOAD_MS, 'main menu');
 }
 
@@ -188,7 +188,7 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
 
     await t.test('error screen: a blocked library shows a clear message instead of a black page', async () => {
       await send('Network.setBlockedURLs', { urls: ['*cdnjs.cloudflare.com*'] });
-      await send('Page.navigate', { url: base });
+      await send('Page.navigate', { url: base + 'room-2-chase/' });
       await waitFor("!document.getElementById('fatal').hidden", 30000, 'error screen');
       assert.equal(await text('#fatalTitle'), 'The game could not load');
       assert.match(await text('#fatalText'), /cdnjs\.cloudflare\.com/);
@@ -198,7 +198,7 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
 
     await t.test('error screen: no WebGL shows how to fix it', async () => {
       const { identifier } = await send('Page.addScriptToEvaluateOnNewDocument', { source: "const g = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function(k, o){ return /webgl/.test(k) ? null : g.call(this, k, o); };" });
-      await send('Page.navigate', { url: base });
+      await send('Page.navigate', { url: base + 'room-2-chase/' });
       await waitFor("!document.getElementById('fatal').hidden", 30000, 'error screen');
       assert.equal(await text('#fatalTitle'), '3D graphics are not available');
       assert.match(await text('#fatalText'), /WebGL/);
@@ -261,12 +261,22 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       await send('Emulation.clearDeviceMetricsOverride');
     });
 
+    await t.test('the start page leads to both rooms, in playing order, and runs no script', async () => {
+      errors.length = 0;
+      await send('Page.navigate', { url: base });
+      await waitFor("!!document.querySelector('.start-rooms')", 15000, 'start page');
+      assert.equal(await evaluate("[...document.querySelectorAll('.start-room')].map(a => a.getAttribute('href')).join()"), 'room-1-escape/,room-2-chase/');
+      assert.equal(await evaluate("document.scripts.length"), 0, 'no script on the start page');
+      assert.equal(await evaluate("getComputedStyle(document.querySelector('.start-room b')).fontFamily.includes('Big Shoulders')"), true, 'the shared fonts load');
+      assert.deepEqual(errors, []);
+    });
+
     await t.test('escape room: the briefing explains who, where and how, then the clock starts', async () => {
-      await send('Page.navigate', { url: base + 'escape-room/' });
+      await send('Page.navigate', { url: base + 'room-1-escape/' });
       await waitFor("!!document.querySelector('#card h1')", LOAD_MS, 'briefing');
       await evaluate("localStorage.removeItem('escape-room-save'), true");
       errors.length = 0;
-      await send('Page.navigate', { url: base + 'escape-room/' });
+      await send('Page.navigate', { url: base + 'room-1-escape/' });
       await waitFor("!!document.querySelector('#card h1')", LOAD_MS, 'briefing');
       assert.match(await text('#card'), /Museu de Marinha/);
       assert.equal(await evaluate("getComputedStyle(document.getElementById('btnNotes')).visibility"), 'hidden', 'rejected: the clue button cannot be reached during the briefing');
@@ -298,7 +308,7 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
     await t.test('escape room: progress is saved and offered after a reload', async () => {
       await hs('go:door');
       await hs('take:mop');
-      await send('Page.navigate', { url: base + 'escape-room/' });
+      await send('Page.navigate', { url: base + 'room-1-escape/' });
       await waitFor("!!document.querySelector('[data-do=\"resume\"]')", LOAD_MS, 'continue card');
       assert.match(await text('#card'), /Mop/);
       await click('[data-do="resume"]');

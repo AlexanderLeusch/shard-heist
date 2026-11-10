@@ -1,17 +1,18 @@
 # Shard Heist
 
-A two-room browser game. **Room 1, *Plot Twist: Cell Block D***, is a 3D prison escape room: find the code for the hatch in the washroom floor before the guard comes back. **Room 2, *Shard Heist***, is the 3D police chase that follows. The two rooms are developed separately and will be connected at the end.
+A two-room browser game. **Room 1, *Plot Twist: Cell Block D***, is a 3D prison escape room: find the code for the hatch in the washroom floor before the guard comes back. **Room 2, *Shard Heist***, is the 3D police chase that follows. A start page leads to both rooms.
 
-| Room | Play |
+| Page | Play |
 |---|---|
-| 1 · Escape room | https://alexanderleusch.github.io/shard-heist/escape-room/ |
-| 2 · Police chase | https://alexanderleusch.github.io/shard-heist/ |
+| Start page (both rooms) | https://alexanderleusch.github.io/shard-heist/ |
+| 1 · Escape room | https://alexanderleusch.github.io/shard-heist/room-1-escape/ |
+| 2 · Police chase | https://alexanderleusch.github.io/shard-heist/room-2-chase/ |
 
 Both rooms take place on the same night and share one design system (the same fonts, panels, buttons and cards), with orange as the accent of the prison and cyan as the accent of the chase. Room 2's story starts where room 1 ends: inmate 4471 is on the run, and Officer Hale helps over the radio.
 
-Both are published automatically from `main` once all tests pass. The rules of both rooms are written out in plain English in [rules/](rules/README.md).
+Both are published automatically from `main` once all tests pass. The rules of both rooms are written out in plain English in [docs/rules/](docs/rules/README.md).
 
-The folder `plot-twist/` holds the original solo project *Plot Twist: The Missing Necklace* (Python and Streamlit), which room 1 rebuilds in 3D. It is kept for reference, and CI tests it, but it is not part of the deployed game. Run it with `cd plot-twist && uv run streamlit run app.py`.
+The folder `original-solo-project/` holds the original solo project *Plot Twist: The Missing Necklace* (Python and Streamlit), which room 1 rebuilds in 3D. It is kept for reference, and CI tests it, but it is not part of the deployed game. Run it with `cd original-solo-project && uv run streamlit run app.py`.
 
 ## Room 1 · Plot Twist: Cell Block D
 
@@ -32,7 +33,7 @@ Progress is saved in the browser after every accepted action, and a reload offer
 
 A 3D police-chase driving game that runs in any modern browser. Pick a map and a getaway vehicle, find the six pieces of evidence that prove you innocent in Lisbon (or grab the bonus shards on the open road), shake off up to four police cars and a helicopter and reach the finish before the clock runs out. Or play **The Necklace Job**, a three-act story with three endings.
 
-**Play:** https://alexanderleusch.github.io/shard-heist/ (published automatically from `main` once all tests pass)
+**Play:** https://alexanderleusch.github.io/shard-heist/room-2-chase/ (published automatically from `main` once all tests pass)
 
 | | |
 |---|---|
@@ -47,41 +48,59 @@ A 3D police-chase driving game that runs in any modern browser. Pick a map and a
 You need [Node.js](https://nodejs.org) 22 or newer. There is nothing to install.
 
 ```bash
-npm start          # serves both rooms: http://localhost:8080/escape-room/ and http://localhost:8080
+npm start          # serves the start page and both rooms: http://localhost:8080
 npm test           # rules, story, input, page and escape-room tests (about 1 s)
 npm run test:sri   # checks the library files against their integrity hashes (needs internet)
 npm run test:browser   # plays both rooms in headless Chrome or Edge (about 3 to 4 min)
 npm run test:all   # all of the above
-cd plot-twist && uv run pytest   # the 36 Python tests of the original Plot Twist project (needs uv)
+cd original-solo-project && uv run pytest   # the 36 Python tests of the original Plot Twist project (needs uv)
 ```
 
-Opening `escape-room/index.html` or `index.html` directly from the folder also works.
+Opening `index.html`, `room-1-escape/index.html` or `room-2-chase/index.html` directly from the folder also works.
 
 ## How it is built
 
-```
-rules/            the rules of both rooms in plain English; npm run docs builds docs/rules.html from them
-plot-twist/       the original Python/Streamlit solo project: logic.py, story.py, db.py, app.py, pytest tests
-escape-room/      ROOM 1, self-contained (it shares no files with room 2):
-  index.html        page structure: HUD, markers, cards, error screen
-  styles.css        prison look
-  src/boot.js       error screen (a copy of room 2's, so the room works on its own)
-  src/rules.js      the story and rules as pure functions: scenes, items, clues, lock, clock, saved games
-  src/room.js       the 3D washroom, camera, markers, lock and clue cards, sound
-  fonts/            its copy of the two fonts, with their licences
+The repository has one folder per room, and one folder for each kind of supporting work. Each room is a complete web page on its own.
 
-index.html        ROOM 2 page structure: HUD, cockpit, menu overlay, error screen; loads the scripts in order
-styles.css        all styling (glass HUD, cockpit, showroom menu, error screen)
-src/boot.js       error screen: catches load failures, missing WebGL and unexpected errors
-src/core.js       the rules: tuning tables, driving, damage, police pressure, scoring, story, input validation
-src/game.js       everything visual and real-time: 3D worlds, vehicles, traffic and police AI, sound, HUD, story scenes
-fonts/            the two fonts (woff2) and their SIL Open Font Licences
-tests/            Node tests for both rooms' rules and pages, plus a headless-browser test of both rooms
-scripts/          dev server (serve.js) and the SRI checker (check-sri.js)
-.github/workflows CI: JavaScript tests, SRI check, browser tests, Python tests and dependency audit on every push to main
-                  and every pull request; deploy to GitHub Pages only when all of them pass
-docs/             Code Guide (PDF): architecture, all code sections, tuning, limits. Rules (PDF): the rules of both rooms
 ```
+shard-heist/
+├── index.html               START PAGE: the two rooms in playing order (no script)
+├── README.md                this file
+├── AGENTS.md / CLAUDE.md    working rules for the team and its coding agents
+│
+├── room-1-escape/           ROOM 1 · Plot Twist: Cell Block D (3D escape room)
+│   ├── index.html           page structure: HUD, markers, cards, error screen
+│   ├── styles.css           the prison look
+│   ├── js/rules.js          the rules: scenes, items, clues, lock, clock, saved games (pure functions)
+│   ├── js/room.js           the 3D washroom, camera, markers, cards, sound
+│   ├── js/boot.js           error screen (load failures, no WebGL, unexpected errors)
+│   └── fonts/               the two fonts with their licences
+│
+├── room-2-chase/            ROOM 2 · Shard Heist (3D police chase)
+│   ├── index.html           page structure: HUD, cockpit, menu, error screen; loads the scripts in order
+│   ├── styles.css           the chase look (also used by the start page)
+│   ├── js/core.js           the rules: driving, damage, police, scoring, story, input checks (pure functions)
+│   ├── js/game.js           everything visual and real-time: worlds, vehicles, AI, sound, HUD, story scenes
+│   ├── js/boot.js           error screen
+│   └── fonts/               the two fonts with their licences
+│
+├── tests/                   all automated tests
+│   ├── room-1/              rules of room 1
+│   ├── room-2/              rules, story and menu input of room 2
+│   ├── project/             both pages, security, the dev server, documents
+│   └── browser/             plays both rooms and the start page in a real (headless) browser
+│
+├── docs/                    documents
+│   ├── rules/               the rules of both rooms and all settings (Markdown, HTML, Rules.pdf)
+│   ├── code-guide/          the Code Guide: architecture and every code section (HTML, PDF)
+│   └── course-guides.md     how the project follows the course guides
+│
+├── tools/                   serve.js (dev server), check-sri.js (library hashes), build-rules.js (rules → HTML)
+├── original-solo-project/   the original Plot Twist solo project (Python/Streamlit) that room 1 rebuilds; tested by CI
+└── .github/workflows/       CI: all tests on every push and pull request; deploy to GitHub Pages only when they pass
+```
+
+**Where to start reading.** For a room's rules, open its rules file (`room-1-escape/js/rules.js`, `room-2-chase/js/core.js`) and the matching tests. For what the player sees, open its page and its big script (`room.js`, `game.js`). The plain-English rules in `docs/rules/` describe the same things without code.
 
 **Room 1 in one sentence.** `rules.js` holds the state as one plain object; `perform(state, action, target)` returns a new state for an accepted action and the same, unchanged state plus a message for a refused one; `tick()` runs the clock; `room.js` only draws the state and turns clicks into actions. This is the structure of the original Plot Twist project, in JavaScript and 3D.
 
@@ -107,7 +126,7 @@ docs/             Code Guide (PDF): architecture, all code sections, tuning, lim
 
 ## Testing
 
-`npm test` runs 118 tests in Node (17 of them for the escape room), and `npm run test:browser` runs 18 more in headless Chrome (4 of them in the escape room). CI runs all of them, plus the SRI check and the 36 pytest checks of `plot-twist/`, on every push to `main` and on every pull request. They cover:
+`npm test` runs 118 tests in Node (17 of them for the escape room), and `npm run test:browser` runs 19 more in headless Chrome (4 of them in the escape room). CI runs all of them, plus the SRI check and the 36 pytest checks of `original-solo-project/`, on every push to `main` and on every pull request. They cover:
 
 - **Escape room:** both endings and the jammed-door grace minute; refused actions (walking where there is no exit, taking an item twice, the car key before the tile is off, the door without the mop, lock wheels that do not exist, anything before the briefing or after an ending) return the unchanged state; wrong codes cost 30 s but never take the clock below zero; warnings sound once; tampered saved games are rejected; in the browser: briefing, refused action, save and continue after a reload, a wrong code and then Ending A.
 - **Accepted actions:** each menu action in the states whose cards show it; valid map and vehicle picks; restoring a valid saved selection; finishing every story act; both story endings.
@@ -122,10 +141,10 @@ Writing the tests found two real bugs. Both are fixed:
 
 ## Security
 
-- **No accounts, no server, no personal data.** The only data the game stores is your last map and vehicle, best times, the radio station, the graphics setting, the steering choice, the volumes and the saved escape-room game, all in your browser's `localStorage` (the full list is in [rules/settings.md](rules/settings.md)). The game has no server of its own. The fonts ship with the game; only the three.js library comes from cdnjs and jsDelivr, so those two services see your IP address. There are no credentials anywhere in the repository; a test scans every file for keys and tokens.
+- **No accounts, no server, no personal data.** The only data the game stores is your last map and vehicle, best times, the radio station, the graphics setting, the steering choice, the volumes and the saved escape-room game, all in your browser's `localStorage` (the full list is in [docs/rules/settings.md](docs/rules/settings.md)). The game has no server of its own. The fonts ship with the game; only the three.js library comes from cdnjs and jsDelivr, so those two services see your IP address. There are no credentials anywhere in the repository; a test scans every file for keys and tokens.
 - **Input validation.** Everything read back from `localStorage` is checked (`parsePick`, `parseBest`, `parseRadio`, `parseSteer`, `parseVolume`, and `restore` and `parseVolume` in room 1) and replaced by defaults when it is invalid. Menu picks and actions are checked against fixed lists using own properties only. Error messages are inserted as text, never as HTML.
 - **Access control.** Nothing on the site needs a login. Cards accept only the actions allowed in the current state, and the dev server only serves known file types from the project folder (no `.git`, no path traversal, GET and HEAD only).
-- **Dependencies.** No npm packages at all. The two fonts ship in `fonts/` with their licences, so no font service is needed. The Python project pins every package in `uv.lock`, and CI audits them with `pip-audit` on every push; a known vulnerability fails the build and stops the deploy. GitHub's Dependabot alerts are on for the repository, so a newly published vulnerability in a pinned version is reported even when nobody pushes. The only runtime library is three.js 0.128.0 (9 files), pinned by exact URL, checked by SRI hashes (`npm run test:sri`) and loaded with `crossorigin="anonymous"`. `npm audit` reports 0 known vulnerabilities for `three@0.128.0` (checked 3 November 2026). GitHub Actions are pinned to commit hashes.
+- **Dependencies.** No npm packages at all. The two fonts ship in each room's `fonts/` folder with their licences, so no font service is needed. The Python project pins every package in `uv.lock`, and CI audits them with `pip-audit` on every push; a known vulnerability fails the build and stops the deploy. GitHub's Dependabot alerts are on for the repository, so a newly published vulnerability in a pinned version is reported even when nobody pushes. The only runtime library is three.js 0.128.0 (9 files), pinned by exact URL, checked by SRI hashes (`npm run test:sri`) and loaded with `crossorigin="anonymous"`. `npm audit` reports 0 known vulnerabilities for `three@0.128.0` (checked 3 November 2026). GitHub Actions are pinned to commit hashes.
 - **Content Security Policy.** Scripts may only come from this site and the two pinned CDNs; there are no inline scripts, plugins, forms or foreign base URLs.
 
 ## When something is unavailable
@@ -134,7 +153,7 @@ The game needs no server of its own and calls no API. The only outside service i
 
 | Missing | What happens |
 |---|---|
-| three.js or one of its effect files (cdnjs, jsDelivr), offline or blocked, or a file that fails its integrity check | The error screen in `src/boot.js` says which file could not load and offers *Reload*, instead of a black page. A browser test blocks the library on purpose and checks this card |
+| three.js or one of its effect files (cdnjs, jsDelivr), offline or blocked, or a file that fails its integrity check | The error screen in `room-2-chase/js/boot.js` says which file could not load and offers *Reload*, instead of a black page. A browser test blocks the library on purpose and checks this card |
 | WebGL (old or locked-down browser) | The same error screen explains how to turn on hardware acceleration. A browser test removes WebGL and checks it |
 | `localStorage` (private mode, blocked storage) | Every read and write is wrapped, so the game runs with the defaults and simply does not remember settings, best times or the escape-room save |
 | The motion sensor on a phone (missing or refused) | Steering stays on the buttons |
@@ -170,4 +189,4 @@ The team's working rules for people and coding agents are in [AGENTS.md](AGENTS.
 All radio music is composed and synthesised by the game at run time, so there are no music files or licences. The tunes are generated from seeded random walks. The classical station plays J. S. Bach's Prelude in C (BWV 846) and the Ode to Joy from Beethoven's Ninth Symphony, both in the public domain.
 
 
-Built with three.js r128 (MIT licence). Fonts: Big Shoulders Display and JetBrains Mono (SIL Open Font License 1.1; the font files and their licences are in `fonts/` and `escape-room/fonts/`). Code written with the help of Claude (Anthropic).
+Built with three.js r128 (MIT licence). Fonts: Big Shoulders Display and JetBrains Mono (SIL Open Font License 1.1; the font files and their licences are in `room-1-escape/fonts/` and `room-2-chase/fonts/`). Code written with the help of Claude (Anthropic).

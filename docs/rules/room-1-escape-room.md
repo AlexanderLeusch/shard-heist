@@ -1,6 +1,6 @@
 # Room 1 · Plot Twist: Cell Block D
 
-> This document describes the rules in `escape-room/src/rules.js`. Values marked **(open)** are not decided yet.
+> This document describes the rules in `room-1-escape/js/rules.js`. Values marked **(open)** are not decided yet.
 
 ## Goal
 

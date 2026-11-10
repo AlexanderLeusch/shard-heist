@@ -1,8 +1,8 @@
-// ### Unit tests for the rules in src/core.js: accepted actions, refused actions and edge cases. No browser is needed.
-// Game rules: driving, damage, police, boundary and scoring (src/core.js)
+// ### Unit tests for the rules in room-2-chase/js/core.js: accepted actions, refused actions and edge cases. No browser is needed.
+// Game rules: driving, damage, police, boundary and scoring (room-2-chase/js/core.js)
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const Core = require('../src/core.js');
+const Core = require('../../room-2-chase/js/core.js');
 const { MODES, VEH } = Core;
 
 const idle = { up: false, down: false, left: false, right: false, brake: false };

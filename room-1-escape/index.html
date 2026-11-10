@@ -48,7 +48,7 @@
 
 <div id="overlay" hidden><div class="card" id="card"></div></div>
 
-<!-- ### ERROR SCREEN: shown by src/boot.js instead of a black page when something cannot load or breaks. -->
+<!-- ### ERROR SCREEN: shown by room-2-chase/js/boot.js instead of a black page when something cannot load or breaks. -->
 <div id="fatal" class="fatal" role="alertdialog" aria-modal="true" aria-labelledby="fatalTitle" aria-describedby="fatalText" hidden>
   <div class="fatal-card">
     <div class="eyebrow">Cell Block D · Error</div>
@@ -62,9 +62,9 @@
 </div>
 
 <!-- ### SCRIPTS: error screen first, then three.js r128 (pinned, checked with an SRI hash), the rules, then the room. -->
-<script src="src/boot.js"></script>
+<script src="js/boot.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js" integrity="sha384-CI3ELBVUz9XQO+97x6nwMDPosPR5XvsxW2ua7N1Xeygeh1IxtgqtCkGfQY9WWdHu" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<script src="src/rules.js"></script>
-<script src="src/room.js"></script>
+<script src="js/rules.js"></script>
+<script src="js/room.js"></script>
 </body>
 </html>

@@ -29,20 +29,20 @@ a{color:var(--accent)}
 </style>
 </head>
 <body>
-<div class="cover"><h1>Shard Heist</h1><p>The game rules, for both rooms. Built from <code style="background:none;color:inherit">rules/*.md</code>.</p></div>
+<div class="cover"><h1>Shard Heist</h1><p>The game rules, for both rooms. Built from <code style="background:none;color:inherit">docs/rules/*.md</code>.</p></div>
 <section id="README">
 <h1>Game rules</h1>
 <blockquote>These documents describe what the game does, as implemented in the code. When a rule changes, update the document, the code and the tests together, then run <code>npm run docs</code> to rebuild the printable version.</blockquote>
 <p>The game has two rooms that are played one after the other. Until the group connects them, each room is its own page.</p>
 <table><tr><th>Room</th><th>Document</th><th>Code with the rules</th><th>Tests</th></tr>
-<tr><td>1 · Plot Twist: Cell Block D (escape room)</td><td><a href="#room-1-escape-room">room-1-escape-room.md</a></td><td><code>escape-room/src/rules.js</code></td><td><code>tests/escape-rules.test.js</code></td></tr>
-<tr><td>2 · Shard Heist (police chase)</td><td><a href="#room-2-shard-heist">room-2-shard-heist.md</a></td><td><code>src/core.js</code> (rules), <code>src/game.js</code> (pickups, police AI)</td><td><code>tests/rules.test.js</code>, <code>tests/story.test.js</code>, <code>tests/input.test.js</code></td></tr>
-<tr><td>Both rooms: every setting and option</td><td>settings.md</td><td><code>src/core.js</code>, <code>escape-room/src/rules.js</code> (checks of stored values)</td><td><code>tests/rules.test.js</code>, <code>tests/escape-rules.test.js</code>, <code>tests/browser.test.js</code></td></tr>
+<tr><td>1 · Plot Twist: Cell Block D (escape room)</td><td><a href="#room-1-escape-room">room-1-escape-room.md</a></td><td><code>room-1-escape/js/rules.js</code></td><td><code>tests/room-1/rules.test.js</code></td></tr>
+<tr><td>2 · Shard Heist (police chase)</td><td><a href="#room-2-shard-heist">room-2-shard-heist.md</a></td><td><code>room-2-chase/js/core.js</code> (rules), <code>room-2-chase/js/game.js</code> (pickups, police AI)</td><td><code>tests/room-2/rules.test.js</code>, <code>tests/room-2/story.test.js</code>, <code>tests/room-2/input.test.js</code></td></tr>
+<tr><td>Both rooms: every setting and option</td><td>settings.md</td><td><code>room-2-chase/js/core.js</code>, <code>room-1-escape/js/rules.js</code> (checks of stored values)</td><td><code>tests/room-2/rules.test.js</code>, <code>tests/room-1/rules.test.js</code>, <code>tests/browser/browser.test.js</code></td></tr>
 </table>
 <h2>The whole game in one paragraph</h2>
 <p>In April 2012 the Starfall necklace, lent by the Ashford family to Lisbon's naval museum for the centenary of the Titanic, vanished from its case. You were the detective on the case, until the trail ended at your own door. Now you are inmate 4471, convicted of stealing it. <b>Room 1:</b> you have ten minutes in a prison washroom to find the code for a hatch in the floor. If you get out (Ending A), a note shows that the guard wanted you out, and a car is waiting at the end of the tunnel. <b>Room 2:</b> the police chase begins. You drive a getaway vehicle through Lisbon's Baixa, on the highway and across the countryside, collecting star shards while up to four police cars and a helicopter hunt you.</p>
 <h2>One night, one look</h2>
-<ul><li><b>Time:</b> both rooms are set on the same night: room 1 around 02:15, room 2 from about 02:30.</li><li><b>Design:</b> both rooms share one design system: the same background, glass panels, fonts, buttons and cards. Each room keeps its own accent colour: <b>orange</b> in the prison, <b>cyan</b> on the run. Hale's radio messages in room 2 are orange because he comes from room 1.</li><li>A test (<code>tests/page.test.js</code>) checks that the shared design tokens and the story links between the rooms stay in place.</li></ul>
+<ul><li><b>Time:</b> both rooms are set on the same night: room 1 around 02:15, room 2 from about 02:30.</li><li><b>Design:</b> both rooms share one design system: the same background, glass panels, fonts, buttons and cards. Each room keeps its own accent colour: <b>orange</b> in the prison, <b>cyan</b> on the run. Hale's radio messages in room 2 are orange because he comes from room 1.</li><li>A test (<code>tests/project/page.test.js</code>) checks that the shared design tokens and the story links between the rooms stay in place.</li></ul>
 <h2>How the two rooms will connect (planned, not built)</h2>
 <ul><li>Ending A of room 1 shows a button that opens room 2.</li><li>Ending B of room 1 stays in room 1 (try again).</li><li>Open question for the group: does room 2 then start in free ride, or straight in the story mode <i>The Necklace Job</i>?</li></ul>
 <h2>Words used in these documents</h2>
@@ -57,7 +57,7 @@ a{color:var(--accent)}
 </section>
 <section id="room-1-escape-room">
 <h1>Room 1 · Plot Twist: Cell Block D</h1>
-<blockquote>This document describes the rules in <code>escape-room/src/rules.js</code>. Values marked <b>(open)</b> are not decided yet.</blockquote>
+<blockquote>This document describes the rules in <code>room-1-escape/js/rules.js</code>. Values marked <b>(open)</b> are not decided yet.</blockquote>
 <h2>Goal</h2>
 <p>Open the hatch in the floor of the toilet stall and climb out <b>before the clock reaches zero</b>.</p>
 <h2>Story</h2>
@@ -131,7 +131,7 @@ a{color:var(--accent)}
 </section>
 <section id="room-2-shard-heist">
 <h1>Room 2 · Shard Heist</h1>
-<blockquote>This document describes the rules in <code>src/core.js</code>, and the pickups and police in <code>src/game.js</code>.</blockquote>
+<blockquote>This document describes the rules in <code>room-2-chase/js/core.js</code>, and the pickups and police in <code>room-2-chase/js/game.js</code>.</blockquote>
 <h2>Where room 2 starts</h2>
 <p>Room 2 begins where room 1 ends. You (inmate 4471, the framed detective) have climbed out of the tunnel under Cell Block D. It is about 02:30 at night. In a lock-up garage, Officer Hale's getaway vehicle is waiting. Every police car in town is now hunting the escaped inmate.</p>
 <p><b>Officer Hale is a secret ally.</b> He believes you were framed, but he cannot prove it. In the story mode he helps over the radio; his messages are shown in <b>orange</b>, the colour of room 1. Police dispatch messages are <b>red</b>.</p>

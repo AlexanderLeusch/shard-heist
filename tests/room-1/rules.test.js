@@ -1,8 +1,8 @@
 // ### Unit tests for room 1, the escape room: both endings, refused actions, lock codes, the clock and tampered saved games.
-// Room 1, the escape room: story rules, accepted and rejected actions, the clock and saved games (escape-room/src/rules.js)
+// Room 1, the escape room: story rules, accepted and rejected actions, the clock and saved games (room-1-escape/js/rules.js)
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const R = require('../escape-room/src/rules.js');
+const R = require('../../room-1-escape/js/rules.js');
 
 // Runs a list of [action, target] steps and returns the final state; every step must be accepted
 function play(steps, s = R.newState()){
