@@ -323,6 +323,20 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       assert.deepEqual(errors, []);
     });
 
+    await t.test('escape room: the arrow keys walk you through the room; while a card is open they do not', async () => {
+      // the clock starts at the door, facing it: walking backwards takes you to the sinks without any button
+      await key('keydown', 'ArrowDown');
+      await waitFor("document.getElementById('place').textContent === 'The Sinks'", 60000, 'walking backwards into the sinks');
+      await key('keyup', 'ArrowDown');
+      await key('keydown', 'KeyP');
+      await waitFor("!document.getElementById('overlay').hidden", 5000, 'pause card');
+      await key('keydown', 'ArrowUp'); await sleep(2500); await key('keyup', 'ArrowUp');
+      assert.equal(await text('#place'), 'The Sinks', 'rejected: no walking while the pause card is open');
+      await key('keydown', 'KeyP');
+      await waitFor("document.getElementById('overlay').hidden", 5000, 'resumed');
+      assert.deepEqual(errors, []);
+    });
+
     await t.test('escape room rejected: the car key cannot be taken while the tile is on, and the sinks have nothing to take', async () => {
       await hs('go:stall');
       assert.equal(await evaluate("!!document.querySelector('[data-hotspot=\"take:carkey\"]')"), false);
