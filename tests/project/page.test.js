@@ -198,9 +198,11 @@ test('the story runs on from room 1 into room 2', () => {
   assert.match(game, /'hale'/, 'Officer Hale helps over the radio');
 });
 
-test('the city is Lisbon: the gate stands under the arch, and the story says so', () => {
-  assert.match(game, /gp = \{ x: 0, z: 83 \}/, 'the gate is on Rua Augusta');
-  assert.match(game, /arco\(80\)/, 'the arch spans z 80 to 86, around the gate');
+test('the city is Lisbon: the gate stands at the south-west corner, towards the bridge, and the story says so', () => {
+  assert.match(game, /gp = \{ x: -144, z: 144 \}/, 'the gate is where Rua do Crucifixo meets the river avenue');
+  assert.equal(Core.streetAt(-144, 144, Math.PI / 2), 'Avenida Infante Dom Henrique');
+  assert.match(game, /gateRot = Math\.atan2\(CITY\.bridge\.position\.x - gp\.x, CITY\.bridge\.position\.z - gp\.z\)/, 'the gate faces the bridge');
+  assert.match(game, /arco\(80\)/, 'the Arco da Rua Augusta still stands over Rua Augusta');
   assert.match(game, /hidden in Lisbon’s Baixa/);
   assert.ok(!/downtown/i.test(game), 'no leftover from the old unnamed city');
   assert.match(game, /fleet: 'tram'/, 'trams are part of the traffic');

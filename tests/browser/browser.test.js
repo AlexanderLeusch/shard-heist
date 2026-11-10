@@ -289,6 +289,8 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       errors.length = 0;
       await send('Page.navigate', { url: base });
       await waitFor("!!document.querySelector('.start-rooms')", 15000, 'start page');
+      // the stylesheet may arrive a moment after the markup
+      await waitFor("getComputedStyle(document.querySelector('.start-room b')).fontFamily.includes('Big Shoulders')", 10000, 'start page stylesheet').catch(() => {});
       assert.equal(await evaluate("[...document.querySelectorAll('.start-room')].map(a => a.getAttribute('href')).join()"), 'room-1-escape/,room-2-chase/');
       assert.equal(await evaluate("document.scripts.length"), 0, 'no script on the start page');
       assert.equal(await evaluate("getComputedStyle(document.querySelector('.start-room b')).fontFamily.includes('Big Shoulders')"), true, 'the shared fonts load');

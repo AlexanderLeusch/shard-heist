@@ -3573,7 +3573,7 @@ function buildTraffic(){
 
 // ---------- Pickups (placed fresh every run) ----------
 // ### placeRun places the star shards, the green repair kits and the finish gate for the current map.
-// ### City: shards in parks, on the squares and on roads, gate under the Arco da Rua Augusta. Highway/countryside: shards along the route,
+// ### City: shards in parks, on the squares and on roads, gate at the south-west corner of the Baixa, on the way to the bridge. Highway/countryside: shards along the route,
 // ### each worth +4 s, gate at the end.
 const gemGeo = new THREE.OctahedronGeometry(0.9, 0); gemGeo.scale(1, 1.45, 1);
 const gemMat = new THREE.MeshStandardMaterial({ color: 0x9ff6ff, emissive: SPARK, emissiveIntensity: 1.4, flatShading: true, roughness: 0.2, metalness: 0.3 });
@@ -3676,7 +3676,9 @@ function placeRun(){
     const roads = shuffle(roadSpots.slice(), rnd);
     for (const s of roads){ if (chosen.length >= M.shards) break; const p = lane(s); if (Math.hypot(p.x, p.z) > 30 && far(p, chosen, 36)) chosen.push(p); }
     for (const s of roads){ if (kitSpots.length >= M.kits) break; const p = lane(s); if (far(p, chosen, 25) && far(p, kitSpots, 60) && Math.hypot(p.x, p.z) > 40) kitSpots.push(p); }
-    gp = { x: 0, z: 83 };
+    // the south-west corner of the Baixa, where Rua do Crucifixo meets the river avenue: the way out to the 25 de Abril bridge.
+    // The gate faces the bridge, which stands beyond the city to the south-west.
+    gp = { x: -144, z: 144 }; gateRot = Math.atan2(CITY.bridge.position.x - gp.x, CITY.bridge.position.z - gp.z);
     gateR = 5.4; gateY = 5.8;
   } else if (mode === 'country'){
     for (let i = 0; i < M.shards; i++){ const s = 220 + i * (ROAD.len - 480) / (M.shards - 1), pt = roadPoint(s, (rnd() < 0.5 ? -1 : 1) * ROAD.lane); chosen.push({ x: pt.x, z: pt.z, s }); }
@@ -4803,7 +4805,7 @@ function showOverview(){
   showCard(`
     <div class="eyebrow">${story ? 'Act 1 · The Evidence' : 'Lisbon · Baixa'} · ${V.name}</div>
     <h2>Where the evidence is</h2>
-    <p>Your friend hid six pieces of evidence in the Baixa. Collect all six, pick up the witness who saw the real thief, then escape through the Arco da Rua Augusta. While you drive, an arrow on the screen points to the nearest piece, then to her.</p>
+    <p>Your friend hid six pieces of evidence in the Baixa. Collect all six, pick up the witness who saw the real thief, then escape through the golden gate at the south-west corner of the Baixa, on the way to the 25 de Abril bridge. While you drive, an arrow on the screen points to the nearest piece, then to her.</p>
     <canvas class="ov-map" id="ovMap" width="640" height="640" role="img" aria-label="Map of the Baixa: ${items.map(it => it.ev.name).join(', ')}, the repair kits, your start and the gate"></canvas>
     <div class="actions">
       <button class="btn" data-action="resume">Start driving <small class="desk-only">Enter</small></button>
@@ -4824,7 +4826,7 @@ function drawOverview(cv){
     g.fillStyle = 'rgba(8,10,22,.86)'; g.fillRect(lx, ly - 15, w, 30); g.fillStyle = color; g.fillText(text, lx + 7, ly + 1);
   };
   // the gate under the arch and your start
-  g.strokeStyle = '#ffc857'; g.lineWidth = 3; g.lineWidth = 4; g.beginPath(); g.arc(X(gate.x), Y(gate.z), 16, 0, Math.PI * 2); g.stroke(); label('Gate · Arco', X(gate.x), Y(gate.z), '#ffc857');
+  g.strokeStyle = '#ffc857'; g.lineWidth = 3; g.lineWidth = 4; g.beginPath(); g.arc(X(gate.x), Y(gate.z), 16, 0, Math.PI * 2); g.stroke(); label('Gate · to the bridge', X(gate.x), Y(gate.z), '#ffc857');
   g.save(); g.translate(X(car.x), Y(car.z)); g.rotate(-car.heading + Math.PI); g.fillStyle = '#ffffff';
   g.beginPath(); g.moveTo(0, -18); g.lineTo(13, 15); g.lineTo(0, 8); g.lineTo(-13, 15); g.closePath(); g.fill(); g.restore();
   label('You', X(car.x), Y(car.z) - 72, '#ffffff');
@@ -4936,7 +4938,7 @@ function updateGuide(){
     let best = Infinity;
     for (const it of items) if (!it.taken){ const d = Math.hypot(it.x - car.x, it.z - car.z); if (d < best){ best = d; t = it; name = it.ev ? it.ev.name : 'Evidence'; } }
     if (!t && witness.active){ t = witness; name = 'Witness · ' + WITNESS.name; }
-    if (!t && gate && gate.active){ t = gate; name = 'Gate · Arco'; }
+    if (!t && gate && gate.active){ t = gate; name = 'Gate · to the bridge'; }
   }
   if (!t){ if (!ui.guide.hidden) ui.guide.hidden = true; last.guide = ''; return; }
   if (ui.guide.hidden) ui.guide.hidden = false;
@@ -4998,7 +5000,7 @@ function repair(kt){
   sfx.repair();
   toast(`Repair kit: damage ${Math.round(before)}% → ${Math.round(damage)}%`, 'green', 2400);
 }
-// ### Opens the finish gate under the Arco (Lisbon) once everything is in the car.
+// ### Opens the finish gate at the south-west corner of the Baixa (Lisbon), on the way to the bridge, once everything is in the car.
 function openGate(text){
   gate.active = true; gate.group.visible = true; gate.grow = 0;
   sfx.gate();
@@ -5010,7 +5012,7 @@ function openGate(text){
 // ### saw the real thief climb out of the museum window, waits on a pavement somewhere in the Baixa, waving, with a golden light
 // ### over her head and a gold mark on the radar. Stop next to her (closer than 7 m, slower than about 11 km/h) and she walks
 // ### to the car and gets in; drive off before she reaches it and she goes back to wait. With her on board the gate opens.
-const WITNESS = Object.freeze({ name: 'Marta Silva', job: 'a night-shift nurse', found: 'Marta Silva is in the car. She saw a man climb out of the museum window that night, and she will say so in court. That is the last piece of evidence. Escape through the Arco da Rua Augusta: follow the golden beam.' });
+const WITNESS = Object.freeze({ name: 'Marta Silva', job: 'a night-shift nurse', found: 'Marta Silva is in the car. She saw a man climb out of the museum window that night, and she will say so in court. That is the last piece of evidence. Drive to the golden gate at the south-west corner of the Baixa, the way out to the 25 de Abril bridge: follow the golden beam.' });
 // ### Marta is built like a person, about 1.70 m tall: legs of 0.88 m that turn at the hip and the knee, a long belted coat over dark
 // ### trousers and boots, a red scarf, a face with eyes, nose and lips, hair tied in a bun, a handbag on her left shoulder, and arms
 // ### that turn at the shoulder, the elbow and the wrist. Every part is a smooth tube or a lofted shell (limbLoft, loft), not a box.
