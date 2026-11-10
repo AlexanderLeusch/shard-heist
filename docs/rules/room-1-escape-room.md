@@ -39,7 +39,9 @@ The clock only starts when the player presses **Start the clock** after the brie
 | **The Hatch** | The trapdoor with a four-wheel combination lock (you kneel down) | Stall |
 | **The Tunnel** | Only reached through Ending A | – |
 
-Walking anywhere else is refused: "You cannot get there from here."
+You walk freely through the washroom in the first person. Where you stand decides your scene: the stall (inside it or right in front of its doorway), the sinks (the west end of the room) or the door (everywhere else). You have to be well inside a new part of the room before it counts, so walking along a border never switches back and forth. The description of a scene is shown the first time you walk in. The Hatch is the only scene you do not walk into: in the stall you click the hatch (or its marker) to kneel down at the lock, and any step stands you up again. Walls, the sink counter, the bin, the bucket, the stall partitions, its open door and the toilet block your way.
+
+The "Walk to" buttons still glide you to a fixed spot in another scene (the only way to move on a touch screen). Walking anywhere else is refused: "You cannot get there from here."
 
 ## Items (you can carry two)
 
@@ -120,10 +122,11 @@ After an ending, every action is refused except **Play again / Try again**, whic
 
 | Input | Action |
 |---|---|
-| Drag the mouse or a finger, or the arrow keys | Look around |
+| Arrow keys (or `W A S D`) | Walk: up and down forwards and backwards, left and right sideways |
+| Drag the mouse or a finger | Look around, all the way round |
 | Click a pulsing marker or the object itself | Use it (the tile, the mirror and the scratches open their mini game) |
-| Space, arrow keys, mouse | Play a mini game (see each game) |
-| "Walk to" buttons (bottom right) | Move to another scene |
+| Space, arrow keys, mouse | Play a mini game (see each game); while a game is open you do not walk |
+| "Walk to" buttons (bottom right) | Glide to another scene |
 | "Clues" button (bottom left) | Read your clue notes |
 | `P` / `Esc` | Pause (Esc also closes a card) |
 | `M` | Sound on or off |

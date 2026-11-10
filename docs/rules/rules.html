@@ -81,7 +81,8 @@ a{color:var(--accent)}
 <tr><td><b>The Hatch</b></td><td>The trapdoor with a four-wheel combination lock (you kneel down)</td><td>Stall</td></tr>
 <tr><td><b>The Tunnel</b></td><td>Only reached through Ending A</td><td>–</td></tr>
 </table>
-<p>Walking anywhere else is refused: "You cannot get there from here."</p>
+<p>You walk freely through the washroom in the first person. Where you stand decides your scene: the stall (inside it or right in front of its doorway), the sinks (the west end of the room) or the door (everywhere else). You have to be well inside a new part of the room before it counts, so walking along a border never switches back and forth. The description of a scene is shown the first time you walk in. The Hatch is the only scene you do not walk into: in the stall you click the hatch (or its marker) to kneel down at the lock, and any step stands you up again. Walls, the sink counter, the bin, the bucket, the stall partitions, its open door and the toilet block your way.</p>
+<p>The "Walk to" buttons still glide you to a fixed spot in another scene (the only way to move on a touch screen). Walking anywhere else is refused: "You cannot get there from here."</p>
 <h2>Items (you can carry two)</h2>
 <table><tr><th>Item</th><th>Where</th><th>What it does</th></tr>
 <tr><td><b>Mop</b></td><td>Bucket by the door</td><td>Optional. Used at the door ("Jam the door with the mop") it is placed under the door handle and leaves your inventory. This buys the extra minute.</td></tr>
@@ -133,10 +134,11 @@ a{color:var(--accent)}
 <ul><li>The game is saved in the browser after <b>every accepted action</b> and every few seconds while the clock runs.</li><li>After a reload, the player can <b>Continue</b> (with the time that was left) or start a <b>New game</b>, which asks for confirmation first.</li><li>A saved game is checked field by field when loaded. Anything that is not a real save is ignored, and a new game starts.</li></ul>
 <h2>Controls</h2>
 <table><tr><th>Input</th><th>Action</th></tr>
-<tr><td>Drag the mouse or a finger, or the arrow keys</td><td>Look around</td></tr>
+<tr><td>Arrow keys (or <code>W A S D</code>)</td><td>Walk: up and down forwards and backwards, left and right sideways</td></tr>
+<tr><td>Drag the mouse or a finger</td><td>Look around, all the way round</td></tr>
 <tr><td>Click a pulsing marker or the object itself</td><td>Use it (the tile, the mirror and the scratches open their mini game)</td></tr>
-<tr><td>Space, arrow keys, mouse</td><td>Play a mini game (see each game)</td></tr>
-<tr><td>"Walk to" buttons (bottom right)</td><td>Move to another scene</td></tr>
+<tr><td>Space, arrow keys, mouse</td><td>Play a mini game (see each game); while a game is open you do not walk</td></tr>
+<tr><td>"Walk to" buttons (bottom right)</td><td>Glide to another scene</td></tr>
 <tr><td>"Clues" button (bottom left)</td><td>Read your clue notes</td></tr>
 <tr><td><code>P</code> / <code>Esc</code></td><td>Pause (Esc also closes a card)</td></tr>
 <tr><td><code>M</code></td><td>Sound on or off</td></tr>
@@ -328,7 +330,8 @@ a{color:var(--accent)}
 <tr><td><b>Pause</b></td><td><code>P</code>, <code>Esc</code> or the pause button</td><td>Stops the clock. The pause card has Resume, Restart and the volume slider</td></tr>
 <tr><td><b>Volume</b></td><td>Slider on the pause card, 0–100 %</td><td>All sounds of the washroom: the light's hum, dripping water, the tap and the effects. A short tone plays when it is let go</td></tr>
 <tr><td><b>Sound</b></td><td><code>M</code> or the speaker button</td><td>All sound off or on</td></tr>
-<tr><td><b>Look around</b></td><td>Drag, or the arrow keys</td><td>Turns the view in the current scene</td></tr>
+<tr><td><b>Walk</b></td><td>Arrow keys or <code>W A S D</code></td><td>Walks through the washroom in the first person</td></tr>
+<tr><td><b>Look around</b></td><td>Drag the mouse or a finger</td><td>Turns your head, all the way round</td></tr>
 </table>
 <h2>What is remembered, and what happens to bad values</h2>
 <p>Every stored value comes from outside the program, so each one is checked when it is loaded. A value that is missing or wrong is ignored and the default is used; the game never breaks because of it.</p>

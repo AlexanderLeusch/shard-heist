@@ -27,18 +27,19 @@ function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t
 
 // ---------- Renderer, scene, camera ----------
 // ### One renderer with soft shadows and filmic tone mapping. The room is lit like a real night-time washroom: one caged
-// ### fluorescent tube that flickers, a weaker lamp over the stall, and cold corridor light through the door window.
+// ### fluorescent tube that burns steadily (it no longer flickers), a weaker lamp over the stall, and cold corridor light
+// ### through the door window.
 const canvas = $('room');
 let renderer;
 try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }); }
 catch (e){ ShardFatal('3D graphics are not available', 'This game needs WebGL. Turn on hardware acceleration in your browser settings, update your graphics driver or try another browser.'); return; }
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, COARSE ? 1.5 : 2));   // lowered by adaptResolution() when frames run slow
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));   // then set by adaptResolution() to suit the frame rate
 renderer.setSize(innerWidth, innerHeight, false);
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.15;
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.PCFShadowMap;   // filtered with each light's shadow.radius: as soft, and cheaper per pixel
 // ### Nothing in the room moves most of the time, so the shadow maps are only redrawn for the frames in which something
 // ### does (the mop, the tile, the hatch lid, the door and Hale in the briefing). shadowsMoved() asks for that.
 renderer.shadowMap.autoUpdate = false;
@@ -49,7 +50,9 @@ const ANISO = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x050607);
 scene.fog = new THREE.FogExp2(0x0b0e0e, 0.03);
-const camera = new THREE.PerspectiveCamera(66, innerWidth / innerHeight, 0.03, 60);
+// the near plane sits 5 cm in front of the eye: you can never get closer to a wall, and the depth buffer stays precise
+// enough that decals on the walls never shimmer
+const camera = new THREE.PerspectiveCamera(66, innerWidth / innerHeight, 0.05, 40);
 const room = new THREE.Group();
 scene.add(room);
 canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); ShardFatal('The graphics were reset', 'The browser stopped the 3D view, usually after a driver reset or when memory runs low. Reload to continue.'); });
@@ -220,13 +223,23 @@ const tileRelief = (() => {
   }
   // dull patches where years of cleaning have worn the glaze
   for (let i = 0; i < 40; i++){ const x = rnd() * S2, y = rnd() * S2, rr = 10 + rnd() * 40, g = r.createRadialGradient(x, y, 0, x, y, rr); g.addColorStop(0, 'rgba(170,170,170,.35)'); g.addColorStop(1, 'rgba(170,170,170,0)'); r.fillStyle = g; r.fillRect(x - rr, y - rr, rr * 2, rr * 2); }
-  return { bump, gloss };
+  // ### The height map is turned into a normal map once. A bump map is worked out per pixel on screen and sparkles along
+  // ### the grout as you move; a normal map is filtered like any texture, so the relief stays calm while you walk and look.
+  const normal = document.createElement('canvas'); normal.width = normal.height = S2;
+  const hd = b.getImageData(0, 0, S2, S2).data, nc = normal.getContext('2d'), out = nc.createImageData(S2, S2), o = out.data;
+  const h = (x, y) => hd[(((y + S2) % S2) * S2 + (x + S2) % S2) * 4] / 255;
+  for (let y = 0; y < S2; y++) for (let x = 0; x < S2; x++){
+    const dx = (h(x + 1, y) - h(x - 1, y)) * 2.2, dy = (h(x, y + 1) - h(x, y - 1)) * 2.2, l = Math.hypot(dx, dy, 1), i = (y * S2 + x) * 4;
+    o[i] = (-dx / l * .5 + .5) * 255; o[i + 1] = (dy / l * .5 + .5) * 255; o[i + 2] = (1 / l * .5 + .5) * 255; o[i + 3] = 255;
+  }
+  nc.putImageData(out, 0, 0);
+  return { normal, gloss };
 })();
 // ### A tiled material: colour, relief and gloss share the same repeat, so the grout lines meet exactly.
 function tileMat(repeatX, repeatY = 1.5){
-  const map = tileTex(repeatX), mk = img => { const t = new THREE.CanvasTexture(img); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = Math.min(ANISO, 2); t.repeat.set(repeatX, repeatY); return t; };
+  const map = tileTex(repeatX), mk = (img, aniso) => { const t = new THREE.CanvasTexture(img); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = aniso; t.repeat.set(repeatX, repeatY); return t; };
   map.repeat.set(repeatX, repeatY);
-  return new THREE.MeshStandardMaterial({ map, bumpMap: mk(tileRelief.bump), bumpScale: .012, roughnessMap: mk(tileRelief.gloss), roughness: 1, metalness: 0 });
+  return new THREE.MeshStandardMaterial({ map, normalMap: mk(tileRelief.normal, ANISO), roughnessMap: mk(tileRelief.gloss, Math.min(ANISO, 4)), roughness: 1, metalness: 0 });
 }
 // ### Brushed stainless steel: fine streaks in one direction change how glossy the metal is, so highlights stretch along them.
 const brushedTex = canvasTex(256, 256, (g, w, h) => {
@@ -482,6 +495,9 @@ haleShadow.position.set(.12, .004, 2.05); haleShadow.rotation.set(-Math.PI / 2, 
 // the cold light that falls in through the open door
 const doorLight = new THREE.SpotLight(0xd4e6ff, 0, 9, .62, .55, 1.3);
 doorLight.position.set(0, 2.3, 4.1); doorLight.target.position.set(0, 0, .3); room.add(doorLight, doorLight.target);
+// ### A light that is switched off still costs every pixel its sums, so the door light and the tunnel light are only part of
+// ### the scene while they shine: the door light during the briefing scene, the tunnel light from the moment the hatch opens.
+doorLight.visible = false;
 
 // Sinks with a polished steel mirror, an empty soap dish and the hot tap
 box(.5, .06, 2.6, M.steel, -3.75, .86, 0);
@@ -616,10 +632,11 @@ const shackle = new THREE.Mesh(new THREE.TorusGeometry(.045, .01, 8, 20, Math.PI
 const wheelTex = [0, 1, 2, 3].map(() => digitTex());
 wheelTex.forEach((t, i) => { const wm = new THREE.Mesh(new THREE.PlaneGeometry(.036, .04), new THREE.MeshBasicMaterial({ map: t })); wm.position.set(-.06 + i * .04, 0, .0255); lockGroup.add(wm); drawDigit(t, 0); });
 hot('lock', lockBody, lid);
+HOT['go:hatch'] = HOT.lock;   // from the stall, clicking the hatch kneels you down at it
 const shaft = new THREE.Mesh(new THREE.BoxGeometry(HS, 4, HS), new THREE.MeshStandardMaterial({ color: 0x2b2a27, roughness: 1, side: THREE.BackSide }));
 shaft.position.set(HATCH.x, -2.01, HATCH.z); room.add(shaft);
 for (let y = -.3; y > -3.9; y -= .3){ const r = new THREE.Mesh(new THREE.CylinderGeometry(.012, .012, .42, 8), M.dullSteel); r.rotation.z = Math.PI / 2; r.position.set(HATCH.x, y, HATCH.z - HS / 2 + .08); room.add(r); }
-const tunnelLight = new THREE.PointLight(0xffb066, 0, 5, 2); tunnelLight.position.set(HATCH.x, -3.4, HATCH.z); room.add(tunnelLight);
+const tunnelLight = new THREE.PointLight(0xffb066, 0, 5, 2); tunnelLight.position.set(HATCH.x, -3.4, HATCH.z); tunnelLight.visible = false; room.add(tunnelLight);
 
 // ### Details that make the washroom feel used and real: tiled skirting, soft shadows in every corner, a camera watching,
 // ### an air vent, the light switch and intercom by the door, a towel dispenser and a bin by the sinks, lamp housings.
@@ -728,68 +745,154 @@ function mergeStatic(){
 }
 mergeStatic();
 
-// ---------- Camera: viewpoints and looking around ----------
-// ### Each scene has a viewpoint (where you stand and what you face). Walking to another scene glides the camera there.
-// ### Dragging the mouse or a finger, or the arrow keys, turns your head within limits.
+// ---------- Camera: walking and looking around ----------
+// ### You walk freely through the washroom in the first person: the arrow keys (or W A S D) walk, dragging the mouse or a
+// ### finger turns your head. Where you stand decides which part of the room the rules see you in (the door, the sinks or
+// ### the stall), so the markers of that part appear as you walk in. The "Walk to" buttons still glide you to a spot (the
+// ### only way to move on a touch screen), and the hatch, the briefing and the endings use the same glide.
 const VIEWS = {
   intro: { pos: [0, 1.62, 2.2], look: [0, 1.4, -3] },
   door: { pos: [-.9, 1.62, 1.2], look: [1.25, .95, 3] },
   sinks: { pos: [-2.15, 1.62, .1], look: [-4, 1.15, 0] },
-  stall: { pos: [2.75, 1.62, .15], look: [2.7, .72, -3] },
+  stall: { pos: [3.25, 1.62, -.95], look: [2.4, .55, -2.6] },
   hatch: { pos: [2.3, 1.02, -.86], look: [2.22, .05, -1.55] },
   tunnel: { pos: [2.2, -2.6, -1.6], look: [2.2, -3.9, -1.95] },
   cell: { pos: [0, 1.62, 1.1], look: [0, 1.45, 3] },
   closing: { pos: [.5, 1.5, -.3], look: [-.05, 1.05, 3] }
 };
-const cam = { pos: new THREE.Vector3(...VIEWS.intro.pos), yaw: 0, pitch: 0, from: null, t: 1, dur: 1, yawOff: 0, pitchOff: 0, idle: 0 };
+const EYE = 1.62, WALK_SPEED = 1.7, BODY = .26, LOOK_SPEED = .0042;
+// lookYaw and lookPitch are where the mouse points the head; yaw and pitch follow them within a few milliseconds, so uneven
+// mouse events never make the picture jerk
+const cam = { pos: new THREE.Vector3(...VIEWS.intro.pos), yaw: 0, pitch: 0, lookYaw: 0, lookPitch: 0, from: null, t: 1, dur: 1,
+  vel: new THREE.Vector3(), stride: 0, bob: 0 };
+camera.rotation.order = 'YXZ';
 // ### The camera angles that look at a point.
 const anglesTo = (pos, look) => { const d = new THREE.Vector3(...look).sub(new THREE.Vector3(...pos)); return { yaw: Math.atan2(d.x, -d.z), pitch: Math.atan2(d.y, Math.hypot(d.x, d.z)) }; };
+const wrapAngle = a => Math.atan2(Math.sin(a), Math.cos(a));
 let camTarget = { pos: new THREE.Vector3(...VIEWS.intro.pos), ...anglesTo(VIEWS.intro.pos, VIEWS.intro.look) };
-Object.assign(cam, { yaw: camTarget.yaw, pitch: camTarget.pitch });
+Object.assign(cam, { yaw: camTarget.yaw, pitch: camTarget.pitch, lookYaw: camTarget.yaw, lookPitch: camTarget.pitch });
 // ### Moves the camera smoothly to another place in the cell.
 function goView(name, dur){
   const v = VIEWS[name];
+  cam.yaw = wrapAngle(cam.yaw);
   cam.from = { pos: cam.pos.clone(), yaw: cam.yaw, pitch: cam.pitch };
   camTarget = { pos: new THREE.Vector3(...v.pos), ...anglesTo(v.pos, v.look) };
   // turn the short way round
   while (camTarget.yaw - cam.from.yaw > Math.PI) camTarget.yaw -= Math.PI * 2;
   while (camTarget.yaw - cam.from.yaw < -Math.PI) camTarget.yaw += Math.PI * 2;
-  cam.t = 0; cam.dur = REDUCED ? .01 : (dur || 1.1); cam.yawOff = 0; cam.pitchOff = 0;
+  cam.t = 0; cam.dur = REDUCED ? .01 : (dur || 1.1); cam.vel.set(0, 0, 0);
 }
-// ### Moves the camera each frame, towards the current place and where the player is looking.
+
+// ### What you bump into, seen from above as rectangles [x0, x1, z0, z1]: the sink counter, the bin, the bucket, the stall
+// ### partitions, its open door and the toilet. The walls are the edges of the room. You are a circle of BODY metres.
+const SOLID = [
+  [-4, -3.5, -1.3, 1.3], [-3.85, -3.51, 2.08, 2.42], [3.15, 3.55, 2.25, 2.65],
+  [1.47, 1.53, -3, -.68], [1.47, 1.8, -.73, -.67], [3.7, 4, -.73, -.67], [3.68, 3.87, -.7, .2],
+  [2.95, 3.55, -3, -2.14]
+];
+// ### Keeps the circle you stand in out of every solid and inside the walls; it slides along what it touches.
+function collide(p){
+  for (let n = 0; n < 2; n++){
+    for (const [x0, x1, z0, z1] of SOLID){
+      const cx = clamp(p.x, x0, x1), cz = clamp(p.z, z0, z1), dx = p.x - cx, dz = p.z - cz, d = Math.hypot(dx, dz);
+      if (d >= BODY) continue;
+      if (d > 1e-6){ p.x = cx + dx / d * BODY; p.z = cz + dz / d * BODY; }
+      else { // the centre is inside: leave by the nearest side
+        const out = [[x0 - BODY - p.x, 0], [x1 + BODY - p.x, 0], [0, z0 - BODY - p.z], [0, z1 + BODY - p.z]].sort((a, b) => Math.abs(a[0] + a[1]) - Math.abs(b[0] + b[1]))[0];
+        p.x += out[0]; p.z += out[1];
+      }
+    }
+    p.x = clamp(p.x, -W / 2 + BODY, W / 2 - BODY); p.z = clamp(p.z, -D / 2 + BODY, D / 2 - BODY);
+  }
+}
+// ### Which part of the room a spot belongs to. You have to be well inside a new part before it counts, so walking along
+// ### a border never switches back and forth.
+function zoneAt(x, z, now){
+  const m = n => (now === n ? .12 : -.12);
+  if (x > SX0 && z < SZ1 + .45 + m('stall')) return 'stall';
+  if (x < -1.7 + m('sinks')) return 'sinks';
+  return 'door';
+}
+const MOVE_KEYS = { ArrowUp: [0, 1], KeyW: [0, 1], ArrowDown: [0, -1], KeyS: [0, -1], ArrowLeft: [-1, 0], KeyA: [-1, 0], ArrowRight: [1, 0], KeyD: [1, 0] };
+const held = new Set();
+const canWalk = () => overlay.hidden && !paused && !S.ending && S.scene !== 'intro' && cam.t >= 1;
+// ### Walking into another part of the room tells the rules, quietly after the first visit. From the hatch you stand up first.
+const seenScenes = new Set();
+function walkInto(zone){
+  if (S.scene === 'hatch' && zone !== 'stall') act('go', 'stall', true);
+  if (S.scene !== zone) act('go', zone, true);
+}
+// ### One step of walking: speed builds up and fades out smoothly, you slide along walls, your head bobs a little with each
+// ### stride (not with reduced motion) and the floor answers with soft footsteps.
+function walk(dt){
+  // a card (a clue, the lock, a mini game, the pause) stops you on the spot; the mini games use the arrow keys themselves
+  if (!canWalk()){ cam.vel.set(0, 0, 0); cam.bob *= .9; return; }
+  let f = 0, s = 0;
+  for (const k of held){ f += MOVE_KEYS[k][1]; s += MOVE_KEYS[k][0]; }
+  const len = Math.hypot(f, s);
+  if (len && S.scene === 'hatch'){ act('go', 'stall', true); }
+  const fx = Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), sp = len ? WALK_SPEED / len : 0;
+  const k = 1 - Math.exp(-dt * (len ? 10 : 14));
+  cam.vel.x += ((fx * f - fz * s) * sp - cam.vel.x) * k;
+  cam.vel.z += ((fz * f + fx * s) * sp - cam.vel.z) * k;
+  const speed = Math.hypot(cam.vel.x, cam.vel.z);
+  if (speed > .002){
+    cam.pos.x += cam.vel.x * dt; cam.pos.z += cam.vel.z * dt;
+    collide(cam.pos);
+    const before = Math.floor(cam.stride / .8);
+    cam.stride += speed * dt;
+    if (Math.floor(cam.stride / .8) !== before && speed > .5) noise(.09, .06, 'lowpass', 240);
+    if (len) $('lookHint').classList.add('gone');
+    const z = zoneAt(cam.pos.x, cam.pos.z, S.scene === 'hatch' ? 'stall' : S.scene);
+    if (z !== (S.scene === 'hatch' ? 'stall' : S.scene)) walkInto(z);
+  } else cam.vel.set(0, 0, 0);
+  // stand up again after the hatch, and a gentle bob that fades in and out with the speed
+  if (S.scene !== 'hatch') cam.pos.y += (EYE - cam.pos.y) * (1 - Math.exp(-dt * 6));
+  const amp = REDUCED ? 0 : .016 * Math.min(1, speed / WALK_SPEED);
+  cam.bob += (Math.sin(cam.stride / .8 * Math.PI * 2) * amp - cam.bob) * (1 - Math.exp(-dt * 12));
+}
+// ### Moves the camera each frame: a glide when one runs, otherwise walking and looking.
 function updateCamera(dt){
   if (cam.t < 1){
     cam.t = Math.min(1, cam.t + dt / cam.dur);
     const e = cam.t < .5 ? 2 * cam.t * cam.t : 1 - Math.pow(-2 * cam.t + 2, 2) / 2;
     cam.pos.lerpVectors(cam.from.pos, camTarget.pos, e);
-    cam.yaw = cam.from.yaw + (camTarget.yaw - cam.from.yaw) * e;
-    cam.pitch = cam.from.pitch + (camTarget.pitch - cam.from.pitch) * e;
+    cam.lookYaw = cam.yaw = cam.from.yaw + (camTarget.yaw - cam.from.yaw) * e;
+    cam.lookPitch = cam.pitch = cam.from.pitch + (camTarget.pitch - cam.from.pitch) * e;
+    cam.bob *= .9;
+  } else {
+    const k = 1 - Math.exp(-dt * 30);
+    cam.yaw += (cam.lookYaw - cam.yaw) * k; cam.pitch += (cam.lookPitch - cam.pitch) * k;
+    walk(dt);
   }
-  const bob = REDUCED ? 0 : Math.sin(clock * 1.3) * .004;
-  const yaw = cam.yaw + cam.yawOff, pitch = clamp(cam.pitch + cam.pitchOff, -1.35, 1.2);
-  camera.position.set(cam.pos.x, cam.pos.y + bob, cam.pos.z);
-  camera.lookAt(cam.pos.x + Math.sin(yaw) * Math.cos(pitch), cam.pos.y + bob + Math.sin(pitch), cam.pos.z - Math.cos(yaw) * Math.cos(pitch));
+  camera.position.set(cam.pos.x, cam.pos.y + cam.bob, cam.pos.z);
+  camera.rotation.set(clamp(cam.pitch, -1.4, 1.4), -cam.yaw, 0);
 }
 let drag = null;
 canvas.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, moved: 0, id: e.pointerId }; try { canvas.setPointerCapture(e.pointerId); } catch (err) {} initAudio(); });
 canvas.addEventListener('pointermove', e => {
   if (drag){
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
-    if (drag.moved > 6){ canvas.classList.add('dragging'); cam.yawOff = clamp(cam.yawOff + dx * .004, -1.3, 1.3); cam.pitchOff = clamp(cam.pitchOff - dy * .004, -.7, .7); $('lookHint').classList.add('gone'); }
+    // the first few pixels decide between a click and a drag; once it is a drag, every pixel turns the head
+    if (drag.moved > 6){
+      if (!drag.looking){ drag.looking = true; canvas.classList.add('dragging'); $('lookHint').classList.add('gone'); }
+      if (cam.t >= 1){ cam.lookYaw += dx * LOOK_SPEED; cam.lookPitch = clamp(cam.lookPitch - dy * LOOK_SPEED, -1.3, 1.25); }
+    }
   } else pendingHover = e;
 });
 canvas.addEventListener('pointerup', e => { if (drag && drag.moved <= 6) clickAt(e); drag = null; canvas.classList.remove('dragging'); });
 canvas.addEventListener('pointercancel', () => { drag = null; canvas.classList.remove('dragging'); });
+if (COARSE) $('lookHint').textContent = 'Drag to look around · tap the markers';
 
 // ---------- Hotspots: markers and clicking objects ----------
 // ### visibleHotspots() from rules.js says what can be used right now. Objects get a pulsing marker (a real button, so it
-// ### works with a keyboard and on touch screens); walking happens with the "Walk to" buttons. Clicking an object in the
-// ### 3D view does the same as its marker.
+// ### works with a keyboard and on touch screens); the "Walk to" buttons glide you to another part of the room, and the
+// ### hatch gets a marker of its own so you can kneel down at it. Clicking an object in the 3D view does the same as its marker.
 const ANCHORS = {
   'take:mop': [3.35, .9, 2.45], 'wedge': [.38, 1.02, 2.86], 'tap': [-3.94, 1.08, -.53],
   'read:mirror': [-3.97, 1.75, .45], 'play:mirror': [-3.97, 1.75, .45], 'read:graffiti': [1.53, 1.5, -1.9], 'play:tile': [2.62, .58, -2.97], 'take:carkey': [2.62, .58, -2.97],
   'read:scratches': [1.75, 1.3, 2.95], 'play:scratches': [1.75, 1.3, 2.95],
-  'lock': [2.2, .1, -1.1]
+  'lock': [2.2, .1, -1.1], 'go:hatch': [2.2, .06, -1.75]
 };
 const keyOf = h => h.target ? `${h.action}:${h.target}` : h.action;
 let markerEls = [];
@@ -803,8 +906,8 @@ function renderHotspots(){
     const b = document.createElement('button');
     b.type = 'button'; b.dataset.hotspot = keyOf(h); b.setAttribute('aria-label', h.label);
     b.addEventListener('click', () => { initAudio(); use(h.action, h.target); });
-    if (h.action === 'go'){ b.textContent = h.label; go.appendChild(b); continue; }
-    b.className = 'mk'; b.innerHTML = '<i></i><span></span>'; b.querySelector('span').textContent = h.label;
+    if (h.action === 'go' && h.target !== 'hatch'){ b.textContent = h.label; go.appendChild(b); continue; }
+    b.className = h.action === 'go' ? 'mk go' : 'mk'; b.innerHTML = '<i></i><span></span>'; b.querySelector('span').textContent = h.label;
     mk.appendChild(b); markerEls.push({ el: b, at: new THREE.Vector3(...(ANCHORS[keyOf(h)] || [0, 1, 0])) });
   }
   $('goBar').hidden = !go.children.length;
@@ -828,7 +931,8 @@ function pick(e){
   const live = new Set(R.visibleHotspots(S).map(keyOf));
   const meshes = Object.entries(HOT).filter(([k]) => live.has(k)).flatMap(([, ms]) => ms).filter(m => m.visible);
   const hit = raycaster.intersectObjects(meshes, false)[0];
-  return hit && hit.distance < 6 ? hit.object.userData.hot : null;
+  // a mesh can stand for more than one hotspot (the hatch lid: kneel down at it, then open the lock); the live one counts
+  return hit && hit.distance < 6 ? Object.keys(HOT).find(k => live.has(k) && HOT[k].includes(hit.object)) || null : null;
 }
 let hovered = null, pendingHover = null;   // pointer moves are handled once per frame, not once per event
 // ### Highlights the hotspot under the pointer.
@@ -859,16 +963,18 @@ function use(action, target){
   act(action, target);
 }
 // ### Sends an action to Rules, and shows the answer. Refused actions return the state unchanged, with a reason.
-function act(action, target){
+function act(action, target, quiet){
   const before = S, r = R.perform(S, action, target);
   cue(r.cue);
   if (!r.ok){ say(r.message, 'warn'); return r; }
   S = r.state;
   if (action !== 'new') save();
-  if (S.scene !== before.scene) goView(S.scene === 'tunnel' ? 'hatch' : S.scene);
+  // walking into another part of the room moves nothing; a button or a marker glides you there
+  if (S.scene !== before.scene && !quiet) goView(S.scene === 'tunnel' ? 'hatch' : S.scene);
+  const known = seenScenes.has(S.scene); if (action === 'go') seenScenes.add(S.scene);
   if (r.cue === 'game'){ showMini(target, r.message); return r; }
   if ((action === 'read' || action === 'win') && R.CLUES[target]) showClue(target);
-  else if (r.message && !S.ending) say(r.message, action === 'try' && !S.ending ? 'warn' : action === 'take' ? 'good' : '');
+  else if (r.message && !S.ending && !(quiet && known)) say(r.message, action === 'try' && !S.ending ? 'warn' : action === 'take' ? 'good' : '');
   if (action === 'try' && !S.ending){ guardShow = 3; renderLock(); }
   if (S.ending === 'A' && before.ending !== 'A'){ hideCard(); endingA(); }
   syncWorld(); renderHud(); renderHotspots();
@@ -887,7 +993,7 @@ function syncWorld(){
   repaint(steamTex, paintSteam, S.clues.includes('mirror'));
   repaint(scratchesTex, paintScratches, S.clues.includes('scratches'));
   S.lock.forEach((d, i) => { if (wheelTex[i].userData !== d){ drawDigit(wheelTex[i], d); wheelTex[i].userData = d; } });
-  if (!S.ending){ lidPivot.rotation.x = 0; tunnelLight.intensity = 0; }
+  if (!S.ending){ lidPivot.rotation.x = 0; tunnelLight.intensity = 0; tunnelLight.visible = false; }
   shadowsMoved();
 }
 
@@ -959,10 +1065,11 @@ function showBrief(i){
   }
   stopCine();
   const body = text ? (text.startsWith('<div') ? text : `<p>${text}</p>`) : `<div class="howto">
-      <b>Drag</b><span>Look around (or use the arrow keys)</span>
+      <b>Arrow keys</b><span>Walk around the washroom (W A S D work too)</span>
+      <b>Drag</b><span>Look around with the mouse</span>
       <b>Markers</b><span>Click a pulsing marker or the object itself to use it</span>
       <b>Mini games</b><span>The crooked tile, the mirror and the scratches each open a mini game of ${MiniGames.TIME} s. Win it to get the clue</span>
-      <b>Walk to</b><span>Buttons bottom right take you to another part of the room</span>
+      <b>Walk to</b><span>Buttons bottom right glide you straight to another part of the room</span>
       <b>Items</b><span>What you pick up appears bottom left and is used automatically</span>
       <b>Clues</b><span>Everything you read is kept in your clue notes</span>
       <b>P / Esc</b><span>Pause. The clock keeps running while you read and try the lock</span>
@@ -1087,7 +1194,7 @@ card.addEventListener('click', e => {
   else if (d === 'resume') resumeRoom();
   else if (d === 'pause') showPause();
   else if (d === 'ask-new') showAskNew();
-  else if (d === 'new'){ paused = false; hatchAnim = -1; tileVel = 0; endingShown = false; act('new'); writeStore(R.SAVE_KEY, ''); hud.classList.add('off'); goView('intro', .8); doorFlash = 0; windowLight.intensity = .9; showBrief(0); }
+  else if (d === 'new'){ paused = false; seenScenes.clear(); held.clear(); hatchAnim = -1; tileVel = 0; endingShown = false; act('new'); writeStore(R.SAVE_KEY, ''); hud.classList.add('off'); goView('intro', .8); doorFlash = 0; windowLight.intensity = .9; showBrief(0); }
   else if (d === 'close') hideCard();
   else if (d === 'replay' && miniSpot) use('play', miniSpot);
   else if (d === 'try') act('try');
@@ -1115,17 +1222,16 @@ addEventListener('keydown', e => {
   }
   if (e.code === 'KeyM') toggleSound();
   if (!overlay.hidden) return;
-  if (e.code === 'ArrowLeft') cam.yawOff = clamp(cam.yawOff - .08, -1.3, 1.3);
-  if (e.code === 'ArrowRight') cam.yawOff = clamp(cam.yawOff + .08, -1.3, 1.3);
-  if (e.code === 'ArrowUp') cam.pitchOff = clamp(cam.pitchOff + .06, -.7, .7);
-  if (e.code === 'ArrowDown') cam.pitchOff = clamp(cam.pitchOff - .06, -.7, .7);
+  // walking: held keys are remembered here and turned into steps in walk(); the page itself never scrolls
+  if (MOVE_KEYS[e.code]){ e.preventDefault(); if (!e.repeat && !paused) held.add(e.code); }
 });
+addEventListener('keyup', e => held.delete(e.code));
 // The clock must not run while nobody is looking
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && S.scene !== 'intro' && !S.ending && !paused) showPause();
+  if (document.hidden){ held.clear(); if (S.scene !== 'intro' && !S.ending && !paused) showPause(); }
   if (ac){ if (document.hidden) ac.suspend(); else if (!muted) ac.resume(); }
 });
-addEventListener('blur', () => { if (S.scene !== 'intro' && !S.ending && !paused) showPause(); });
+addEventListener('blur', () => { held.clear(); if (S.scene !== 'intro' && !S.ending && !paused) showPause(); });
 addEventListener('pagehide', () => { if (ac) ac.suspend(); save(); });
 addEventListener('shardheist:fatal', () => { if (S.scene !== 'intro' && !S.ending && !paused) showPause(); if (ac) ac.suspend(); $('fatalReload').focus(); });
 
@@ -1200,7 +1306,7 @@ const LINES = [
 ];
 function cineLine(html){ const el = card.querySelector('#cineLine'); if (el) el.innerHTML = html; }
 function startCine(){
-  hall.visible = true; cineT = REDUCED ? CINE_END : 0;
+  hall.visible = true; doorLight.visible = true; cineT = REDUCED ? CINE_END : 0;
   overlay.classList.add('cine'); $('lookHint').classList.add('hush'); goView('closing', 1.2);
   if (REDUCED){ cineLine(LINES[2][1]); card.querySelector('#cineClock').classList.add('on'); guardShow = 5; }
   else cineLine(LINES[0][1]);
@@ -1209,7 +1315,7 @@ function startCine(){
 function stopCine(){
   overlay.classList.remove('cine'); $('lookHint').classList.remove('hush');
   if (cineT < 0) return;
-  cineT = -1; hall.visible = false; doorPivot.rotation.y = 0; haleFade(0); haleShadow.material.opacity = 0; doorLight.intensity = 0; shake = 0; shadowsMoved();
+  cineT = -1; hall.visible = false; doorPivot.rotation.y = 0; haleFade(0); haleShadow.material.opacity = 0; doorLight.intensity = 0; doorLight.visible = false; shake = 0; shadowsMoved();
   if (S.scene === 'intro') goView('intro', .9);
 }
 // ### One step of the scene: the door, the light and Hale follow the time; the sounds and words come once each.
@@ -1235,13 +1341,13 @@ function updateCine(dt){
 // ### Ending A: the lid swings up, warm light comes from below and the camera climbs down the ladder, then the ending
 // ### card. Ending B: the door is flung open, white corridor light floods in, then the card.
 let hatchAnim = -1, doorFlash = 0, endingShown = false;
-function endingA(){ hatchAnim = 0; endingShown = false; }
+function endingA(){ hatchAnim = 0; endingShown = false; tunnelLight.visible = true; }
 function endingB(){ doorFlash = 1; goView('cell', .6); setTimeout(() => { if (S.ending === 'B'){ showEnding(); } }, 1400); }
 
 // ---------- Loop ----------
-// ### Runs once per screen refresh: the clock (rules.tick), then animations (camera, steam, flicker, guard, tile, hatch),
-// ### then the markers and the picture. The clock only runs while playing, not paused and not in the briefing.
-let clock = 0, last = performance.now(), guardShow = 0, flicker = 0, tileVel = 0;
+// ### Runs once per screen refresh: the clock (rules.tick), then animations (camera, steam, guard, tile, hatch), then the
+// ### markers and the picture. The clock only runs while playing, not paused and not in the briefing.
+let clock = 0, last = performance.now(), guardShow = 0, tileVel = 0;
 // ### The room loop each frame: clock, camera, markers and drawing.
 function frame(now){
   requestAnimationFrame(frame);
@@ -1259,17 +1365,11 @@ function frame(now){
   updateCamera(dt);
   updateCine(dt);
   if (shake > 0 && !REDUCED){ shake = Math.max(0, shake - dt); camera.position.x += (Math.random() - .5) * shake * .05; camera.position.y += (Math.random() - .5) * shake * .05; }
-  // fluorescent flicker
-  flicker -= dt;
-  let li = 1;
-  if (flicker < 0){ flicker = 2 + Math.random() * 7; }
-  if (flicker < .25 && !REDUCED) li = Math.random() < .5 ? .25 : 1;
-  mainLight.intensity = 3.2 * li; tube.material.emissiveIntensity = 2.4 * li;
   // steam on the mirror and rising from the hot sink
   const st = S.steam ? 1 : 0;
   M.steam.opacity += (st * .92 - M.steam.opacity) * Math.min(1, dt * .45);
   if (waterGain) waterGain.gain.value += ((S.steam && !paused ? .05 : 0) - waterGain.gain.value) * Math.min(1, dt * 4);
-  steamPuffs.forEach(s => { s.userData.t = (s.userData.t + dt * .25) % 1; const t = s.userData.t; s.position.set(-3.73 + Math.sin(t * 9 + s.id) * .05, .9 + t * 1.1, -.65 + Math.cos(t * 7 + s.id) * .08); s.scale.setScalar(.15 + t * .5); s.material.opacity = S.steam ? Math.sin(t * Math.PI) * .35 : Math.max(0, s.material.opacity - dt); });
+  steamPuffs.forEach(s => { s.userData.t = (s.userData.t + dt * .25) % 1; const t = s.userData.t; s.position.set(-3.73 + Math.sin(t * 9 + s.id) * .05, .9 + t * 1.1, -.65 + Math.cos(t * 7 + s.id) * .08); s.scale.setScalar(.15 + t * .5); s.material.opacity = S.steam ? Math.sin(t * Math.PI) * .35 : Math.max(0, s.material.opacity - dt); s.visible = s.material.opacity > .003; });
   // the guard's silhouette in the window
   guardShow = Math.max(0, guardShow - dt);
   M.guard.opacity += ((guardShow > 0 || S.ending === 'B' ? .95 : 0) - M.guard.opacity) * Math.min(1, dt * 3);
@@ -1297,31 +1397,33 @@ function frame(now){
   if (pendingHover){ hover(pendingHover); pendingHover = null; }
   updateMarkers();
   if (shadowFrames > 0){ renderer.shadowMap.needsUpdate = true; shadowFrames--; }
-  // while a mini game runs the room behind the card stands still, so it is not drawn again and the game runs smoothly
-  if (!mini) renderer.render(scene, camera);
+  // while a mini game runs the room behind the card stands still, so it is not drawn again and the game runs smoothly;
+  // a new size is applied just before drawing: resizing after it would clear the picture and show a black frame
+  if (!mini){
+    if (sizeDirty){ sizeDirty = false; renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+    renderer.render(scene, camera);
+  }
   adaptResolution(elapsed);
 }
 
 // ### The resolution follows the frame rate: when frames take too long the picture is drawn with fewer pixels, and when
-// ### there is room to spare for a few seconds it goes back up, never above the screen's own pixel density.
+// ### there is room to spare for a while it goes back up, never above the screen's own pixel density. It starts at 1.5x
+// ### at most (sharp enough, and a quarter of the pixels of 2x), and each step back up waits longer than the last, so the
+// ### sharpness never pumps up and down.
 const PR_MAX = Math.min(window.devicePixelRatio || 1, COARSE ? 1.5 : 2), PR_MIN = Math.min(PR_MAX, .75);
-let pixelRatio = PR_MAX, perfT = 0, perfN = 0, perfGood = 0;
+let pixelRatio = Math.min(PR_MAX, 1.5), perfT = 0, perfN = 0, perfGood = 0, perfWait = 4, sizeDirty = false;
+renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth, innerHeight, false);
 function adaptResolution(elapsed){
-  if (elapsed > .25 || document.hidden) return;   // a hitch (a tab switch, a card) says nothing about the graphics card
+  if (elapsed > .25 || document.hidden || !overlay.hidden) return;   // a hitch (a tab switch, a card) says nothing about the graphics card
   perfT += elapsed; perfN++;
   if (perfT < 1) return;
   const ft = perfT / perfN; perfT = perfN = 0;
   let next = pixelRatio;
-  if (ft > 1 / 45){ next = Math.max(PR_MIN, pixelRatio - .25); perfGood = 0; }
-  else if (ft < 1 / 56 && ++perfGood >= 5){ next = Math.min(PR_MAX, pixelRatio + .25); perfGood = 0; }
-  if (next !== pixelRatio){ pixelRatio = next; renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth, innerHeight, false); }
+  if (ft > 1 / 45){ next = Math.max(PR_MIN, pixelRatio - .25); perfGood = 0; perfWait = Math.min(60, perfWait * 2); }
+  else if (ft < 1 / 57 && ++perfGood >= perfWait){ next = Math.min(PR_MAX, pixelRatio + .25); perfGood = 0; }
+  if (next !== pixelRatio){ pixelRatio = next; sizeDirty = true; }
 }
-
-function resize(){
-  renderer.setSize(innerWidth, innerHeight, false);
-  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
-}
-addEventListener('resize', resize);
+addEventListener('resize', () => { sizeDirty = true; });
 
 // ---------- Start ----------
 // ### Restores a saved game if there is a valid one, then starts the loop.
