@@ -161,6 +161,13 @@ test('escape room: every element the room looks up by id exists in its page', ()
   for (const id of wanted) assert.ok(ids.has(id) || runtime.has(id), `#${id} is missing from room-1-escape/index.html`);
 });
 
+test('escape room: every scanned texture the room loads ships with it and is credited', () => {
+  const files = [...new Set([...escRoom.matchAll(/'(?:textures\/)?([a-z-]+\.(?:jpg|png))'/g)].map(m => m[1]))];
+  assert.ok(files.length >= 9, 'the floor, wall and steel scans and the vault HDRI');
+  for (const f of files) assert.ok(fs.existsSync(path.join(ROOT, 'room-1-escape/textures', f)), f + ' is missing');
+  assert.match(read('README.md'), /Poly Haven.*CC0/);
+});
+
 test('escape room: the two rooms stay separate (no file of one room loads the other)', () => {
   assert.ok(!/\.\.\//.test(escHtml), 'room 1 does not load files from room 2');
   assert.ok(!/room-1-escape/.test(html), 'room 2 does not load files from room 1');

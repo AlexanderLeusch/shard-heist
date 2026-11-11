@@ -74,6 +74,7 @@ shard-heist/
 │   ├── js/rules.js          the rules: scenes, items, clues, lock, clock, saved games (pure functions)
 │   ├── js/room.js           the 3D washroom, camera, markers, cards, sound
 │   ├── js/boot.js           error screen (load failures, no WebGL, unexpected errors)
+│   ├── textures/            CC0 scans from Poly Haven: concrete, cinder blocks, scratched steel, the vault HDRI
 │   └── fonts/               the two fonts with their licences
 │
 ├── room-2-chase/            ROOM 2 · Shard Heist (3D police chase)
@@ -116,7 +117,7 @@ shard-heist/
 |---|---|---|
 | Static website, no backend, no build step | Runs anywhere, free hosting on GitHub Pages, nothing to install or keep running, no server to attack | No online leaderboard |
 | three.js r128 from a CDN, pinned to one version, with SRI hashes | A proven 3D engine instead of raw WebGL; the hashes make the browser refuse any file that is not exactly the one we tested | r128 is from 2021; upgrading means re-testing the post-processing add-ons |
-| Everything procedural (buildings, textures, vehicles, sounds) | No image or audio files to license or download; the whole game is a few hundred KB | Stylised rather than photo-real |
+| Everything procedural (buildings, textures, vehicles, sounds), except four CC0 scans from Poly Haven in the escape room | Almost no image or audio files to license or download; the scans (concrete, cinder blocks, scratched steel and one HDRI for the steel's reflections, 1.7 MB) make the washroom photo-real where it matters | Stylised elsewhere |
 | Rules split out into `core.js` | They can be tested in Node in milliseconds, and the rules are in one place | `game.js` still shares state between its sections |
 | Arcade physics (speed along the heading, collision circles) | Predictable, fun handling at 60 fps on modest hardware | No real tyre grip or weight transfer |
 | Engine sound from a small physical model: a pressure pulse per firing, a reflecting exhaust pipe, fixed muffler resonances, separate loops for load and overrun | Follows every rpm and gear change, each vehicle has its real engine layout, and the model can be tested in Node | Approximates real engines, it is not a recording; we checked it by measurement, and the group should judge it by ear |
@@ -188,5 +189,7 @@ The team's working rules for people and coding agents are in [AGENTS.md](AGENTS.
 
 All radio music is composed and synthesised by the game at run time, so there are no music files or licences. The tunes are generated from seeded random walks. The classical station plays J. S. Bach's Prelude in C (BWV 846) and the Ode to Joy from Beethoven's Ninth Symphony, both in the public domain.
 
+
+Escape-room scans from [Poly Haven](https://polyhaven.com) (CC0, fetched through its public API and kept in `room-1-escape/textures/`): the textures *Hangar Concrete Floor*, *Concrete Wall 004* and *Blue Metal Plate*, and the HDRI *Bank Vault*. CC0 asks for no credit; we give it anyway.
 
 Built with three.js r128 (MIT licence). Fonts: Big Shoulders Display and JetBrains Mono (SIL Open Font License 1.1; the font files and their licences are in `room-1-escape/fonts/` and `room-2-chase/fonts/`). Code written with the help of Claude (Anthropic).

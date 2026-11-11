@@ -620,16 +620,17 @@ marker or object clicked  →  use(action, target)  →  act()  →  rules.perfo
     <tr><td class="num">12</td><td>State and saving</td><td>The game state from rules.js, safe storage access, the saved game</td></tr>
     <tr><td class="num">28</td><td>Renderer, scene, camera</td><td>Renderer with WebGL check, shadows, filmic colour, fog</td></tr>
     <tr><td class="num">60</td><td>Painted textures</td><td>Tiles (colour, relief and gloss), paint, concrete, brushed steel, partitions, ceiling, diamond plate, graffiti with the clue, steamed mirror, sign, soft shadows and floor stains</td></tr>
-    <tr><td class="num">290</td><td>Materials</td><td>All surfaces, from glazed tiles to polished steel</td></tr>
-    <tr><td class="num">333</td><td>The washroom</td><td>Walls, door and window, sinks and mirror, mop and bucket, stall with its open door, the steel prison toilet, tile, hatch, shaft, lights, room details (skirting, security camera, vents, switch, intercom, dispenser, bin); mergeStatic() joins the static meshes</td></tr>
-    <tr><td class="num">748</td><td>Camera</td><td>Free first-person walking (arrow keys or W A S D) with collisions and footsteps, drag to look, where you stand picks the scene; glides for the buttons, the hatch and the endings</td></tr>
-    <tr><td class="num">885</td><td>Hotspots</td><td>Markers placed over objects, “Walk to” buttons, clicking objects in 3D</td></tr>
-    <tr><td class="num">954</td><td>Actions</td><td>use() and act(): everything goes through rules.perform(); syncWorld() moves the objects</td></tr>
-    <tr><td class="num">998</td><td>HUD and cards</td><td>Clock, items, clues, messages; briefing, continue, pause, clue, lock and ending cards</td></tr>
-    <tr><td class="num">1,236</td><td>Sound</td><td>The hum of the tube, dripping water, the running tap and short effects for each kind of action, all synthesised</td><td></td></tr>
-    <tr><td class="num">1,338</td><td>Endings</td><td>Hatch opens and the camera climbs down; or the door bursts open</td></tr>
-    <tr><td class="num">1,345</td><td>Loop</td><td>Clock (rules.tick), animations, markers, render; the resolution follows the frame rate</td></tr>
-    <tr><td class="num">1,426</td><td>Start</td><td>Continue a saved game or start the briefing</td></tr>
+    <tr><td class="num">277</td><td>Scanned textures (Poly Haven, CC0)</td><td>SCAN() loads the concrete, cinder-block and scratched-steel scans once and hands out copies with their own repeat; blockMat() and steelMat() build the walls and the stainless steel</td></tr>
+    <tr><td class="num">311</td><td>Materials</td><td>All surfaces, from glazed tiles to scanned stainless steel</td></tr>
+    <tr><td class="num">359</td><td>The washroom</td><td>Walls, door and window, sinks and mirror, mop and bucket, stall with its open door, the steel prison toilet, tile, hatch, shaft, lights, room details (skirting, security camera, vents, switch, intercom, dispenser, bin, urinal trough, barred window, two showers and their drain, steel bench, fire extinguisher, soap dispenser, wet-floor sign); the vault HDRI for the reflections; mergeStatic() joins the static meshes</td></tr>
+    <tr><td class="num">851</td><td>Camera</td><td>Free first-person walking (arrow keys or W A S D) with collisions and footsteps, drag to look, where you stand picks the scene; glides for the buttons, the hatch and the endings</td></tr>
+    <tr><td class="num">991</td><td>Hotspots</td><td>Markers placed over objects, “Walk to” buttons, clicking objects in 3D</td></tr>
+    <tr><td class="num">1,060</td><td>Actions</td><td>use() and act(): everything goes through rules.perform(); syncWorld() moves the objects</td></tr>
+    <tr><td class="num">1,104</td><td>HUD and cards</td><td>Clock, items, clues, messages; briefing, continue, pause, clue, lock and ending cards</td></tr>
+    <tr><td class="num">1,342</td><td>Sound</td><td>The hum of the tube, dripping water, the running tap and short effects for each kind of action, all synthesised</td><td></td></tr>
+    <tr><td class="num">1,444</td><td>Endings</td><td>Hatch opens and the camera climbs down; or the door bursts open</td></tr>
+    <tr><td class="num">1,451</td><td>Loop</td><td>Clock (rules.tick), animations, markers, render; the resolution follows the frame rate</td></tr>
+    <tr><td class="num">1,532</td><td>Start</td><td>Continue a saved game or start the briefing</td></tr>
   </table>
   <h3>Design decisions</h3>
   <ul>

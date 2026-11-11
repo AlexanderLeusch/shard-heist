@@ -96,12 +96,6 @@ const tileTex = repeatX => canvasTex(TEX, TEX, (g, w, h) => {
   grime(g, w, h, 26, 'rgba(92,78,48,.16)', w * .12, true);
   grime(g, w, h, 18, 'rgba(40,46,40,.14)', w * .06, false);
 }, [repeatX, 1.5]);
-const paintTex = canvasTex(TEX, TEX, (g, w, h) => {
-  g.fillStyle = '#7d8a80'; g.fillRect(0, 0, w, h);
-  for (let i = 0; i < 9000; i++){ const v = rnd() * 40 - 20 | 0; g.fillStyle = `rgba(${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${Math.abs(v) / 400})`; g.fillRect(rnd() * w, rnd() * h, 2, 2); }
-  grime(g, w, h, 30, 'rgba(70,60,40,.18)', w * .15, false);
-  for (let i = 0; i < 14; i++){ g.fillStyle = 'rgba(160,160,150,.5)'; const x = rnd() * w, y = rnd() * h; g.beginPath(); g.ellipse(x, y, 6 + rnd() * 20, 4 + rnd() * 12, rnd() * 3, 0, 7); g.fill(); }
-}, [3, 1]);
 const concreteTex = canvasTex(TEX, TEX, (g, w, h) => {
   g.fillStyle = '#5a5d5b'; g.fillRect(0, 0, w, h);
   for (let i = 0; i < 16000; i++){ const v = rnd(); g.fillStyle = v > .5 ? `rgba(255,255,255,${(v - .5) * .12})` : `rgba(0,0,0,${v * .2})`; g.fillRect(rnd() * w, rnd() * h, 2, 2); }
@@ -241,13 +235,6 @@ function tileMat(repeatX, repeatY = 1.5){
   map.repeat.set(repeatX, repeatY);
   return new THREE.MeshStandardMaterial({ map, normalMap: mk(tileRelief.normal, ANISO), roughnessMap: mk(tileRelief.gloss, Math.min(ANISO, 4)), roughness: 1, metalness: 0 });
 }
-// ### Brushed stainless steel: fine streaks in one direction change how glossy the metal is, so highlights stretch along them.
-const brushedTex = canvasTex(256, 256, (g, w, h) => {
-  g.fillStyle = '#8c8c8c'; g.fillRect(0, 0, w, h);
-  for (let i = 0; i < 2600; i++){ const v = rnd() < .5 ? 255 : 0; g.fillStyle = `rgba(${v},${v},${v},${.03 + rnd() * .06})`; g.fillRect(rnd() * w - 40, rnd() * h, 30 + rnd() * 160, 1); }
-  for (let i = 0; i < 18; i++){ g.strokeStyle = `rgba(255,255,255,${.12 + rnd() * .15})`; g.lineWidth = .8; g.beginPath(); const x = rnd() * w, y = rnd() * h; g.moveTo(x, y); g.lineTo(x + (rnd() - .5) * 90, y + (rnd() - .5) * 90); g.stroke(); }
-  grime(g, w, h, 10, 'rgba(255,255,255,.12)', 50, false);
-}, [1, 1]);
 // ### Powder-coated stall partitions: a slightly mottled finish, scuffs, scratched tally marks and dirt rising from the floor.
 const partitionTex = canvasTex(512, 512, (g, w, h) => {
   g.fillStyle = '#6f7c75'; g.fillRect(0, 0, w, h);
@@ -285,19 +272,55 @@ const speakerTex = canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#a4abad'; g
 
 // soft gradients and small parts need no extra texture samples at grazing angles; the ceiling and steel need only a few
 for (const t of [aoTex, blobTex, stainTex, puddleTex, grilleTex, speakerTex]) t.anisotropy = 1;
-brushedTex.anisotropy = 2; ceilingTex.anisotropy = partitionTex.anisotropy = 4;
+ceilingTex.anisotropy = partitionTex.anisotropy = 4;
+
+// ---------- Scanned textures (Poly Haven, CC0) ----------
+// ### Real photographed surfaces from Poly Haven's free asset library (polyhaven.com, all CC0), fetched once through its
+// ### API and kept in room-1-escape/textures: a scratched hangar floor of poured concrete, a painted cinder-block wall,
+// ### a scratched steel plate whose gloss and dents give the stainless steel its wear, and the "Bank Vault" HDRI (a
+// ### caged concrete vault under a fluorescent tube) that every metal surface reflects. Each file loads once; every
+// ### surface that uses it gets its own copy with its own repeat, and all copies are refreshed when the picture arrives.
+const SCAN = (() => {
+  const loader = new THREE.TextureLoader(), files = {};
+  return (file, srgb, rx = 1, ry = 1, aniso = ANISO) => {
+    let f = files[file];
+    if (!f){
+      f = files[file] = { copies: [], img: null };
+      loader.load('textures/' + file, t => { f.img = t.image; for (const c of f.copies){ c.image = t.image; c.needsUpdate = true; } shadowsMoved(); });
+    }
+    const t = new THREE.Texture(f.img || undefined);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = aniso;
+    if (srgb) t.encoding = THREE.sRGBEncoding;
+    if (f.img) t.needsUpdate = true;
+    f.copies.push(t);
+    return t;
+  };
+})();
+// ### Painted cinder blocks for the walls above the tiles (one picture is about a metre of wall), tinted the washed-out
+// ### institutional green of the rest of the room.
+function blockMat(w, h){
+  return new THREE.MeshStandardMaterial({ map: SCAN('wall-blocks-color.jpg', true, w, h), normalMap: SCAN('wall-blocks-normal.jpg', false, w, h, 4),
+    normalScale: new THREE.Vector2(1.2, 1.2), roughnessMap: SCAN('wall-blocks-rough.jpg', false, w, h, 2), roughness: 1.1, color: 0xf4f6ec });
+}
+// ### Stainless steel: the scanned scratches change the gloss and dent the surface a little; the vault HDRI does the rest.
+function steelMat(color, roughness, o){
+  return new THREE.MeshStandardMaterial(Object.assign({ color, metalness: 1, roughness, roughnessMap: SCAN('steel-scratches-rough.jpg', false, 1, 1),
+    normalMap: SCAN('steel-scratches-normal.jpg', false, 1, 1, 4), normalScale: new THREE.Vector2(.35, .35), envMapIntensity: 1.25 }, o));
+}
 
 // ---------- Materials ----------
-// ### The surfaces of the cell: painted canvas textures for walls, floor and metal, so the room loads no image files.
+// ### The surfaces of the cell: scanned textures for the concrete, the cinder blocks and the steel, painted canvas
+// ### textures for everything that tells the story (the tiles, the graffiti, the scratches, the steam, the sign).
 const M = {
   tiles: w => tileMat(w / 1.2),
-  paint: new THREE.MeshStandardMaterial({ map: paintTex, roughness: .9 }),
   floor: new THREE.MeshStandardMaterial({ map: concreteTex, roughness: .78 }),
-  ceiling: new THREE.MeshStandardMaterial({ map: ceilingTex, roughness: .95 }),
-  steel: new THREE.MeshStandardMaterial({ color: 0xbcc4c8, metalness: .9, roughness: .55, roughnessMap: brushedTex }),
-  dullSteel: new THREE.MeshStandardMaterial({ color: 0x8f989c, metalness: .7, roughness: .85, roughnessMap: brushedTex }),
+  ceiling: new THREE.MeshStandardMaterial({ map: ceilingTex, roughness: .95, normalMap: SCAN('floor-concrete-normal.jpg', false, 3, 2.25, 4), normalScale: new THREE.Vector2(.8, .8) }),
+  steel: steelMat(0xc9cfd2, 1.35),
+  dullSteel: steelMat(0x9aa2a6, 2.1, { envMapIntensity: .9 }),
   // the toilet: polished stainless steel, seen from both sides inside the bowl and the basin
-  bowl: new THREE.MeshStandardMaterial({ color: 0xc4cbce, metalness: .92, roughness: .42, roughnessMap: brushedTex, side: THREE.DoubleSide }),
+  bowl: steelMat(0xd2d8da, 1.1, { side: THREE.DoubleSide }),
+  // the steel bench, the urinal trough and the showers: plain stainless, a little duller where hands and water wear it
+  worn: steelMat(0xb4bcc0, 1.7),
   water: new THREE.MeshStandardMaterial({ color: 0x5d6b5e, metalness: .1, roughness: .04, transparent: true, opacity: .88 }),
   chrome: new THREE.MeshStandardMaterial({ color: 0xe8ecee, metalness: 1, roughness: .12 }),
   cove: new THREE.MeshStandardMaterial({ color: 0x3d4440, roughness: .35 }),
@@ -327,7 +350,10 @@ const M = {
   scratches: new THREE.MeshStandardMaterial({ map: scratchesTex, transparent: true, roughness: .8, depthWrite: false }),
   steam: new THREE.MeshStandardMaterial({ map: steamTex, transparent: true, opacity: 0, roughness: 1, depthWrite: false }),
   sign: new THREE.MeshStandardMaterial({ map: signTex, roughness: .8 }),
-  rubber: new THREE.MeshStandardMaterial({ color: 0x1c1d1e, roughness: .9 })
+  rubber: new THREE.MeshStandardMaterial({ color: 0x1c1d1e, roughness: .9 }),
+  frost: new THREE.MeshStandardMaterial({ color: 0x9fb4c4, emissive: 0x24384e, emissiveIntensity: 1, roughness: .2, metalness: 0 }),
+  yellow: new THREE.MeshStandardMaterial({ color: 0xf2c014, roughness: .5 }),
+  black: new THREE.MeshStandardMaterial({ color: 0x141516, roughness: .6 })
 };
 
 // ---------- The washroom ----------
@@ -354,22 +380,24 @@ const hot = (key, ...meshes) => { (HOT[key] = HOT[key] || []).push(...meshes); m
 
 function wall(len, x, z, ry){
   plane(len, TILE_H, M.tiles(len), x, TILE_H / 2, z, ry);
-  const p = plane(len, H - TILE_H, M.paint, x, TILE_H + (H - TILE_H) / 2, z, ry);
-  p.material = M.paint.clone(); p.material.map = paintTex.clone(); p.material.map.needsUpdate = true; p.material.map.repeat.set(len / 2.6, .5);
+  plane(len, H - TILE_H, blockMat(len, H - TILE_H), x, TILE_H + (H - TILE_H) / 2, z, ry);
   const trim = box(len, .05, .03, M.partition, x, TILE_H, z); trim.rotation.y = ry; trim.position.x += Math.sin(ry) * .015; trim.position.z += Math.cos(ry) * .015;
 }
 { // floor with an opening where the hatch is (shape coordinates are metres; y of the shape becomes -z in the room)
   const fs = new THREE.Shape(); fs.moveTo(-W / 2, -D / 2); fs.lineTo(W / 2, -D / 2); fs.lineTo(W / 2, D / 2); fs.lineTo(-W / 2, D / 2); fs.lineTo(-W / 2, -D / 2);
   const hp = new THREE.Path(), hx = 2.2, hz = 1.75, hh = .37; hp.moveTo(hx - hh, hz - hh); hp.lineTo(hx - hh, hz + hh); hp.lineTo(hx + hh, hz + hh); hp.lineTo(hx + hh, hz - hh); hp.lineTo(hx - hh, hz - hh); fs.holes.push(hp);
-  const ft = concreteTex.clone(); ft.needsUpdate = true; ft.repeat.set(.5, .5);
-  const fl = new THREE.Mesh(new THREE.ShapeGeometry(fs), new THREE.MeshStandardMaterial({ map: ft, roughness: .78 }));
+  // the scanned concrete: one picture covers 2 m of floor (the shape's uv are metres), brightened to the room's grey
+  const fm = new THREE.MeshStandardMaterial({ map: SCAN('floor-concrete-color.jpg', true, .5, .5), normalMap: SCAN('floor-concrete-normal.jpg', false, .5, .5),
+    roughnessMap: SCAN('floor-concrete-rough.jpg', false, .5, .5, 4), roughness: .95, envMapIntensity: .5 });
+  fm.color.setRGB(1.75, 1.85, 1.9);
+  const fl = new THREE.Mesh(new THREE.ShapeGeometry(fs), fm);
   fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; room.add(fl);
 }
 plane(W, D, M.ceiling, 0, H, 0, 0, Math.PI / 2);
 wall(W, 0, -D / 2, 0);            // north
 // south (door wall), built around the doorway so the open door shows the corridor in the briefing
 wall(3.45, -2.275, D / 2, Math.PI); wall(3.45, 2.275, D / 2, Math.PI);
-{ const p = plane(1.1, H - 2.14, M.paint, 0, 2.14 + (H - 2.14) / 2, D / 2, Math.PI); p.material = M.paint.clone(); p.material.map = paintTex.clone(); p.material.map.needsUpdate = true; p.material.map.repeat.set(1.1 / 2.6, .3); }
+plane(1.1, H - 2.14, blockMat(1.1, H - 2.14), 0, 2.14 + (H - 2.14) / 2, D / 2, Math.PI);
 wall(D, -W / 2, 0, Math.PI / 2);  // west (sinks)
 wall(D, W / 2, 0, -Math.PI / 2);  // east
 // skirting drain channel and floor drain
@@ -398,7 +426,7 @@ const tube = box(1.3, .06, .14, M.tube, -.6, 2.93, .3); tube.castShadow = false;
 for (let i = 0; i < 5; i++){ const c = box(.012, .1, .2, M.dullSteel, -1.2 + i * .3, 2.93, .3); c.castShadow = false; }
 const stallTube = box(.6, .05, .1, M.tube.clone(), 2.75, 2.94, -1.8); stallTube.castShadow = false;
 stallTube.material.emissive.set(0xffe6c4); stallTube.material.emissiveIntensity = 1.8;
-plane(1.9, .7, M.sign, 3.995, 1.6, 1.3, -Math.PI / 2);
+plane(1.5, .56, M.sign, -1.9, 2.2, -D / 2 + .012);
 
 // The door with its barred window; Officer Hale's silhouette appears in it. It hangs on hinges on the west side (x -0.52)
 // and swings into the room; doorPivot turns it. Closed (rotation 0) it is exactly where it always was.
@@ -505,7 +533,9 @@ box(.5, .12, 2.6, M.steel, -3.75, .78, 0);
 const basins = [];
 for (const z of [-.65, .65]){
   const b = new THREE.Mesh(new THREE.CylinderGeometry(.19, .13, .12, 24, 1, true), M.steel); b.position.set(-3.73, .83, z); add(b); basins.push(b);
-  cyl(.19, .19, .004, M.dark, -3.73, .891, z, 24).material = new THREE.MeshStandardMaterial({ color: 0x2a2e30, metalness: .9, roughness: .25 });
+  // the basin seen from above: polished steel with a rolled rim and the drain in the middle
+  cyl(.19, .19, .004, M.bowl, -3.73, .891, z, 32); cyl(.03, .03, .002, M.dark, -3.73, .894, z, 16);
+  { const rim = new THREE.Mesh(new THREE.TorusGeometry(.19, .012, 8, 40), M.steel); rim.rotation.x = Math.PI / 2; rim.position.set(-3.73, .894, z); add(rim); }
   const sp = cyl(.025, .025, .18, M.steel, -3.94, .98, z, 10); sp.rotation.z = Math.PI / 2;
   cyl(.03, .03, .05, M.steel, -3.96, 1.05, z + .12, 10);
 }
@@ -680,6 +710,71 @@ const tunnelLight = new THREE.PointLight(0xffb066, 0, 5, 2); tunnelLight.positio
   cyl(.17, .15, .44, M.dullSteel, -3.68, .22, 2.25, 22); cyl(.155, .155, .004, M.dark, -3.68, .43, 2.25, 22);
   { const r = new THREE.Mesh(new THREE.TorusGeometry(.17, .008, 6, 28), M.steel); r.rotation.x = Math.PI / 2; r.position.set(-3.68, .44, 2.25); add(r); }
   flat(.55, .55, M.blob, -3.68, 2.25);
+  // ### More of a real prison washroom: a stainless urinal trough on the north wall under the house rules, a barred
+  // ### window of wired glass high up with the night behind it, two push-button showers on the east wall with their drain,
+  // ### a steel bench bolted to the wall by the door, a fire extinguisher, a soap dispenser and a yellow wet-floor sign.
+  { // the urinal trough: splashback, trough with a rolled rim and a film of water, brackets, flush pipe and waste pipe
+    const X = -2, L = 2, Z = -D / 2;
+    box(L, .9, .015, M.worn, X, .95, Z + .008);
+    box(L, .02, .26, M.worn, X, .42, Z + .15); box(L, .2, .02, M.worn, X, .52, Z + .28);
+    { const r = cyl(.016, .016, L, M.worn, X, .62, Z + .285, 12); r.rotation.z = Math.PI / 2; }
+    for (const dx of [-L / 2, L / 2]) box(.02, .2, .28, M.worn, X + dx, .52, Z + .15);
+    box(L - .04, .004, .24, M.water, X, .44, Z + .15);
+    for (const dx of [-.8, 0, .8]) box(.04, .3, .2, M.dullSteel, X + dx, .26, Z + .11);
+    cyl(.025, .025, .42, M.pipe, X - .8, .21, Z + .16, 12);
+    { const f = cyl(.014, .014, L, M.chrome, X, 1.38, Z + .03, 10); f.rotation.z = Math.PI / 2; }
+    cyl(.014, .014, 1.6, M.chrome, X + L / 2 - .1, 2.18, Z + .03, 10);
+    box(.08, .12, .04, M.worn, X + L / 2 + .12, 1.2, Z + .02); { const b = cyl(.02, .02, .02, M.chrome, X + L / 2 + .12, 1.2, Z + .045, 14); b.rotation.x = Math.PI / 2; }
+    flat(2.2, .7, M.stain, X, Z + .45); flat(.9, .4, M.puddle, X + .3, Z + .5, .005);
+  }
+  { // the window: wired, frosted glass glowing faintly with the yard lights, five bars and a heavy steel frame
+    const X = .4, Y = 2.3, Z = -D / 2, w = .9, h = .46;
+    const wire = canvasTex(256, 128, (g, cw, ch) => { g.fillStyle = '#c7d4dc'; g.fillRect(0, 0, cw, ch); g.strokeStyle = 'rgba(40,46,50,.55)'; g.lineWidth = 1.5; for (let i = 0; i <= cw; i += 16){ g.beginPath(); g.moveTo(i, 0); g.lineTo(i, ch); g.stroke(); } for (let j = 0; j <= ch; j += 16){ g.beginPath(); g.moveTo(0, j); g.lineTo(cw, j); g.stroke(); } grime(g, cw, ch, 10, 'rgba(70,60,40,.3)', 40, true); });
+    const glass = M.frost.clone(); glass.map = wire; glass.emissiveMap = wire;
+    plane(w, h, glass, X, Y, Z + .01);
+    for (const [bw, bh, dx, dy] of [[w + .1, .05, 0, h / 2 + .025], [w + .1, .05, 0, -h / 2 - .025], [.05, h + .1, -w / 2 - .025, 0], [.05, h + .1, w / 2 + .025, 0]]) box(bw, bh, .07, M.dullSteel, X + dx, Y + dy, Z + .035);
+    for (let i = 0; i < 5; i++) cyl(.012, .012, h, M.steel, X - w / 2 + w * (i + .5) / 5, Y, Z + .05, 8);
+    box(w + .14, .03, .1, M.dullSteel, X, Y - h / 2 - .06, Z + .05);   // the sill
+  }
+  { // two showers: supply pipe from the ceiling, wall plate, arm and head; a push-button valve; one drain in the floor
+    for (const z of [.45, 1.55]){
+      const X = W / 2;
+      cyl(.016, .016, H - 2.05, M.pipe, X - .03, (H + 2.05) / 2, z, 10);
+      box(.015, .16, .12, M.worn, X - .008, 2.05, z);
+      { const a = cyl(.014, .014, .26, M.chrome, X - .13, 2.07, z, 10); a.rotation.z = Math.PI / 2; }
+      { const hd = cyl(.055, .03, .05, M.chrome, X - .27, 2.04, z, 18); hd.rotation.z = -.5; }
+      cyl(.05, .05, .003, M.dark, X - .285, 2.012, z, 18);
+      box(.03, .16, .11, M.worn, X - .015, 1.2, z);
+      { const b = cyl(.025, .025, .025, M.chrome, X - .035, 1.22, z, 16); b.rotation.z = Math.PI / 2; }
+      box(.06, .015, .18, M.worn, X - .03, 1.0, z);   // a soap ledge
+      flat(.8, .8, M.blob, X - .35, z);
+    }
+    box(.24, .01, .24, M.dullSteel, 3.55, .005, 1.0);
+    for (let i = -2; i <= 2; i++) box(.2, .012, .018, M.dark, 3.55, .006, 1.0 + i * .04);
+    flat(1.3, 1.9, M.puddle, 3.45, 1.0, .005); flat(1.1, 1.6, M.stain, 3.5, 1.0);
+  }
+  { // the steel bench bolted to the wall west of the door
+    const X = -2.35, Z = D / 2;
+    box(1.6, .04, .36, M.worn, X, .46, Z - .2); box(1.6, .06, .02, M.worn, X, .44, Z - .385);
+    for (const dx of [-.65, .65]){ box(.04, .42, .3, M.dullSteel, X + dx, .23, Z - .17); box(.12, .12, .01, M.dullSteel, X + dx, .3, Z - .006); }
+    for (const dx of [-.7, -.2, .2, .7]){ const b = cyl(.01, .01, .006, M.chrome, X + dx, .482, Z - .2, 6); }
+    flat(1.9, .7, M.blob, X, Z - .25);
+  }
+  { // a fire extinguisher on its bracket by the door, and a soap dispenser between the sinks
+    const X = -1.25, Z = D / 2 - .1;
+    cyl(.075, .075, .44, M.red, X, .6, Z, 18); cyl(.05, .075, .06, M.red, X, .85, Z, 18);
+    cyl(.02, .02, .06, M.black, X, .9, Z, 10); box(.12, .025, .04, M.black, X + .03, .935, Z);
+    { const hose = new THREE.Mesh(new THREE.TorusGeometry(.07, .008, 6, 16, Math.PI * 1.2), M.black); hose.position.set(X + .07, .78, Z + .02); hose.rotation.y = Math.PI / 2; add(hose); }
+    box(.16, .05, .1, M.dullSteel, X, .45, Z + .04); box(.05, .5, .01, M.dullSteel, X, .6, Z + .095);
+    box(.08, .16, .08, M.steel, -3.955, 1.1, 0); box(.02, .02, .03, M.black, -3.91, 1.015, 0);
+  }
+  { // the wet-floor sign: a yellow A-frame by the showers
+    const g = new THREE.Group(); g.position.set(2.7, 0, 1.35); g.rotation.y = .5; room.add(g);
+    const signFace = canvasTex(128, 256, (c, w, h) => { c.fillStyle = '#f2c014'; c.fillRect(0, 0, w, h); c.fillStyle = '#141516'; c.font = '800 26px "Arial Narrow", Arial, sans-serif'; c.textAlign = 'center'; c.fillText('CAUTION', w / 2, 46); c.fillText('WET', w / 2, 200); c.fillText('FLOOR', w / 2, 230); c.beginPath(); c.moveTo(w / 2, 70); c.lineTo(w - 18, 170); c.lineTo(18, 170); c.closePath(); c.lineWidth = 6; c.strokeStyle = '#141516'; c.stroke(); c.fillRect(w / 2 - 4, 100, 8, 40); c.fillRect(w / 2 - 4, 148, 8, 8); });
+    const face = new THREE.MeshStandardMaterial({ map: signFace, roughness: .5 });
+    for (const s of [-1, 1]){ const p = new THREE.Mesh(new THREE.BoxGeometry(.3, .6, .012), [M.yellow, M.yellow, M.yellow, M.yellow, face, face]); p.position.set(0, .3, s * .09); p.rotation.x = s * -.16; p.castShadow = p.receiveShadow = true; g.add(p); }
+    flat(.5, .5, M.blob, 2.7, 1.35);
+  }
   // the bucket's wire handle
   { const hd = new THREE.Mesh(new THREE.TorusGeometry(.2, .006, 6, 24, Math.PI), M.dullSteel); hd.position.set(3.35, .33, 2.45); hd.rotation.set(-1.0, .5, 0); add(hd); }
   // housings over both lamps and a cage over the stall lamp
@@ -695,9 +790,17 @@ const tunnelLight = new THREE.PointLight(0xffb066, 0, 5, 2); tunnelLight.positio
   const strip = new THREE.Mesh(new THREE.BoxGeometry(1.4, .08, .25), new THREE.MeshBasicMaterial({ color: 0xffffff })); strip.position.set(-.6, 1.45, .3); envScene.add(strip);
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(envScene, .02).texture;
-  pmrem.dispose();
   scene.background = new THREE.Color(0x050607);
+  // ### Then the real thing: Poly Haven's "Bank Vault" HDRI, stored as RGBE in a PNG (red, green, blue and a shared
+  // ### exponent in the alpha channel), so the fluorescent tube in it is many times brighter than the walls, as in life.
+  new THREE.TextureLoader().load('textures/bank-vault-rgbe.png', t => {
+    t.encoding = THREE.RGBEEncoding; t.minFilter = t.magFilter = THREE.NearestFilter; t.generateMipmaps = false; t.flipY = true;
+    const env = pmrem.fromEquirectangular(t).texture;
+    scene.environment.dispose(); scene.environment = env; t.dispose(); pmrem.dispose();
+  }, undefined, () => pmrem.dispose());
 }
+// ### Surfaces that are not metal only pick up a little of the vault, as soft fill light; the metal shows all of it.
+room.traverse(o => { if (o.isMesh && o.material.isMeshStandardMaterial && !o.material.metalness && o.material.envMapIntensity === 1) o.material.envMapIntensity = .45; });
 
 // ### Static meshes that share a material are merged into one mesh, so the room is drawn in a few dozen draw calls instead
 // ### of several hundred (and each shadow-casting light draws every caster once more). Objects that move or can be clicked
@@ -788,7 +891,8 @@ function goView(name, dur){
 const SOLID = [
   [-4, -3.5, -1.3, 1.3], [-3.85, -3.51, 2.08, 2.42], [3.15, 3.55, 2.25, 2.65],
   [1.47, 1.53, -3, -.68], [1.47, 1.8, -.73, -.67], [3.7, 4, -.73, -.67], [3.68, 3.87, -.7, .2],
-  [2.95, 3.55, -3, -2.14]
+  [2.95, 3.55, -3, -2.14],
+  [-3.05, -.95, -3, -2.68], [-3.17, -1.53, 2.58, 3], [-1.35, -1.15, 2.78, 3], [2.5, 2.9, 1.15, 1.55]
 ];
 // ### Keeps the circle you stand in out of every solid and inside the walls; it slides along what it touches.
 function collide(p){
