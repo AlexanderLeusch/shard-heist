@@ -513,8 +513,8 @@
         porthole(row % 2 ? 330 : 30, y0 + 50, 10, ['#5b7fa6', '#13253a']);
       }
       // a bookcase in the library
-      g.fillStyle = '#3c2412'; g.fillRect(236, h - 140, 90, 120);
-      for (let s = 0; s < 4; s++) for (let b = 0; b < 9; b++){ g.fillStyle = ['#7a2e2a', '#2e4a6a', '#5b5236', '#3a5a3a', '#8a6a2a'][(s + b) % 5]; g.fillRect(240 + b * 9.5, h - 134 + s * 29, 8, 24); }
+      g.fillStyle = '#3c2412'; g.fillRect(236, h - 108, 90, 96);
+      for (let s = 0; s < 3; s++) for (let b = 0; b < 9; b++){ g.fillStyle = ['#7a2e2a', '#2e4a6a', '#5b5236', '#3a5a3a', '#8a6a2a'][(s + b) % 5]; g.fillRect(240 + b * 9.5, h - 102 + s * 29, 8, 24); }
       g.fillStyle = '#2f5a3a'; g.fillRect(0, h - 12, w, 12);
     } else if (id === 'first'){
       // the Grand Staircase: white and gold panels, arched windows, the clock "Honour and Glory", a chandelier, red carpet
