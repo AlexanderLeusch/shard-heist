@@ -1762,10 +1762,10 @@ function buildCity(){
     let top = 44 + 9 * Math.sin(x * 0.006) + 5 * Math.sin(x * 0.017 + 2);
     const wb = Math.exp(-((x - BR_END.x) ** 2 + (z - BR_END.z) ** 2) / 8100); top = top * (1 - wb) + 42.4 * wb;
     top += 15 * Math.exp(-((x - CRISTO.x) ** 2 + (z - CRISTO.z) ** 2) / 2000);
-    const up = clamp((d - 16) / 44, 0, 1), rise = up * up * (3 - 2 * up);
+    const up = clamp((d - 36) / 44, 0, 1), rise = up * up * (3 - 2 * up);
     return 2.2 + (top - 2.2) * rise - clamp((d - 260) / 300, 0, 1) * 12;
   };
-  const bankGeo = new THREE.PlaneGeometry(2600, 370, 110, 30).rotateX(-Math.PI / 2).translate(0, 0, 815);
+  const bankGeo = new THREE.PlaneGeometry(2600, 370, 130, 62).rotateX(-Math.PI / 2).translate(0, 0, 815);
   {
     const P = bankGeo.attributes.position, col = new Float32Array(P.count * 3), c = new THREE.Color();
     const quay = C(0x6f6a62), rock = C(0x8a6f4c), grass = C(0x4c5a36), town = C(0x77705f);
@@ -1773,7 +1773,7 @@ function buildCity(){
       const x = P.getX(i), z = P.getZ(i), h = southBank(x, z), slope = Math.abs(southBank(x, z + 5) - southBank(x, z - 5)) / 10;
       P.setY(i, h);
       const n = 0.5 + 0.5 * Math.sin(x * 0.031 + z * 0.047) * Math.sin(x * 0.011 - z * 0.019);
-      if (h < 3) c.copy(quay); else if (slope > 0.35) c.copy(rock).lerp(grass, n * 0.35); else c.copy(grass).lerp(town, n * 0.8);
+      if (h < 3) c.copy(quay); else if (slope > 0.35) c.copy(rock).lerp(grass, 0.6 + n * 0.3); else c.copy(grass).lerp(town, n * 0.8);
       c.multiplyScalar(0.8 + 0.3 * n);
       col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
     }
@@ -1852,20 +1852,53 @@ function buildCity(){
     const WALLS = [0xf2ede2, 0xead9bd, 0xf3dc9c, 0xe6bfa3, 0xcdd9e6, 0xefc7b8, 0xc9dcc9, 0xe9e2d2], ROOFS = [0xb5573a, 0xa84e36, 0xc0623f, 0x9c4a3a];
     const spots = { house: [], town: [], block: [] };
     const bdx = Math.cos(1.2), bdz = Math.sin(1.2); // the direction of the bridge on the ground
-    let n = 0;
-    for (let tries = 0; tries < 7000 && n < 620; tries++){
-      const water = rng() < 0.16, centre = rng() < 0.55;
-      const x = centre ? -120 + (rng() + rng() - 1) * 420 : (rng() - 0.5) * 2300;
-      const shore = 648 + 14 * Math.sin(x * 0.004 + 1), z = shore + (water ? 6 + rng() * 8 : 70 + rng() * (centre ? 210 : 150));
-      // keep the bridge's way and the hill of the statue free
+    // the town is laid out on a grid of 13 m plots: a plot holds one house (a block takes its neighbours too), so no two
+    // houses stand in each other, and the plots left over are gardens and trees
+    const taken = new Set(), plot = (x, z) => Math.round(x / 13) + ',' + Math.round(z / 13);
+    const free = (x, z, r) => { for (let i = -r; i <= r; i++) for (let j = -r; j <= r; j++) if (taken.has(plot(x + i * 13, z + j * 13))) return false; return true; };
+    const claim = (x, z, r) => { for (let i = -r; i <= r; i++) for (let j = -r; j <= r; j++) taken.add(plot(x + i * 13, z + j * 13)); };
+    const clear = (x, z, margin) => {
       const along = (x + 400) * bdx + (z - 410) * bdz, off = Math.abs(-(x + 400) * bdz + (z - 410) * bdx);
-      if (off < 26 && along < 420) continue;
-      if (Math.hypot(x - CRISTO.x, z - CRISTO.z) < 44) continue;
-      const kind = water ? 'house' : centre ? (rng() < 0.05 ? 'block' : rng() < 0.5 ? 'town' : 'house') : (rng() < 0.2 ? 'town' : 'house');
+      return !(off < margin && along < 420) && Math.hypot(x - CRISTO.x, z - CRISTO.z) >= 44;
+    };
+    let n = 0;
+    for (let tries = 0; tries < 30000 && n < 1250; tries++){
+      const water = rng() < 0.14, centre = rng() < 0.6;
+      const x0 = centre ? -120 + (rng() + rng() - 1) * 640 : (rng() - 0.5) * 2400;
+      const shore = 648 + 14 * Math.sin(x0 * 0.004 + 1), z0 = shore + (water ? 12 + rng() * 16 : 92 + rng() * (centre ? 235 : 200));
+      // on the plot grid, so the houses line up along streets
+      const x = Math.round(x0 / 13) * 13, z = water ? z0 : Math.round(z0 / 13) * 13;
+      // keep the bridge's way and the hill of the statue free
+      if (!clear(x, z, 26)) continue;
+      const kind = water ? 'house' : centre ? (rng() < 0.045 ? 'block' : rng() < 0.5 ? 'town' : 'house') : (rng() < 0.2 ? 'town' : 'house');
+      const r = kind === 'block' ? 1 : 0;
+      if (!free(x, z, r)) continue;
+      claim(x, z, r);
       const K = KINDS[kind], pick = ([lo, hi]) => lo + rng() * (hi - lo);
       // streets run along the river, so most houses stand square to it
-      spots[kind].push({ x, z, y: southBank(x, z) - 0.6, w: pick(K.w), d: pick(K.d), h: pick(K.h), rot: (rng() < 0.8 ? 0 : Math.PI / 2) + (rng() - 0.5) * 0.12 });
+      spots[kind].push({ x, z, y: southBank(x, z) - 0.6, w: pick(K.w), d: pick(K.d), h: pick(K.h), rot: (rng() < 0.8 ? 0 : Math.PI / 2) + (rng() - 0.5) * 0.08 });
       n++;
+    }
+    // ### Trees: umbrella pines and dark cypresses, as on the real hillside. They cover the cliff under the town, stand in the
+    // ### plots between the houses and along the quay, and thin out towards the back. Crowns and trunks are two instanced meshes.
+    {
+      const tmp = new THREE.Object3D(), tc = new THREE.Color();
+      const NT = 3600, crowns = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), farLit({ color: 0xffffff, emissive: 0x04070a, flatShading: true }), NT);
+      const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.5, 0.7, 1, 6).translate(0, 0.5, 0), farLit({ color: 0x4a3a2c, emissive: 0x050403 }), NT);
+      const GREENS = [0x3f6b3a, 0x4d7a3e, 0x35582f, 0x5a8546, 0x2f4f33];
+      let t = 0;
+      for (let tries = 0; tries < 60000 && t < NT; tries++){
+        const slope = rng() < 0.58, x = (rng() - 0.5) * 2500, shore = 648 + 14 * Math.sin(x * 0.004 + 1);
+        const z = shore + (slope ? 34 + rng() * 52 : rng() < 0.06 ? 5 + rng() * 6 : 88 + rng() * 250);
+        if (!clear(x, z, 16) || (!slope && taken.has(plot(x, z)))) continue;
+        const y = southBank(x, z) - 0.3, cypress = rng() < 0.22, th = cypress ? 1.5 : 3 + rng() * 3.5, cw = cypress ? 1.1 + rng() * 0.5 : 2.6 + rng() * 2.2, chh = cypress ? 4.5 + rng() * 3 : cw * (0.5 + rng() * 0.2);
+        tmp.position.set(x, y, z); tmp.rotation.set(0, rng() * 6.28, 0); tmp.scale.set(cypress ? 0.5 : 0.6, th, cypress ? 0.5 : 0.6); tmp.updateMatrix(); trunks.setMatrixAt(t, tmp.matrix);
+        tmp.position.y = y + th + chh * 0.7; tmp.scale.set(cw, chh, cw); tmp.updateMatrix(); crowns.setMatrixAt(t, tmp.matrix);
+        crowns.setColorAt(t, tc.setHex(cypress ? 0x24402c : GREENS[Math.floor(rng() * GREENS.length)]).multiplyScalar(0.85 + rng() * 0.3));
+        t++;
+      }
+      crowns.count = t; trunks.count = t; crowns.frustumCulled = false; trunks.frustumCulled = false;
+      grp.add(crowns, trunks);
     }
     const tmp = new THREE.Object3D(), tc = new THREE.Color();
     for (const kind of Object.keys(KINDS)){
@@ -4917,7 +4950,7 @@ function boardSection(m){
     head = lastRank.personalBest
       ? (lastRank.prev ? `New personal best for ${who} (was ${fmtTimeExact(lastRank.prev)}).` : `${who} is on the board.`)
       : `${who}'s best stays ${fmtTimeExact(lastRank.prev)}.`;
-    head = `<p class="lb-head">${head} All time: place <b>${lastRank.rank}</b> of ${n}${lastRank.monthRank ? ` · This month: place <b>${lastRank.monthRank}</b>${lastRank.monthRank === 1 && lastRank.monthBest ? ', you lead the month!' : ''}` : ''}.</p>`;
+    head = `<p class="lb-head">${head} All time: place <b>${lastRank.rank}</b> of ${n}${lastRank.monthRank ? ` · This month: place <b>${lastRank.monthRank}</b>${lastRank.monthRank === 1 && lastRank.monthBest ? ': you lead the month' : ''}` : ''}.</p>`;
   }
   const ask = !driver && pendingRun ? `<div class="lb-ask"><span>Enter your name to put this time on the board</span>${nameField('Your name', 'Save time')}</div>` : '';
   return `<div class="eyebrow">Leaderboard · ${MODES[m].title}</div>${head}${ask}${boardPanels(m)}`;
@@ -5641,23 +5674,29 @@ function finish(){
   pendingRun = { mode, time: used, veh: V.key, stars }; lastRank = null;
   recordPending();
   const city = mode === 'city';
+  // ### The result card: the title with the stars beside it, the drive time as the one large number with the best time under it,
+  // ### three smaller figures next to it, then the two leaderboards. Everything is set large, to be read at a glance.
+  const dmg = Math.round(damage);
   showCard(`
-    <div class="eyebrow">${M.title} · ${V.name}</div>
-    <h1>Clean <em>getaway</em></h1>
-    ${city ? `<p>With the six pieces of evidence in the glovebox and ${WITNESS.name} beside you, you cross the 25 de Abril bridge as the sky over the Tejo turns pale. Lisbon is behind you.</p>` : ''}
-    <div class="stars">${[0, 1, 2].map(i => `<span class="${i < stars ? 'on' : ''}">${STAR}</span>`).join('')}</div>
-    <div class="stats">
-      <div class="stat"><span class="eyebrow">Drive time</span><b>${fmtTimeExact(used)}</b></div>
-      <div class="stat"><span class="eyebrow">${city ? 'Time left' : 'Shards'}</span><b>${city ? fmtTime(timeLeft) : collected + '/' + items.length}</b></div>
-      <div class="stat"><span class="eyebrow">Damage</span><b>${Math.round(damage)}%</b></div>
-      <div class="stat"><span class="eyebrow">Cops wrecked</span><b>${copsWrecked}</b></div>
+    <div class="res-top">
+      <div><div class="eyebrow">${M.title} · ${V.name}</div><h1>Clean <em>getaway</em></h1></div>
+      <div class="stars" role="img" aria-label="${stars} of 3 stars">${[0, 1, 2].map(i => `<span class="${i < stars ? 'on' : ''}">${STAR}</span>`).join('')}</div>
     </div>
-    <p class="note">${isBest ? 'New best time on this device!' : 'Best time on this device: ' + fmtTimeExact(best[mode])}${lostStar ? ' · One star lost for heavy damage.' : ''}</p>
+    ${city ? `<p>With the six pieces of evidence in the glovebox and ${WITNESS.name} beside you, you cross the 25 de Abril bridge as the sky over the Tejo turns pale. Lisbon is behind you.</p>` : ''}
+    <div class="res-hero">
+      <div class="res-time"><span class="eyebrow">Drive time</span><b>${fmtTimeExact(used)}</b><i class="${isBest ? 'best' : ''}">${isBest ? 'New best time on this device' : 'Best on this device · ' + fmtTimeExact(best[mode])}</i></div>
+      <div class="res-stats">
+        <div class="stat"><span class="eyebrow">${city ? 'Time left' : 'Shards'}</span><b>${city ? fmtTime(timeLeft) : collected + '/' + items.length}</b></div>
+        <div class="stat ${dmg > 50 ? 'bad' : dmg > 20 ? 'warn' : 'good'}"><span class="eyebrow">Damage</span><b>${dmg}%</b></div>
+        <div class="stat"><span class="eyebrow">Cops wrecked</span><b>${copsWrecked}</b></div>
+      </div>
+    </div>
+    ${lostStar ? '<p class="note">One star lost for heavy damage (over 50 %).</p>' : ''}
     <section class="lb" data-board="${mode}">${boardSection(mode)}</section>
     <div class="actions">
       <button class="btn" data-action="again">Drive again <small class="desk-only">Enter</small></button>
       <button class="btn ghost" data-action="menu">Change vehicle</button>
-    </div>`);
+    </div>`, 'result');
 }
 
 // ### Ends a run that failed: busted, wrecked or out of time.
@@ -5795,7 +5834,7 @@ function menuFraming(on){
 function showCard(html, kind){
   const isMenu = kind === 'menu';
   card.innerHTML = html;
-  overlay.classList.toggle('menu', isMenu); card.classList.toggle('menu', isMenu); card.classList.toggle('map', kind === 'map');
+  overlay.classList.toggle('menu', isMenu); card.classList.toggle('menu', isMenu); card.classList.toggle('map', kind === 'map'); card.classList.toggle('result', kind === 'result');
   menuFraming(isMenu);
   overlay.hidden = false;
   const b = card.querySelector('.btn'); if (b && !COARSE) b.focus({ preventScroll: true });
