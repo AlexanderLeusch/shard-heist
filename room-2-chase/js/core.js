@@ -451,29 +451,49 @@
   }
   // Names are matched without case, so "alex" and "Alex" are the same driver
   const sameName = (a, b) => typeof a === 'string' && typeof b === 'string' && a.toLowerCase() === b.toLowerCase();
-  function newBoard(){ return { drivers: [], runs: { city: [], highway: [], country: [] } }; }
+  const emptyRuns = () => ({ city: [], highway: [], country: [] });
+  // ### Two boards per map: the all-time board (runs) and the board of one calendar month (month.runs, for the month in month.key).
+  function newBoard(){ return { drivers: [], runs: emptyRuns(), month: { key: '', runs: emptyRuns() } }; }
+  // The calendar month of a moment, as "2026-11" (local time), or '' for a bad value; and its name, "November 2026"
+  function monthKey(now){
+    if (!Number.isFinite(now) || now <= 0 || now > 4e12) return '';
+    const d = new Date(now);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  function monthName(key){
+    const m = /^(\d{4})-(\d{2})$/.exec(key || '');
+    return m && MONTHS[+m[2] - 1] ? MONTHS[+m[2] - 1] + ' ' + m[1] : '';
+  }
+  // One saved list of runs, cleaned: bad names and impossible times are dropped, each driver keeps only their best run, fastest first
+  function cleanRuns(list){
+    const out = [];
+    if (!Array.isArray(list)) return out;
+    for (const r of list){
+      if (!r || typeof r !== 'object') continue;
+      const name = cleanName(r.name), time = parseBest(String(r.time));
+      if (!name || time === null) continue;
+      const stars = Number.isInteger(r.stars) && r.stars >= 1 && r.stars <= 3 ? r.stars : 1;
+      const entry = { name, time, veh: isVeh(r.veh) ? r.veh : 'car', stars };
+      const i = out.findIndex(x => sameName(x.name, name));
+      if (i < 0) out.push(entry); else if (time < out[i].time) out[i] = entry;
+    }
+    return out.sort((a, b) => a.time - b.time).slice(0, BOARD_KEEP);
+  }
   // ### Reads a saved leaderboard. Bad names, impossible times and unknown maps are dropped, and only each driver's best run stays.
   function parseBoard(raw){
     const board = newBoard();
-    if (typeof raw !== 'string' || raw.length > 20000) return board;
+    if (typeof raw !== 'string' || raw.length > 40000) return board;
     let s; try { s = JSON.parse(raw); } catch (e) { return board; }
     if (!s || typeof s !== 'object' || Array.isArray(s)) return board;
     if (Array.isArray(s.drivers)) for (const d of s.drivers){ const n = cleanName(d); if (n && !board.drivers.some(x => sameName(x, n))) board.drivers.push(n); }
     board.drivers = board.drivers.slice(-DRIVERS_MAX);
     const runs = s.runs && typeof s.runs === 'object' ? s.runs : {};
-    for (const m of Object.keys(board.runs)){
-      if (!Array.isArray(runs[m])) continue;
-      for (const r of runs[m]){
-        if (!r || typeof r !== 'object') continue;
-        const name = cleanName(r.name), time = parseBest(String(r.time));
-        if (!name || time === null) continue;
-        const stars = Number.isInteger(r.stars) && r.stars >= 1 && r.stars <= 3 ? r.stars : 1;
-        const entry = { name, time, veh: isVeh(r.veh) ? r.veh : 'car', stars };
-        const i = board.runs[m].findIndex(x => sameName(x.name, name));
-        if (i < 0) board.runs[m].push(entry); else if (time < board.runs[m][i].time) board.runs[m][i] = entry;
-      }
-      board.runs[m].sort((a, b) => a.time - b.time);
-      board.runs[m] = board.runs[m].slice(0, BOARD_KEEP);
+    for (const m of Object.keys(board.runs)) board.runs[m] = cleanRuns(runs[m]);
+    const mo = s.month && typeof s.month === 'object' ? s.month : {};
+    if (typeof mo.key === 'string' && monthName(mo.key) && mo.runs && typeof mo.runs === 'object'){
+      board.month.key = mo.key;
+      for (const m of Object.keys(board.month.runs)) board.month.runs[m] = cleanRuns(mo.runs[m]);
     }
     return board;
   }
@@ -483,27 +503,46 @@
     if (!name) return { board, name: '' };
     const old = board.drivers.find(d => sameName(d, name)) || name;
     const drivers = board.drivers.filter(d => !sameName(d, old)).concat(old).slice(-DRIVERS_MAX);
-    return { board: { drivers, runs: board.runs }, name: old };
+    return { board: Object.assign({}, board, { drivers }), name: old };
   }
-  // ### Puts a finished run on its map's board. A driver's slower run never replaces their best one.
-  // ### Returns the new board, the driver's place (1 = fastest) and whether the run is their new personal best.
-  function recordRun(board, modeKey, raw, time, veh, stars){
-    const name = cleanName(raw), t = parseBest(String(time));
-    if (!isMode(modeKey) || !name || t === null) return { board, rank: 0, personalBest: false, prev: null };
-    const list = board.runs[modeKey].slice(), i = list.findIndex(x => sameName(x.name, name));
-    const prev = i >= 0 ? list[i].time : null, personalBest = prev === null || t < prev;
-    if (personalBest){
-      if (i >= 0) list.splice(i, 1);
-      // a tie goes behind the run that was there first
-      let at = list.findIndex(x => x.time > t); if (at < 0) at = list.length;
-      list.splice(at, 0, { name: i >= 0 ? board.runs[modeKey][i].name : name, time: t, veh: isVeh(veh) ? veh : 'car', stars: Number.isInteger(stars) && stars >= 1 && stars <= 3 ? stars : 1 });
+  // Puts one run into a list: a driver's slower run never replaces their best one, and a tie goes behind the run that was there first
+  function putRun(list, name, t, veh, stars){
+    const out = list.slice(), i = out.findIndex(x => sameName(x.name, name));
+    const prev = i >= 0 ? out[i].time : null, best = prev === null || t < prev;
+    if (best){
+      const keep = i >= 0 ? out[i].name : name;
+      if (i >= 0) out.splice(i, 1);
+      let at = out.findIndex(x => x.time > t); if (at < 0) at = out.length;
+      out.splice(at, 0, { name: keep, time: t, veh: isVeh(veh) ? veh : 'car', stars: Number.isInteger(stars) && stars >= 1 && stars <= 3 ? stars : 1 });
     }
-    const kept = list.slice(0, BOARD_KEEP), rank = kept.findIndex(x => sameName(x.name, name)) + 1;
-    return { board: { drivers: board.drivers, runs: Object.assign({}, board.runs, { [modeKey]: kept }) }, rank, personalBest, prev };
+    const kept = out.slice(0, BOARD_KEEP);
+    return { list: kept, rank: kept.findIndex(x => sameName(x.name, name)) + 1, best, prev };
+  }
+  // ### Puts a finished run on its map's boards: the all-time board, and the board of the month that `now` (milliseconds) falls in.
+  // ### When a new month has begun, the monthly board starts empty. Returns the new board, the driver's place on each board
+  // ### (1 = fastest) and whether the run is their new best, all-time (personalBest) and this month (monthBest).
+  function recordRun(board, modeKey, raw, time, veh, stars, now){
+    const name = cleanName(raw), t = parseBest(String(time));
+    if (!isMode(modeKey) || !name || t === null) return { board, rank: 0, personalBest: false, prev: null, monthRank: 0, monthBest: false };
+    const all = putRun(board.runs[modeKey], name, t, veh, stars), key = monthKey(now);
+    let month = board.month || { key: '', runs: emptyRuns() }, mo = { rank: 0, best: false };
+    if (key){
+      const base = month.key === key ? month.runs : emptyRuns();
+      mo = putRun(base[modeKey], name, t, veh, stars);
+      month = { key, runs: Object.assign({}, base, { [modeKey]: mo.list }) };
+    }
+    return { board: { drivers: board.drivers, runs: Object.assign({}, board.runs, { [modeKey]: all.list }), month },
+      rank: all.rank, personalBest: all.best, prev: all.prev, monthRank: mo.rank, monthBest: mo.best };
+  }
+  // The runs of one map on the all-time board, or on the board of the month `key` (empty when the saved month is another one)
+  function boardList(board, modeKey, key){
+    if (!isMode(modeKey)) return [];
+    if (key === undefined) return board.runs[modeKey];
+    return board.month && key && board.month.key === key ? board.month.runs[modeKey] : [];
   }
   // ### The rows the end screen shows: the top five, plus the driver's own row below them when they are further down.
-  function boardRows(board, modeKey, name){
-    const list = isMode(modeKey) ? board.runs[modeKey] : [];
+  function boardRows(board, modeKey, name, key){
+    const list = boardList(board, modeKey, key);
     const rows = list.slice(0, BOARD_SHOW).map((r, i) => Object.assign({ place: i + 1, me: sameName(r.name, name) }, r));
     const mine = list.findIndex(r => sameName(r.name, name));
     if (mine >= BOARD_SHOW) rows.push(Object.assign({ place: mine + 1, me: true, gap: mine > BOARD_SHOW }, list[mine]));
@@ -540,11 +579,13 @@
   // ### muffler, whose resonances stay at the same frequencies whatever the rpm. Under load the pulses are strong; on overrun
   // ### they are weak and irregular. The V8's two banks fire unevenly (L R R L R L L R) into pipes of different length: its burble.
   // ### Idling is its own sound, not a quiet overrun: slow, soft pulses through a closed-down muffler, so it is low and round. The
-  // ### cylinders fire unevenly, which makes the V8 lope once per cycle, and valve train or diesel knock sit on top (idling). Gears are the speeds in m/s at
+  // ### cylinders fire unevenly, which makes the V8 lope once per cycle, and valve train or diesel knock sit on top (idling). The V8's
+  // ### idle is tuned deep: resonances at its firing frequency (47 Hz at 750 rpm) and the next multiples, one bank louder than the
+  // ### other so the firing order L R R L R L L R is heard as the burble, and a strong lope from cycle to cycle. Gears are the speeds in m/s at
   // ### which each gear reaches max rpm.
   const ENGINES = {
     car: { layout: 'V8, cross-plane', cyl: 8, idle: 750, max: 6800, launch: 2600, gears: [12, 20, 29, 38, 48, 70], down: 0.62, shift: 0.16, rev: [9, 4, 14],
-      refs: [750, 1500, 2700, 4300, 6300], loop: 1.5, idling: { pulse: 0.0052, lope: 0.14, weak: 0.05, mech: 1.4, gain: 1.15, lowpass: 900, spread: 0.36 }, banks: [0, 1, 1, 0, 1, 0, 0, 1], pipes: [0.0079, 0.0094], lag: 0.0016, reflect: -0.72, damp: 0.55,
+      refs: [750, 1500, 2700, 4300, 6300], loop: 1.5, idling: { pulse: 0.0046, lope: 0.3, weak: 0.1, uneven: 2.6, wander: 5, mech: 1.1, gain: 1.3, lowpass: 720, spread: 0.3, bankGain: [1, 0.74], body: [[47, 0.9, 2.4], [94, 1.0, 1.7], [141, 1.1, 1.0], [235, 1.2, 0.45], [520, 1.4, 0.12]] }, banks: [0, 1, 1, 0, 1, 0, 0, 1], pipes: [0.0079, 0.0094], lag: 0.0016, reflect: -0.72, damp: 0.55,
       pulse: 0.05, pulseMax: 0.0042, rough: 0.2, spread: 0.2, jitter: 0.1, tick: 0.012, knock: 0,
       body: [[95, 1.1, 1.3], [240, 1.3, 0.8], [620, 1.6, 0.3]], direct: 0.1, lowpass: 3600, intake: [420, 1.6, 0.5], off: 0.42, drive: 1.6,
       pops: 620, turbo: 0, air: false, whine: [24, 0.012], road: 1, vol: 1 },
@@ -608,11 +649,12 @@
     const tau = idle ? I.pulse : Math.min(E.pulse * cycle, E.pulseMax), L = Math.round(tau * 9 * sr), step = 1 / (tau * sr);
     let cycleAmp = 1;
     for (let c = 0; c < cycles * E.cyl; c++){
-      const ci = c % E.cyl, irregular = E.jitter * (0.5 + low) * (onLoad || idle ? 1 : 2.5);
+      const ci = c % E.cyl, irregular = E.jitter * (0.5 + low) * (onLoad ? 1 : idle ? (I.uneven || 1) : 2.5);
       if (idle && ci === 0) cycleAmp = 1 + (rnd() - 0.5) * 2 * I.lope;
       const weak = idle && rnd() < I.weak ? 0.45 : 1;
-      const amp = (onLoad ? 1 : idle ? 0.7 * cycleAmp * weak : E.off) * Math.max(0, 1 + trim[ci] + (rnd() - 0.5) * 2 * irregular);
-      const s0 = Math.round(((c / E.cyl + (rnd() - 0.5) * 0.004 * (0.3 + low)) * cycle + E.banks[ci] * E.lag * (0.25 + 0.75 * low)) * sr), dest = flow[E.banks[ci] % flow.length];
+      // at idle one bank of a V8 is heard more than the other (bankGain), which turns its uneven firing order into the burble
+      const amp = (onLoad ? 1 : idle ? 0.7 * cycleAmp * weak * (I.bankGain ? I.bankGain[E.banks[ci] % I.bankGain.length] : 1) : E.off) * Math.max(0, 1 + trim[ci] + (rnd() - 0.5) * 2 * irregular);
+      const s0 = Math.round(((c / E.cyl + (rnd() - 0.5) * 0.004 * (0.3 + low) * (idle && I.wander ? I.wander : 1)) * cycle + E.banks[ci] * E.lag * (0.25 + 0.75 * low)) * sr), dest = flow[E.banks[ci] % flow.length];
       const rough = E.rough * (onLoad ? 1 : 1.5);
       let turb = 0;
       for (let k = 0; k < L; k++){
@@ -632,7 +674,8 @@
       }
     }
     const pipes = E.pipes.map(d => ({ ring: new Float32Array(Math.max(1, Math.round(d * sr))), at: 0, lp: 0 }));
-    const body = E.body.map(([f, Q, g]) => ({ f: resonance(f, Q, sr), g }));
+    // idling has its own resonances when given: the deep notes of the firing frequency and its first multiples
+    const body = (idle && I.body ? I.body : E.body).map(([f, Q, g]) => ({ f: resonance(f, Q, sr), g }));
     const intake = resonance(E.intake[0], E.intake[1], sr), intakeG = onLoad ? E.intake[2] * (0.35 + 0.65 * rpm / E.max) : 0;
     const smooth = 1 - Math.exp(-2 * Math.PI * (idle ? I.lowpass : E.lowpass) / sr);
     let prev = 0, lp = 0, lp2 = 0;
@@ -823,7 +866,7 @@
     crashDamage, CRASH_FREE, CRASH_FACTOR, CRASH_QUIET, newCrashGuard, chargeCrash, addDamage, repairDamage, isWrecked, damageStage, damageLevel, smokeFor, actionHeld, TILT_DEAD, TILT_FULL, tiltSteer, parseSteer, snapShadow, QUALITY_SCALES, newQuality, stepQuality, parseVolume, volumeGain,
     PURSUIT, MAX_STARS, SPOT_RADIUS, HELI_AFTER, wantedStars, pursuit, helicopterDue, copTopSpeed, trackStep, inSpotlight, bustStep, edgeDistance,
     driveTime, runStars, isNewBest,
-    NAME_MAX, DRIVERS_MAX, BOARD_KEEP, BOARD_SHOW, cleanName, sameName, newBoard, parseBoard, addDriver, recordRun, boardRows,
+    NAME_MAX, DRIVERS_MAX, BOARD_KEEP, BOARD_SHOW, cleanName, sameName, newBoard, parseBoard, addDriver, recordRun, boardRows, boardList, monthKey, monthName,
     newStory, beginAct, retryAct, finishOpen, storyEnding, dueRadio,
     ENGINES, ENGINE_SR, gearFor, engineTarget, isBraking, isReversing, skidAmount, engineLoop, engineLoops, ROTOR, rotorLoop,
     RADIO, RADIO_ORDER, BACH, parseRadio, radioNext, radioBar

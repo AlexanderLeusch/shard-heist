@@ -151,3 +151,31 @@ test('a saved leaderboard is read back exactly, and broken or changed data is cl
   assert.deepEqual(Object.keys(bad.runs), ['city', 'highway', 'country']);
   assert.deepEqual(bad.runs.highway, []);
 });
+
+test('leaderboard of the month: its own board per calendar month, which starts empty when a new month begins', () => {
+  const nov = new Date(2026, 10, 11, 12).getTime(), nov2 = new Date(2026, 10, 28, 9).getTime(), dec = new Date(2026, 11, 1, 0, 5).getTime();
+  assert.equal(Core.monthKey(nov), '2026-11');
+  assert.equal(Core.monthName('2026-11'), 'November 2026');
+  for (const bad of [NaN, -1, 0, Infinity, 'x', undefined]) assert.equal(Core.monthKey(bad), '', String(bad));
+  for (const bad of ['', '2026-13', '2026-00', 'abc', null]) assert.equal(Core.monthName(bad), '', String(bad));
+  let b = Core.newBoard(), r = Core.recordRun(b, 'city', 'Alex', 90, 'car', 3, nov); b = r.board;
+  assert.deepEqual([r.rank, r.monthRank, r.personalBest, r.monthBest], [1, 1, true, true]);
+  r = Core.recordRun(b, 'city', 'Sarah', 80, 'bike', 3, nov2); b = r.board;
+  assert.deepEqual([r.rank, r.monthRank], [1, 1]);
+  assert.deepEqual(Core.boardList(b, 'city', '2026-11').map(x => x.name), ['Sarah', 'Alex']);
+  // December: the monthly board starts again, the all-time board stays
+  assert.deepEqual(Core.boardList(b, 'city', Core.monthKey(dec)), [], 'nobody has driven in December yet');
+  r = Core.recordRun(b, 'city', 'Alex', 95, 'car', 2, dec); b = r.board;
+  assert.deepEqual([r.rank, r.personalBest, r.monthRank, r.monthBest], [2, false, 1, true], 'slower than his best, but the leader of December');
+  assert.equal(b.month.key, '2026-12');
+  assert.deepEqual(Core.boardList(b, 'city', '2026-12').map(x => [x.name, x.time]), [['Alex', 95]]);
+  assert.deepEqual(Core.boardList(b, 'city').map(x => [x.name, x.time]), [['Sarah', 80], ['Alex', 90]]);
+  assert.deepEqual(Core.boardRows(b, 'city', 'alex', '2026-12').map(x => [x.place, x.me]), [[1, true]]);
+  // saved and read back; a tampered month is dropped, the all-time board is kept
+  assert.deepEqual(Core.parseBoard(JSON.stringify(b)), b);
+  const bad = Core.parseBoard(JSON.stringify({ drivers: ['Alex'], runs: b.runs, month: { key: '<b>', runs: { city: [{ name: 'Eve', time: 20 }] } } }));
+  assert.equal(bad.month.key, ''); assert.deepEqual(bad.month.runs.city, []); assert.equal(bad.runs.city.length, 2);
+  // without a valid clock the run still counts all time
+  r = Core.recordRun(Core.newBoard(), 'highway', 'Alex', 70, 'car', 3);
+  assert.deepEqual([r.rank, r.monthRank, r.board.month.key], [1, 0, '']);
+});

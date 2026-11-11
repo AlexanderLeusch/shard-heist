@@ -1750,9 +1750,114 @@ function buildCity(){
     for (let z = -D2; z < D2; z += 6) neon.box(cx - W2, cx - W2 + 2, b + H, b + H + 2, cz + z, cz + z + 3, wall);
   }
   // Far across the water (no fog, or the night would swallow them): the south bank, Cristo Rei and the 25 de Abril bridge
-  const farMat = c => new THREE.MeshBasicMaterial({ color: c, fog: false });
-  const bank = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 12).scale(1200, 46, 130).translate(0, 0, 770), farMat(0x070a18));
-  const cristo = new THREE.Mesh(mergeGeos([boxG(9, 42, 9, -170, 62, 690), boxG(5.5, 19, 4, -170, 92, 690), boxG(22, 2.8, 3, -170, 98, 690), boxG(3, 3.4, 3, -170, 103, 690)]), farMat(0xa9aec4));
+  // ### Almada, the town on the south bank, after the real one: a quay along the water (Cacilhas and the Cais do Ginjal), a cliff
+  // ### of ochre rock about 45 m high, and on top of it the town, white and pastel houses with terracotta roofs and a few
+  // ### taller blocks in the centre, with lit windows at night. The land is one grid bent over southBank(x, z); it is lit like
+  // ### everything else, so it is a dark shape with lights at night and shows its colours in the morning light of the finale. The
+  // ### road of the bridge meets the top of the cliff at its south end.
+  const CRISTO = { x: -150, z: 748 }, BR_END = { x: -273, z: 736 };
+  const southBank = (x, z) => {
+    const d = z - (648 + 14 * Math.sin(x * 0.004 + 1));
+    if (d < 0) return -6;
+    let top = 44 + 9 * Math.sin(x * 0.006) + 5 * Math.sin(x * 0.017 + 2);
+    const wb = Math.exp(-((x - BR_END.x) ** 2 + (z - BR_END.z) ** 2) / 8100); top = top * (1 - wb) + 42.4 * wb;
+    top += 15 * Math.exp(-((x - CRISTO.x) ** 2 + (z - CRISTO.z) ** 2) / 2000);
+    const up = clamp((d - 16) / 44, 0, 1), rise = up * up * (3 - 2 * up);
+    return 2.2 + (top - 2.2) * rise - clamp((d - 260) / 300, 0, 1) * 12;
+  };
+  const bankGeo = new THREE.PlaneGeometry(2600, 370, 110, 30).rotateX(-Math.PI / 2).translate(0, 0, 815);
+  {
+    const P = bankGeo.attributes.position, col = new Float32Array(P.count * 3), c = new THREE.Color();
+    const quay = C(0x6f6a62), rock = C(0x8a6f4c), grass = C(0x4c5a36), town = C(0x77705f);
+    for (let i = 0; i < P.count; i++){
+      const x = P.getX(i), z = P.getZ(i), h = southBank(x, z), slope = Math.abs(southBank(x, z + 5) - southBank(x, z - 5)) / 10;
+      P.setY(i, h);
+      const n = 0.5 + 0.5 * Math.sin(x * 0.031 + z * 0.047) * Math.sin(x * 0.011 - z * 0.019);
+      if (h < 3) c.copy(quay); else if (slope > 0.35) c.copy(rock).lerp(grass, n * 0.35); else c.copy(grass).lerp(town, n * 0.8);
+      c.multiplyScalar(0.8 + 0.3 * n);
+      col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+    }
+    bankGeo.setAttribute('color', new THREE.BufferAttribute(col, 3)); bankGeo.computeVertexNormals();
+  }
+  const farLit = o => new THREE.MeshLambertMaterial(Object.assign({ fog: false }, o));
+  const bank = new THREE.Mesh(bankGeo, farLit({ vertexColors: true, emissive: 0x0a0c16 }));
+  // the houses: one box and one hipped roof each, drawn as two instanced meshes; their windows are the lights of the far bank
+  const bl = [];
+  {
+    const WALLS = [0xf2ede2, 0xe9dcc6, 0xf4e3b8, 0xe7c8b0, 0xd9dde6, 0xf0d2c4, 0xcfd8cf], N = 620, tmp = new THREE.Object3D(), tc = new THREE.Color();
+    const houses = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), farLit({ color: 0xffffff, emissive: 0x08090c }), N);
+    const roofs = new THREE.InstancedMesh(new THREE.ConeGeometry(0.72, 1, 4, 1).rotateY(Math.PI / 4).translate(0, 0.5, 0), farLit({ color: 0xb4583a, emissive: 0x160806 }), N);
+    const bdx = Math.cos(1.2), bdz = Math.sin(1.2); // the direction of the bridge on the ground
+    let n = 0;
+    for (let tries = 0; tries < 6000 && n < N; tries++){
+      const water = rng() < 0.16, centre = rng() < 0.55;
+      const x = centre ? -120 + (rng() + rng() - 1) * 420 : (rng() - 0.5) * 2300;
+      const shore = 648 + 14 * Math.sin(x * 0.004 + 1), z = shore + (water ? 5 + rng() * 9 : 70 + rng() * (centre ? 210 : 150));
+      // keep the bridge's way and the hill of the statue free
+      const along = (x + 400) * bdx + (z - 410) * bdz, off = Math.abs(-(x + 400) * bdz + (z - 410) * bdx);
+      if (off < 24 && along < 420) continue;
+      if (Math.hypot(x - CRISTO.x, z - CRISTO.z) < 42) continue;
+      const tall = !water && centre && rng() < 0.035, w = 7 + rng() * 9, dp = 7 + rng() * 7, h = water ? 5 + rng() * 5 : tall ? 18 + rng() * 12 : 6 + rng() * 10, y = southBank(x, z) - 0.6;
+      tmp.position.set(x, y, z); tmp.rotation.y = (rng() - 0.5) * 0.5; tmp.scale.set(w, h, dp); tmp.updateMatrix();
+      houses.setMatrixAt(n, tmp.matrix); houses.setColorAt(n, tc.setHex(WALLS[Math.floor(rng() * WALLS.length)]).multiplyScalar(0.82 + rng() * 0.18));
+      tmp.position.y = y + h; tmp.scale.set(w, tall ? 0.01 : 2 + rng() * 1.6, dp); tmp.updateMatrix();
+      roofs.setMatrixAt(n, tmp.matrix);
+      // lit windows on the side that faces Lisbon, and now and then a street lamp
+      const lit = tall ? 5 : rng() < 0.75 ? 1 + Math.floor(rng() * 2) : 0;
+      for (let k = 0; k < lit; k++) bl.push(x + (rng() - 0.5) * w * 0.8, y + 2 + rng() * (h - 3), z - dp / 2 - 0.4);
+      n++;
+    }
+    houses.count = n; roofs.count = n; houses.frustumCulled = false; roofs.frustumCulled = false;
+    grp.add(houses, roofs);
+    // lamps along the quay
+    for (let x = -1100; x < 1100; x += 34) bl.push(x, 5.5, 652 + 14 * Math.sin(x * 0.004 + 1));
+  }
+  // ### Cristo Rei, after the real monument above Almada (1959): a base building, then the tall pedestal of four slender pillars
+  // ### that lean together and are joined near the top by arches under a platform, and on it the statue of Christ in a long
+  // ### robe with both arms held out wide, facing Lisbon. Pale concrete, floodlit at night.
+  const cristo = new THREE.Group();
+  {
+    const stone = farLit({ color: 0xe2ddd0, emissive: 0x4f5058 }), shade = farLit({ color: 0xbdb7a8, emissive: 0x3a3b42 });
+    const PH = 56, W0 = 8.2, W1 = 5.6, T = 2.5, parts = [], dark = [];
+    // one face of the pedestal: two leaning pillars and the arch that joins them, as a flat shape with a tall arched opening
+    const face = () => {
+      const sh = new THREE.Shape();
+      sh.moveTo(-W0, 0); sh.lineTo(W0, 0); sh.lineTo(W1, PH); sh.lineTo(-W1, PH); sh.closePath();
+      const hole = new THREE.Path(), a0 = W0 - T, a1 = W1 - T * 0.8, yA = PH - 11;
+      hole.moveTo(-a0, 0); hole.lineTo(-a1, yA); hole.absarc(0, yA, a1, Math.PI, 0, true); hole.lineTo(a0, 0); hole.closePath();
+      sh.holes.push(hole);
+      return new THREE.ExtrudeGeometry(sh, { depth: T, bevelEnabled: false, curveSegments: 10 });
+    };
+    for (let k = 0; k < 4; k++){
+      // each face leans in with the pillars: it stands on the edge of the base and tilts towards the middle
+      const g = face(); g.translate(0, 0, -T / 2); g.rotateX(-Math.atan2(W0 - W1, PH)); g.translate(0, 0, W0 - T / 2); g.rotateY(k * Math.PI / 2);
+      parts.push(g);
+    }
+    // the platform with its rim, and the base building with a door towards the river
+    parts.push(boxG(2 * W1 + 3, 1.6, 2 * W1 + 3, 0, PH + 0.8, 0), boxG(2 * W1 + 1.2, 1.4, 2 * W1 + 1.2, 0, PH + 2.3, 0));
+    dark.push(boxG(30, 7, 24, 0, -3.5, 0), boxG(34, 1.2, 28, 0, -7.6, 0), boxG(2 * W1 + 3.6, 0.5, 2 * W1 + 3.6, 0, PH + 0.1, 0));
+    // the statue, 22 m: robe from the feet to the shoulders, neck and head, hair, and the two arms with wide sleeves and open hands
+    const Y = PH + 3, st = [];
+    st.push(loft([[0, Y, 0, 2.3, 1.7], [0, Y + 3, 0, 2.05, 1.5], [0, Y + 8, 0, 1.85, 1.3], [0, Y + 12.5, 0.1, 2.0, 1.35], [0, Y + 15.6, 0.1, 2.75, 1.4], [0, Y + 17.0, 0, 2.5, 1.25], [0, Y + 17.9, 0, 0.9, 0.8]], 18));
+    st.push(limbLoft([0, Y + 17.4, 0], [0, Y + 18.7, 0], [0.62, 0.55, 0.55], 10), ball([0, Y + 19.9, -0.08], 1.12, 0.84, 1.08, 0.92));
+    st.push(ball([0, Y + 20.1, 0.22], 1.2, 0.9, 1.0, 0.85), ball([0, Y + 18.9, 0.5], 1.0, 1.0, 1.3, 0.6));
+    for (const sd of [-1, 1]){
+      st.push(loft([[sd * 2.2, Y + 16.4, 0, 1.0, 1.15], [sd * 4.6, Y + 16.6, 0, 0.95, 1.0], [sd * 7.2, Y + 16.5, -0.1, 0.9, 1.05], [sd * 8.6, Y + 16.3, -0.15, 0.55, 0.9]], 12));
+      // the sleeve hangs down from the forearm; the hand is open, palm to the front
+      st.push(loft([[sd * 5.2, Y + 16.2, 0, 0.5, 0.75], [sd * 6.6, Y + 13.9, 0, 0.6, 0.55], [sd * 8.1, Y + 15.9, 0, 0.3, 0.6]], 8));
+      st.push(ball([sd * 9.5, Y + 16.3, -0.2], 0.62, 1.35, 0.55, 1.0));
+    }
+    // folds of the robe down the front, and the mantle over the left shoulder
+    for (const x of [-1.1, -0.35, 0.4, 1.15]) st.push(limb([x, Y + 0.3, -1.45], [x * 0.75, Y + 12, -1.2], 0.22, 0.16, 5));
+    st.push(limb([1.9, Y + 16.6, -0.9], [-1.3, Y + 9.5, -1.35], 0.5, 0.35, 6));
+    const body = new THREE.Mesh(mergeGeos(parts.concat(st)), stone), base = new THREE.Mesh(mergeGeos(dark), shade);
+    cristo.add(body, base);
+    cristo.position.set(CRISTO.x, southBank(CRISTO.x, CRISTO.z) + 7, CRISTO.z);
+    // floodlights at its foot and the glow on the statue at night
+    for (const [dx, dz] of [[-12, -10], [12, -10], [0, -14]]) bl.push(CRISTO.x + dx, cristo.position.y + 1, CRISTO.z + dz);
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, color: 0xfff0d0, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    halo.scale.set(70, 70, 1); halo.position.y = PH + 13; cristo.add(halo);
+  }
   // ### The 25 de Abril bridge, after the real one (a suspension bridge built in 1966, painted red): two towers on concrete
   // ### foundations in the river, each with two legs joined by cross beams at four heights; two main cables, one over each edge
   // ### of the deck, hanging between the towers and running down to the anchor blocks at both ends; a hanger every 10 m from
@@ -1822,10 +1927,8 @@ function buildCity(){
     bridge.add(new THREE.Points(rg, new THREE.PointsMaterial({ map: glowTexture, color: 0xff3344, size: 9, sizeAttenuation: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
     bridge.position.set(-400, 0, 410); bridge.rotation.y = -1.2;
   }
-  const bl = [];
-  for (let n = 0; n < 260; n++){ const x = (rng() - 0.5) * 1700, k = rng(); bl.push(x, 5 + k * 28, 655 + k * 55); }
   const blg = new THREE.BufferGeometry(); blg.setAttribute('position', new THREE.Float32BufferAttribute(bl, 3));
-  grp.add(bank, cristo, bridge, new THREE.Points(blg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffd9a0, size: 2.8, sizeAttenuation: true, transparent: true, opacity: LAMP_HALO, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
+  grp.add(bank, cristo, bridge, new THREE.Points(blg, new THREE.PointsMaterial({ map: glowTexture, color: 0xffd9a0, size: 4.6, sizeAttenuation: true, transparent: true, opacity: LAMP_HALO, depthWrite: false, blending: THREE.AdditiveBlending, fog: false })));
 
   // Road markings, crosswalks and stop lines
   const wht = C(0xd8dbe4);
@@ -4699,33 +4802,46 @@ function setDriver(raw){
 // ### Saves the run that just ended under the active driver (once).
 function recordPending(){
   if (!pendingRun || !driver) return;
-  lastRank = Core.recordRun(board, pendingRun.mode, driver, pendingRun.time, pendingRun.veh, pendingRun.stars);
+  lastRank = Core.recordRun(board, pendingRun.mode, driver, pendingRun.time, pendingRun.veh, pendingRun.stars, Date.now());
   board = lastRank.board; pendingRun = null; saveBoard();
 }
 // The name field with its button; the same one is used in the menu and on the end screen
 const nameField = (ph, label) => `<span class="drv-new"><input type="text" class="drv-input" maxlength="${Core.NAME_MAX}" placeholder="${ph}" aria-label="${ph}" autocomplete="off" spellcheck="false"><button type="button" class="drv-add" data-driver-add>${label}</button></span>`;
-// ### The menu section: every driver as a button (the active one pressed) and a field for a new one.
+// One board as a list: place, name, vehicle and time, the driver's own row marked
+const boardList = (rows, empty) => rows.length
+  ? `<ol class="lb-list">${rows.map(r => `<li class="${r.me ? 'me' : ''}${r.gap ? ' gap' : ''}"><span class="lb-place">${r.place}</span><span class="lb-name">${esc(r.name)}</span><span class="lb-veh">${VEH[r.veh].name}</span><b>${fmtTimeExact(r.time)}</b></li>`).join('')}</ol>`
+  : `<p class="lb-empty">${empty}</p>`;
+// ### The two boards of one map side by side: all time, and the current calendar month with its leader named above it.
+function boardPanels(m){
+  const key = Core.monthKey(Date.now()), month = Core.monthName(key), lead = Core.boardList(board, m, key)[0];
+  return `<p class="lb-leader"><span>Leader of the month</span><b>${lead ? esc(lead.name) : 'nobody yet'}</b>${lead ? `<i>${fmtTimeExact(lead.time)} · ${VEH[lead.veh].name}</i>` : ''}</p>
+    <div class="lb-cols">
+      <div class="lb-col"><h3>All time</h3>${boardList(Core.boardRows(board, m, driver), 'No times on this map yet.')}</div>
+      <div class="lb-col"><h3>${month}</h3>${boardList(Core.boardRows(board, m, driver, key), 'No times this month yet.')}</div>
+    </div>`;
+}
+// ### The menu section: every driver as a button (the active one pressed), a large field for a new one, and the two leaderboards
+// ### (all time and this month) of the map that is chosen.
 function driverSection(){
   return `<div class="m-label"><span>03</span>Driver · your name on the leaderboard</div>
-      <div class="drivers">${board.drivers.slice().reverse().map(d => `<button class="drv" data-driver="${esc(d)}" aria-pressed="${Core.sameName(d, driver)}">${esc(d)}</button>`).join('')}${nameField(board.drivers.length ? 'New driver' : 'Your name', 'Add driver')}</div>
-      <p class="drv-hint">${driver ? `Driving as <b>${esc(driver)}</b>. Each finished run goes on the leaderboard of its map.` : 'Add a name to put your times on the leaderboard. It stays on this device.'}</p>`;
+      <div class="drivers">${board.drivers.slice().reverse().map(d => `<button class="drv" data-driver="${esc(d)}" aria-pressed="${Core.sameName(d, driver)}">${esc(d)}</button>`).join('')}</div>
+      ${nameField(board.drivers.length ? 'New driver name' : 'Your name', 'Add driver')}
+      <p class="drv-hint">${driver ? `Driving as <b>${esc(driver)}</b>. Each finished run goes on the leaderboard of its map.` : 'Add a name to put your times on the leaderboard. It stays on this device.'}</p>
+      <div class="lb"><div class="eyebrow">Leaderboard · ${MODES[sel.mode].title}</div>${boardPanels(sel.mode)}</div>`;
 }
-// ### The end screen's leaderboard for one map: the top five, the driver's own place, and the name field when nobody is signed in.
+// ### The end screen's leaderboards for one map: what this run did, the all-time and monthly boards with the leader of the month,
+// ### and the name field when nobody is signed in.
 function boardSection(m){
-  const rows = Core.boardRows(board, m, driver);
   let head = '';
   if (lastRank && lastRank.rank){
-    const who = esc(driver);
+    const who = esc(driver), n = board.runs[m].length;
     head = lastRank.personalBest
       ? (lastRank.prev ? `New personal best for ${who} (was ${fmtTimeExact(lastRank.prev)}).` : `${who} is on the board.`)
       : `${who}'s best stays ${fmtTimeExact(lastRank.prev)}.`;
-    head = `<p class="lb-head">${head} Place <b>${lastRank.rank}</b> of ${board.runs[m].length}.</p>`;
+    head = `<p class="lb-head">${head} All time: place <b>${lastRank.rank}</b> of ${n}${lastRank.monthRank ? ` · This month: place <b>${lastRank.monthRank}</b>${lastRank.monthRank === 1 && lastRank.monthBest ? ', you lead the month!' : ''}` : ''}.</p>`;
   }
-  const list = rows.length
-    ? `<ol class="lb-list">${rows.map(r => `<li class="${r.me ? 'me' : ''}${r.gap ? ' gap' : ''}"><span class="lb-place">${r.place}</span><span class="lb-name">${esc(r.name)}</span><span class="lb-veh">${VEH[r.veh].name}</span><b>${fmtTimeExact(r.time)}</b></li>`).join('')}</ol>`
-    : '<p class="note">No times on this map yet.</p>';
   const ask = !driver && pendingRun ? `<div class="lb-ask"><span>Enter your name to put this time on the board</span>${nameField('Your name', 'Save time')}</div>` : '';
-  return `<div class="eyebrow">Leaderboard · ${MODES[m].title}</div>${head}${list}${ask}`;
+  return `<div class="eyebrow">Leaderboard · ${MODES[m].title}</div>${head}${ask}${boardPanels(m)}`;
 }
 // ### Reads the name field next to the button (or the field itself) and creates the driver.
 function addDriverFrom(el){
@@ -5572,6 +5688,7 @@ card.addEventListener('click', e => {
     card.querySelectorAll(`[data-pick="${pick.dataset.pick}"]`).forEach(b => b.setAttribute('aria-pressed', String(b === pick)));
     if (pick.dataset.pick === 'veh') setVehicle(sel.veh);
     renderVehDetail();
+    if (pick.dataset.pick === 'mode'){ const sec = card.querySelector('[data-drivers]'), typed = sec && sec.querySelector('.drv-input').value; if (sec){ sec.innerHTML = driverSection(); sec.querySelector('.drv-input').value = typed; } }
     writeStore('shard-heist-pick', JSON.stringify(sel));
     return;
   }
