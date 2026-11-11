@@ -21,7 +21,8 @@
 |---|---|---|
 | **Pause** | `P`, `Esc` or the pause button | Stops everything: the clock, the police, the traffic and the music. The pause card shows the shards, time, damage and bust meter |
 | **Pause card** | Resume, Restart (or Retry act in the story), Main menu | It also has the steering choice (phones) and both volume sliders |
-| **Sound** | `M` or the speaker button | Turns all sound off or on, without changing the volume sliders |
+| **Map** (Lisbon) | `M`, or a tap on the radar | Pauses the run and shows the large map of the Baixa: where you are, the evidence, repair kits and witness that are still out there, the gate, and the yellow way to it once it is open. `M` or `Enter` closes it |
+| **Sound** | `N` or the speaker button | Turns all sound off or on, without changing the volume sliders |
 | **Radio** | `R` or the radio button | Next station; the name is shown under the clock |
 
 ## Room 2: what the game sets by itself

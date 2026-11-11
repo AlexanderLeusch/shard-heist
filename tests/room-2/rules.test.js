@@ -713,3 +713,36 @@ test('tram rails: a wheel that crosses a rail is a jolt that grows with speed; s
   assert.ok(Core.railShake(0, 15, true).rumble > 0 && Core.railShake(0, 15, true).jolt === 0, 'rolling along the bed only rumbles');
   assert.deepEqual(Core.railShake(1, NaN, true), { jolt: 0, rumble: 0 });
 });
+
+// ---------- The route to the gate ----------
+test('route to the gate: along the streets, turning at a crossing, from wherever the car is', () => {
+  const P = Core.BAIXA.pitch, gate = [-144, 144];
+  // on a north-south street: stay on it to the gate's row, then turn
+  assert.deepEqual(Core.routeTo(-3.5, -6, 0, ...gate), [[0, -6], [0, 144], [-144, 144]]);
+  // on an east-west street: along it to the gate's column, then turn
+  assert.deepEqual(Core.routeTo(30, 50, Math.PI / 2, ...gate), [[30, 48], [-144, 48], [-144, 144]]);
+  // on a crossing the car's direction chooses the first street
+  assert.deepEqual(Core.routeTo(0, 0, 0, ...gate), [[0, 0], [0, 144], [-144, 144]]);
+  assert.deepEqual(Core.routeTo(0, 0, -Math.PI / 2, ...gate), [[0, 0], [-144, 0], [-144, 144]]);
+  // from the middle of a block: to the nearest crossing first
+  assert.deepEqual(Core.routeTo(20, 20, 0, ...gate), [[20, 20], [0, 0], [0, 144], [-144, 144]]);
+  // already on the gate's street: one straight line
+  assert.deepEqual(Core.routeTo(-144, 100, 0, ...gate), [[-144, 100], [-144, 144]]);
+  // every corner is a crossing of the grid, and bad input gives no route
+  for (const p of Core.routeTo(70, -90, 1, ...gate).slice(1)) assert.ok(p[0] % P === 0 && p[1] % P === 0, String(p));
+  for (const bad of [[NaN, 0], [0, Infinity]]) assert.deepEqual(Core.routeTo(bad[0], bad[1], 0, ...gate), []);
+});
+
+test('route arrows: evenly spaced in the driving lane, pointing along the street, never more than asked for', () => {
+  const pts = Core.routeTo(0, 0, 0, -144, 144), marks = Core.routeMarks(pts, 5, 3.5, 8, 100);
+  assert.ok(marks.length > 40 && marks.length <= 100);
+  const south = marks.filter(m => Math.abs(m.h) < 1e-9), west = marks.filter(m => Math.abs(m.h + Math.PI / 2) < 1e-9);
+  assert.equal(south.length + west.length, marks.length, 'each arrow points south or west');
+  assert.ok(south.every(m => Math.abs(m.x + 3.5) < 1e-9), 'heading south, the right-hand lane is at x = -3.5');
+  assert.ok(west.every(m => Math.abs(m.z - 140.5) < 1e-9), 'heading west, the right-hand lane is on the north side');
+  assert.equal(south[0].z, 8, 'the first arrow is ahead of the car');
+  for (let i = 1; i < south.length; i++) assert.ok(Math.abs(south[i].z - south[i - 1].z - 5) < 1e-9);
+  assert.ok(Math.min(...west.map(m => m.x)) >= -144 && Math.max(...south.map(m => m.z)) < 144, 'none beyond a corner or the gate');
+  assert.equal(Core.routeMarks(pts, 5, 3.5, 8, 7).length, 7);
+  assert.deepEqual(Core.routeMarks([], 5, 3.5, 8, 100), []);
+});

@@ -479,3 +479,7 @@ body.start{overflow:auto;touch-action:auto;user-select:auto;-webkit-user-select:
 .lb-ask{display:grid;gap:8px;font-family:var(--f-mono);font-size:13px;color:var(--ink)}
 .card.menu .lb-cols{grid-template-columns:1fr}
 @media (max-width:480px){.lb-cols{grid-template-columns:1fr}}
+
+/* ### The big map (key M): a wider card with the map as large as the window allows */
+.card.map{width:min(880px,100%)}
+.card.map .ov-map{width:min(100%,70vh)}

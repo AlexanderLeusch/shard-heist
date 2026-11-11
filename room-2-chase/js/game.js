@@ -1781,34 +1781,109 @@ function buildCity(){
   }
   const farLit = o => new THREE.MeshLambertMaterial(Object.assign({ fog: false }, o));
   const bank = new THREE.Mesh(bankGeo, farLit({ vertexColors: true, emissive: 0x0a0c16 }));
-  // the houses: one box and one hipped roof each, drawn as two instanced meshes; their windows are the lights of the far bank
+  // ### The houses of Almada, three kinds, after the real town: small two-storey houses, town houses of three or four floors
+  // ### with a shop or a door on the ground floor and iron balconies, and a few apartment blocks of eight floors with a balcony
+  // ### band on every floor. Each kind has a facade painted once on a canvas (plinth, cornice, windows with stone frames and
+  // ### shutters, doors, balconies) and a second picture of its lit windows, which glow at night. The walls are tinted per house
+  // ### in the pastel colours of Lisbon. Houses and town houses carry a hipped tile roof with eaves, a ridge and a chimney; the
+  // ### blocks a flat roof with a parapet and a lift house. Every kind is one instanced mesh, so 600 houses stay cheap.
   const bl = [];
   {
-    const WALLS = [0xf2ede2, 0xe9dcc6, 0xf4e3b8, 0xe7c8b0, 0xd9dde6, 0xf0d2c4, 0xcfd8cf], N = 620, tmp = new THREE.Object3D(), tc = new THREE.Color();
-    const houses = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), farLit({ color: 0xffffff, emissive: 0x08090c }), N);
-    const roofs = new THREE.InstancedMesh(new THREE.ConeGeometry(0.72, 1, 4, 1).rotateY(Math.PI / 4).translate(0, 0.5, 0), farLit({ color: 0xb4583a, emissive: 0x160806 }), N);
+    const facade = (cols, floors, kind) => {
+      const W = 64 * cols, H = 72 * floors + 12, cv = document.createElement('canvas'), lit = document.createElement('canvas');
+      cv.width = lit.width = W; cv.height = lit.height = H;
+      const g = cv.getContext('2d'), e = lit.getContext('2d'), r = mulberry32(cols * 31 + floors * 7);
+      g.fillStyle = '#f4f1ea'; g.fillRect(0, 0, W, H); e.fillStyle = '#000'; e.fillRect(0, 0, W, H);
+      // cornice under the roof, a stone plinth, and a band between the floors
+      g.fillStyle = '#d9d4c8'; g.fillRect(0, 0, W, 9); g.fillStyle = '#b9b3a6'; g.fillRect(0, H - 9, W, 9);
+      for (let fl = 0; fl < floors; fl++){
+        const y0 = 12 + fl * 72, ground = fl === floors - 1;
+        if (fl) { g.fillStyle = 'rgba(0,0,0,.07)'; g.fillRect(0, y0 - 2, W, 3); }
+        for (let c = 0; c < cols; c++){
+          const x0 = c * 64, door = ground && (kind === 'block' ? c === Math.floor(cols / 2) : c === (kind === 'house' ? 1 : 0));
+          const shop = ground && kind === 'town' && c > 0 && c < cols - 1;
+          const on = !door && r() < (kind === 'block' ? 0.34 : 0.3);
+          if (door){
+            g.fillStyle = '#cfc8b8'; g.fillRect(x0 + 17, y0 + 14, 30, 58 - 9);
+            g.fillStyle = kind === 'block' ? '#2b3440' : ['#1f4a3a', '#5a2a22', '#243b5a'][Math.floor(r() * 3)]; g.fillRect(x0 + 21, y0 + 18, 22, 45);
+            g.fillStyle = '#3a4756'; g.fillRect(x0 + 23, y0 + 20, 18, 10);
+          } else if (shop){
+            g.fillStyle = '#cfc8b8'; g.fillRect(x0 + 6, y0 + 16, 52, 47);
+            g.fillStyle = '#26303c'; g.fillRect(x0 + 9, y0 + 24, 46, 36);
+            g.fillStyle = ['#8f2d2a', '#2d5a46', '#b7892c'][Math.floor(r() * 3)]; g.fillRect(x0 + 6, y0 + 16, 52, 8);
+            if (r() < 0.5){ e.fillStyle = '#ffd9a0'; e.fillRect(x0 + 9, y0 + 24, 46, 36); }
+          } else {
+            const tall = kind !== 'house' && !ground, wy = y0 + (tall ? 12 : 18), wh = tall ? 46 : 34;
+            // stone frame, glass with glazing bars, and green shutters folded back on the small houses
+            g.fillStyle = '#d6d0c2'; g.fillRect(x0 + 16, wy - 3, 32, wh + 6);
+            g.fillStyle = on ? '#6b6f6a' : '#2a3442'; g.fillRect(x0 + 19, wy, 26, wh);
+            g.fillStyle = '#e9e5da'; g.fillRect(x0 + 31, wy, 2, wh); g.fillRect(x0 + 19, wy + wh * 0.45, 26, 2);
+            if (kind === 'house'){ g.fillStyle = '#35604c'; g.fillRect(x0 + 10, wy, 7, wh); g.fillRect(x0 + 47, wy, 7, wh); }
+            if (on){ e.fillStyle = r() < 0.7 ? '#ffd28a' : '#cfe0ff'; e.fillRect(x0 + 19, wy, 26, wh); }
+            // a balcony: a slab and an iron railing (a band right across on the blocks)
+            if (tall && kind === 'town' && r() < 0.6){
+              g.fillStyle = '#8f897c'; g.fillRect(x0 + 10, wy + wh + 2, 44, 4);
+              g.strokeStyle = '#22262c'; g.lineWidth = 1.5; g.strokeRect(x0 + 11, wy + wh - 14, 42, 16);
+              for (let k = 0; k < 7; k++){ g.beginPath(); g.moveTo(x0 + 14 + k * 6, wy + wh - 14); g.lineTo(x0 + 14 + k * 6, wy + wh + 2); g.stroke(); }
+            }
+          }
+        }
+        if (kind === 'block' && !ground){ g.fillStyle = '#c9c4b6'; g.fillRect(0, y0 + 50, W, 14); g.fillStyle = 'rgba(0,0,0,.22)'; g.fillRect(0, y0 + 64, W, 3); }
+      }
+      const tex = c2 => { const t = new THREE.CanvasTexture(c2); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t; };
+      return { map: tex(cv), emissiveMap: tex(lit) };
+    };
+    const KINDS = {
+      house: { cols: 3, floors: 2, w: [8.5, 11], d: [7, 9], h: [6, 7], roof: true },
+      town: { cols: 4, floors: 4, w: [10, 13], d: [8, 10.5], h: [12, 14], roof: true },
+      block: { cols: 6, floors: 8, w: [16, 20], d: [10, 13], h: [23, 26], roof: false }
+    };
+    // a hipped roof on a 1 x 1 footprint, 1 high: eaves that stand out, four tiled slopes up to a ridge, and a chimney
+    const hip = (() => {
+      const E = 0.56, R = 0.2, v = [[-E, 0, -E], [E, 0, -E], [E, 0, E], [-E, 0, E], [-R, 1, 0], [R, 1, 0]];
+      const tri = [[0, 4, 5], [0, 5, 1], [2, 5, 4], [2, 4, 3], [1, 5, 2], [3, 4, 0], [0, 1, 2], [0, 2, 3]], pos = [];
+      tri.forEach(t => t.forEach(i => pos.push(...v[i])));
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(pos.length / 3 * 2), 2)); g.computeVertexNormals();
+      return mergeGeos([g, boxG(0.09, 0.5, 0.12, 0.26, 0.75, 0.12)]);
+    })();
+    // the flat roof of a block: a parapet all round and the lift house
+    const flat = mergeGeos([boxG(1.0, 0.5, 0.04, 0, 0.25, 0.48), boxG(1.0, 0.5, 0.04, 0, 0.25, -0.48), boxG(0.03, 0.5, 1.0, 0.485, 0.25, 0), boxG(0.03, 0.5, 1.0, -0.485, 0.25, 0), boxG(0.22, 1.0, 0.3, 0.2, 0.5, 0.1)]);
+    const WALLS = [0xf2ede2, 0xead9bd, 0xf3dc9c, 0xe6bfa3, 0xcdd9e6, 0xefc7b8, 0xc9dcc9, 0xe9e2d2], ROOFS = [0xb5573a, 0xa84e36, 0xc0623f, 0x9c4a3a];
+    const spots = { house: [], town: [], block: [] };
     const bdx = Math.cos(1.2), bdz = Math.sin(1.2); // the direction of the bridge on the ground
     let n = 0;
-    for (let tries = 0; tries < 6000 && n < N; tries++){
+    for (let tries = 0; tries < 7000 && n < 620; tries++){
       const water = rng() < 0.16, centre = rng() < 0.55;
       const x = centre ? -120 + (rng() + rng() - 1) * 420 : (rng() - 0.5) * 2300;
-      const shore = 648 + 14 * Math.sin(x * 0.004 + 1), z = shore + (water ? 5 + rng() * 9 : 70 + rng() * (centre ? 210 : 150));
+      const shore = 648 + 14 * Math.sin(x * 0.004 + 1), z = shore + (water ? 6 + rng() * 8 : 70 + rng() * (centre ? 210 : 150));
       // keep the bridge's way and the hill of the statue free
       const along = (x + 400) * bdx + (z - 410) * bdz, off = Math.abs(-(x + 400) * bdz + (z - 410) * bdx);
-      if (off < 24 && along < 420) continue;
-      if (Math.hypot(x - CRISTO.x, z - CRISTO.z) < 42) continue;
-      const tall = !water && centre && rng() < 0.035, w = 7 + rng() * 9, dp = 7 + rng() * 7, h = water ? 5 + rng() * 5 : tall ? 18 + rng() * 12 : 6 + rng() * 10, y = southBank(x, z) - 0.6;
-      tmp.position.set(x, y, z); tmp.rotation.y = (rng() - 0.5) * 0.5; tmp.scale.set(w, h, dp); tmp.updateMatrix();
-      houses.setMatrixAt(n, tmp.matrix); houses.setColorAt(n, tc.setHex(WALLS[Math.floor(rng() * WALLS.length)]).multiplyScalar(0.82 + rng() * 0.18));
-      tmp.position.y = y + h; tmp.scale.set(w, tall ? 0.01 : 2 + rng() * 1.6, dp); tmp.updateMatrix();
-      roofs.setMatrixAt(n, tmp.matrix);
-      // lit windows on the side that faces Lisbon, and now and then a street lamp
-      const lit = tall ? 5 : rng() < 0.75 ? 1 + Math.floor(rng() * 2) : 0;
-      for (let k = 0; k < lit; k++) bl.push(x + (rng() - 0.5) * w * 0.8, y + 2 + rng() * (h - 3), z - dp / 2 - 0.4);
+      if (off < 26 && along < 420) continue;
+      if (Math.hypot(x - CRISTO.x, z - CRISTO.z) < 44) continue;
+      const kind = water ? 'house' : centre ? (rng() < 0.05 ? 'block' : rng() < 0.5 ? 'town' : 'house') : (rng() < 0.2 ? 'town' : 'house');
+      const K = KINDS[kind], pick = ([lo, hi]) => lo + rng() * (hi - lo);
+      // streets run along the river, so most houses stand square to it
+      spots[kind].push({ x, z, y: southBank(x, z) - 0.6, w: pick(K.w), d: pick(K.d), h: pick(K.h), rot: (rng() < 0.8 ? 0 : Math.PI / 2) + (rng() - 0.5) * 0.12 });
       n++;
     }
-    houses.count = n; roofs.count = n; houses.frustumCulled = false; roofs.frustumCulled = false;
-    grp.add(houses, roofs);
+    const tmp = new THREE.Object3D(), tc = new THREE.Color();
+    for (const kind of Object.keys(KINDS)){
+      const K = KINDS[kind], list = spots[kind], F = facade(K.cols, K.floors, kind);
+      const wall = farLit({ color: 0xffffff, map: F.map, emissive: 0xffffff, emissiveMap: F.emissiveMap, emissiveIntensity: 0.9 }), plain = farLit({ color: 0xd8d2c4, emissive: 0x08090c });
+      const walls = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), [wall, wall, plain, plain, wall, wall], list.length);
+      const roofs = new THREE.InstancedMesh(K.roof ? hip : flat, farLit({ color: 0xffffff, emissive: 0x0c0605 }), list.length);
+      list.forEach((p, i) => {
+        tmp.position.set(p.x, p.y, p.z); tmp.rotation.y = p.rot; tmp.scale.set(p.w, p.h, p.d); tmp.updateMatrix();
+        walls.setMatrixAt(i, tmp.matrix); walls.setColorAt(i, tc.setHex(WALLS[Math.floor(rng() * WALLS.length)]));
+        tmp.position.y = p.y + p.h; tmp.scale.set(p.w, K.roof ? 2.2 + rng() * 1.2 : 2.4, p.d); tmp.updateMatrix();
+        roofs.setMatrixAt(i, tmp.matrix); roofs.setColorAt(i, K.roof ? tc.setHex(ROOFS[Math.floor(rng() * ROOFS.length)]) : tc.setHex(0xbcb6a8));
+        // a street lamp in front of some houses, on the side that faces Lisbon
+        if (rng() < 0.3) bl.push(p.x + (rng() - 0.5) * p.w, p.y + 5, p.z - p.d / 2 - 2.5);
+      });
+      walls.frustumCulled = false; roofs.frustumCulled = false;
+      grp.add(walls, roofs);
+    }
     // lamps along the quay
     for (let x = -1100; x < 1100; x += 34) bl.push(x, 5.5, 652 + 14 * Math.sin(x * 0.004 + 1));
   }
@@ -4415,7 +4490,8 @@ addEventListener('keydown', e => {
   if ((e.code === 'Enter' || e.code === 'Space') && onButton){ e.preventDefault(); if (!e.repeat) document.activeElement.click(); return; }
   if (Object.hasOwn(keyMap, e.code)){ held.add(e.code); keys[keyMap[e.code]] = true; e.preventDefault(); }
   if (e.code === 'KeyP' || e.code === 'Escape'){ if (state === 'play') pause(); else if (state === 'pause') resume(); }
-  if (e.code === 'KeyM') toggleSound();
+  if (e.code === 'KeyM'){ if (state === 'play') showMap(); else if (state === 'pause' && mapOpen) resume(); }
+  if (e.code === 'KeyN') toggleSound();
   if (e.code === 'KeyR'){ initAudio(); setStation(Core.radioNext(radio.key, e.shiftKey ? -1 : 1), true); }
   if (e.code === 'Enter' && !overlay.hidden){ const b = card.querySelector('.btn'); if (b){ e.preventDefault(); b.click(); } }
 });
@@ -4660,6 +4736,9 @@ function updateHud(dt){
 
 // Radar (heading up, world drawn to scale)
 const rc = $('radar'), rx = rc.getContext('2d');
+// a tap or click on the radar opens the big map
+rc.style.pointerEvents = 'auto'; rc.style.cursor = 'pointer';
+rc.addEventListener('click', () => { if (state === 'play') showMap(); });
 // ### Draws the radar: streets, shards, kits, police, the helicopter light, the gate and story markers.
 function drawRadar(){
   const S = rc.width, R = S / 2, range = M.radar, kk = R / range;
@@ -4915,7 +4994,24 @@ function startRun(m, v){
 }
 // ### Lisbon starts with a map of the Baixa: where the six pieces of evidence lie, the repair kits, your start and the gate.
 // ### The run is paused while it is open; "Start driving" begins the clock. The sealed letter of the story is not on it.
-let overviewOpen = false;
+let overviewOpen = false, mapOpen = false;
+// ### The big map during a run in Lisbon (key M, or a tap on the radar): the run pauses and the map of the Baixa fills the
+// ### card, with what is still to collect, the witness, the gate, and the yellow way to it once it is open. M or Enter closes it.
+function showMap(){
+  if (mode !== 'city'){ toast('The map is only there in Lisbon.', '', 2000); return; }
+  state = 'pause'; overviewOpen = false; mapOpen = true;
+  held.clear(); Object.keys(keys).forEach(k => keys[k] = false);
+  const left = items.filter(it => !it.taken).length;
+  showCard(`
+    <div class="eyebrow">Map · Lisbon · Baixa</div>
+    <h2>${gate.active ? 'To the gate' : witness.active ? 'Pick up the witness' : left + ' of ' + items.length + ' pieces left'}</h2>
+    <canvas class="ov-map" id="ovMap" width="900" height="900" role="img" aria-label="Map of the Baixa: where you are, what is left to collect and the gate"></canvas>
+    <div class="actions">
+      <button class="btn" data-action="resume">Back to driving <small class="desk-only">M</small></button>
+      <button class="btn ghost" data-action="menu">Main menu</button>
+    </div>`, 'map');
+  drawOverview($('ovMap'));
+}
 function showOverview(){
   state = 'pause'; overviewOpen = true;
   showCard(`
@@ -4933,24 +5029,41 @@ function showOverview(){
 function drawOverview(cv){
   const g = cv.getContext('2d'), S = cv.width, span = LIMIT + 24, k = S / (2 * span);
   const X = x => (x + span) * k, Y = z => (z + span) * k;
+  // everything was drawn for a 640 px canvas; a larger one is scaled up around each marker
+  const u = S / 640;
   g.fillStyle = '#0e1022'; g.fillRect(0, 0, S, S);
   for (const r of CITY.radar){ g.fillStyle = r.c; g.fillRect(X(r.x0), Y(r.z0), (r.x1 - r.x0) * k, (r.z1 - r.z0) * k); }
   g.strokeStyle = 'rgba(255,93,108,.6)'; g.lineWidth = 2; g.setLineDash([7, 7]); g.strokeRect(X(-LIMIT), Y(-LIMIT), 2 * LIMIT * k, 2 * LIMIT * k); g.setLineDash([]);
-  g.font = '700 25px "Big Shoulders Display", "Segoe UI", sans-serif'; g.textBaseline = 'middle';
+  g.font = `700 ${Math.round(25 * u)}px "Big Shoulders Display", "Segoe UI", sans-serif`; g.textBaseline = 'middle';
   const label = (text, x, y, color) => {
-    const w = g.measureText(text).width + 14, lx = Math.min(S - w - 4, Math.max(4, x - w / 2)), ly = Math.min(S - 16, y + 36);
-    g.fillStyle = 'rgba(8,10,22,.86)'; g.fillRect(lx, ly - 15, w, 30); g.fillStyle = color; g.fillText(text, lx + 7, ly + 1);
+    const w = g.measureText(text).width + 14 * u, lx = Math.min(S - w - 4, Math.max(4, x - w / 2)), ly = Math.min(S - 16 * u, y + 36 * u);
+    g.fillStyle = 'rgba(8,10,22,.86)'; g.fillRect(lx, ly - 15 * u, w, 30 * u); g.fillStyle = color; g.fillText(text, lx + 7 * u, ly + u);
   };
-  // the gate under the arch and your start
-  g.strokeStyle = '#ffc857'; g.lineWidth = 3; g.lineWidth = 4; g.beginPath(); g.arc(X(gate.x), Y(gate.z), 16, 0, Math.PI * 2); g.stroke(); label('Gate · to the bridge', X(gate.x), Y(gate.z), '#ffc857');
-  g.save(); g.translate(X(car.x), Y(car.z)); g.rotate(-car.heading + Math.PI); g.fillStyle = '#ffffff';
+  // the yellow way to the gate, once it is open
+  if (gate.active){
+    const pts = Core.routeTo(car.x, car.z, car.heading, gate.x, gate.z);
+    g.strokeStyle = '#ffd21f'; g.lineWidth = 7 * u; g.lineJoin = 'round'; g.lineCap = 'round'; g.setLineDash([14 * u, 10 * u]);
+    g.beginPath(); pts.forEach((p, i) => i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.stroke(); g.setLineDash([]);
+  }
+  // the gate at the south-west corner and where you are
+  g.strokeStyle = '#ffc857'; g.lineWidth = 4 * u; g.beginPath(); g.arc(X(gate.x), Y(gate.z), 16 * u, 0, Math.PI * 2); g.stroke();
+  if (gate.active){ g.fillStyle = 'rgba(255,200,87,.35)'; g.fill(); }
+  label('Gate · to the bridge', X(gate.x), Y(gate.z), '#ffc857');
+  if (witness.active){
+    g.fillStyle = '#ffc857'; g.beginPath(); g.arc(X(witness.x), Y(witness.z), 11 * u, 0, Math.PI * 2); g.fill();
+    label('Witness · ' + WITNESS.name, X(witness.x), Y(witness.z), '#ffc857');
+  }
+  g.save(); g.translate(X(car.x), Y(car.z)); g.rotate(-car.heading + Math.PI); g.scale(u, u); g.fillStyle = '#ffffff';
   g.beginPath(); g.moveTo(0, -18); g.lineTo(13, 15); g.lineTo(0, 8); g.lineTo(-13, 15); g.closePath(); g.fill(); g.restore();
-  label('You', X(car.x), Y(car.z) - 72, '#ffffff');
-  for (const kt of kits){ g.fillStyle = '#4ef0a0'; g.fillRect(X(kt.x) - 10, Y(kt.z) - 3.5, 20, 7); g.fillRect(X(kt.x) - 3.5, Y(kt.z) - 10, 7, 20); }
+  label('You', X(car.x), Y(car.z) - 72 * u, '#ffffff');
+  for (const kt of kits){ if (kt.taken) continue; g.fillStyle = '#4ef0a0'; g.fillRect(X(kt.x) - 10 * u, Y(kt.z) - 3.5 * u, 20 * u, 7 * u); g.fillRect(X(kt.x) - 3.5 * u, Y(kt.z) - 10 * u, 7 * u, 20 * u); }
   items.forEach((it, i) => {
+    if (it.taken) return;
     const x = X(it.x), y = Y(it.z);
+    g.save(); g.translate(x, y); g.scale(u, u); g.translate(-x, -y);
     evMedal(g, x, y, it.ev.key, i + 1);
-    label(`${i + 1} · ${it.ev.name}`, x, y + 6, '#55ecff');
+    g.restore();
+    label(`${i + 1} · ${it.ev.name}`, x, y + 6 * u, '#55ecff');
   });
 }
 // ### One piece of evidence on the map: a dark medallion with a cyan rim and glow, a small drawing of the piece inside, and its
@@ -5072,7 +5185,7 @@ function updateGuide(){
 const what = () => mode === 'city' ? 'pieces of evidence' : 'shards';
 // ### Pauses the run and shows the pause card.
 function pause(){
-  state = 'pause'; overviewOpen = false;
+  state = 'pause'; overviewOpen = false; mapOpen = false;
   showCard(`
     <div class="eyebrow">${M.title} · ${V.name}</div>
     <h2>Paused</h2>
@@ -5087,7 +5200,7 @@ function pause(){
 }
 // ### Goes back to driving after a pause.
 function resume(){
-  hideOverlay(); state = 'play'; initAudio();
+  hideOverlay(); state = 'play'; initAudio(); mapOpen = false;
   if (overviewOpen){ overviewOpen = false; toast('Follow the arrow to the evidence. Every police car is looking for inmate 4471.', '', 3600); }
 }
 
@@ -5117,10 +5230,45 @@ function repair(kt){
   toast(`Repair kit: damage ${Math.round(before)}% → ${Math.round(damage)}%`, 'green', 2400);
 }
 // ### Opens the finish gate at the south-west corner of the Baixa (Lisbon), on the way to the bridge, once everything is in the car.
-function openGate(text){
+function openGate(){
   gate.active = true; gate.group.visible = true; gate.grow = 0;
   sfx.gate();
-  toast(text, 'gold', 6500);
+}
+
+// ---------- The route on the road ----------
+// ### Once the gate is open, yellow arrows on the road show the way to it, as in an open-world driving game: one every 5 m in
+// ### the driving lane, along the streets and round the corners (Core.routeTo, Core.routeMarks). They are worked out again as
+// ### the car moves, so a wrong turn simply gives a new way, and a pulse runs along them towards the gate. All arrows are one
+// ### instanced mesh that lies flat on the road and follows the hills.
+const ROUTE = { max: 100, step: 5, lane: 3.5, lead: 8 };
+const route = (() => {
+  const sh = new THREE.Shape();
+  // a chevron pointing along +z, 2.6 m wide
+  [[0, 1.7], [1.6, 0.1], [1.6, -0.9], [0, 0.7], [-1.6, -0.9], [-1.6, 0.1]].forEach(([x, y], i) => i ? sh.lineTo(x, y) : sh.moveTo(x, y));
+  const geo = new THREE.ShapeGeometry(sh).rotateX(Math.PI / 2);
+  const mesh = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ color: 0xffd21f, transparent: true, opacity: 0.92, side: THREE.DoubleSide, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }), ROUTE.max);
+  mesh.frustumCulled = false; mesh.visible = false; mesh.count = 0; mesh.renderOrder = 2; scene.add(mesh);
+  return { mesh, marks: [], pts: [], at: null, dummy: new THREE.Object3D() };
+})();
+function updateRoute(){
+  const on = mode === 'city' && gate && gate.active && !finale.on && (state === 'play' || state === 'pause');
+  route.mesh.visible = on;
+  if (!on){ route.at = null; route.pts = []; return; }
+  if (!route.at || Math.hypot(car.x - route.at.x, car.z - route.at.z) > 3){
+    route.at = { x: car.x, z: car.z };
+    route.pts = Core.routeTo(car.x, car.z, car.heading, gate.x, gate.z);
+    route.marks = Core.routeMarks(route.pts, ROUTE.step, ROUTE.lane, ROUTE.lead, ROUTE.max);
+  }
+  const D = route.dummy;
+  route.marks.forEach((m, i) => {
+    const fx = Math.sin(m.h), fz = Math.cos(m.h), y = groundH(m.x, m.z);
+    D.position.set(m.x, y + 0.09, m.z);
+    // nose up or down with the road, and a pulse that runs from the car towards the gate
+    D.rotation.set(-Math.atan2(groundH(m.x + fx, m.z + fz) - groundH(m.x - fx, m.z - fz), 2), m.h, 0, 'YXZ');
+    D.scale.setScalar(REDUCED ? 1 : 0.82 + 0.26 * Math.max(0, Math.sin(clock * 5 - i * 0.5)));
+    D.updateMatrix(); route.mesh.setMatrixAt(i, D.matrix);
+  });
+  route.mesh.count = route.marks.length; route.mesh.instanceMatrix.needsUpdate = true;
 }
 
 // ---------- The witness and the finale over the bridge ----------
@@ -5337,8 +5485,23 @@ function updateWitness(dt, live){
     sfx.collect();
     const [bx, bz] = toWorld(px, pz); burst(bx, car.y + py + 0.8, bz, GOLD, 18);
     renderChips();
-    openGate(WITNESS.found);
+    openGate();
+    witnessCard();
   }
+}
+// ### With Marta in the car the game stops for a moment: a card in the middle of the screen tells what she saw and where to go
+// ### now. It has to be closed (button, Enter, or a tap) before the drive goes on; the police wait as well.
+function witnessCard(){
+  state = 'pause'; overviewOpen = false; mapOpen = false;
+  held.clear(); Object.keys(keys).forEach(k => keys[k] = false);
+  showCard(`
+    <div class="eyebrow">The witness · ${WITNESS.name}</div>
+    <h2>“I saw him climb out of that window.”</h2>
+    <p>${WITNESS.name}, ${WITNESS.job}, is in the car. She saw a man climb out of the museum window that night, and she will say so in court. That is the last piece of evidence: with the photos, the fingerprints, the torch, the lockpick, the clothes and the balaclava, it proves you did not take the necklace.</p>
+    <p><b>Now get out of the city.</b> Follow the yellow arrows on the road to the golden gate at the south-west corner of the Baixa. Behind it is the 25 de Abril bridge.${COARSE ? ' Tap the radar to see the map.' : ' Press <kbd>M</kbd> for the map.'}</p>
+    <div class="actions">
+      <button class="btn" data-action="resume">Drive on <small class="desk-only">Enter</small></button>
+    </div>`, 'story');
 }
 
 // ### The finale: through the gate the picture fades, and you are on the 25 de Abril bridge with Marta beside you, driving south
@@ -5609,7 +5772,7 @@ function showMenu(){
     <section class="m-sec" data-drivers>${driverSection()}</section>
     <button class="btn m-start" data-action="go"><span>Start the getaway</span><kbd class="desk-only">Enter</kbd></button>
     <div class="m-foot">
-      <span class="desk-only"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive · <kbd>Space</kbd> handbrake · <kbd>P</kbd> pause · <kbd>M</kbd> sound · <kbd>R</kbd> radio</span>
+      <span class="desk-only"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> drive · <kbd>Space</kbd> handbrake · <kbd>P</kbd> pause · <kbd>M</kbd> map · <kbd>N</kbd> sound · <kbd>R</kbd> radio</span>
       <span class="touch-only">Steer on the left, brake and gas on the right.</span>
       <span>Best · Lisbon ${bestNote('city')} · Highway ${bestNote('highway')} · Country ${bestNote('country')}</span>
       <span class="gfx">Radio ${Core.RADIO_ORDER.map(k => `<button data-radio="${k}" aria-pressed="${radio.key === k}">${k === 'off' ? 'Off' : Core.RADIO[k].name}</button>`).join('')}</span>
@@ -5632,7 +5795,7 @@ function menuFraming(on){
 function showCard(html, kind){
   const isMenu = kind === 'menu';
   card.innerHTML = html;
-  overlay.classList.toggle('menu', isMenu); card.classList.toggle('menu', isMenu);
+  overlay.classList.toggle('menu', isMenu); card.classList.toggle('menu', isMenu); card.classList.toggle('map', kind === 'map');
   menuFraming(isMenu);
   overlay.hidden = false;
   const b = card.querySelector('.btn'); if (b && !COARSE) b.focus({ preventScroll: true });
@@ -6477,6 +6640,7 @@ function frame(now){
   updateHud(dt);
   if (state !== 'menu') drawRadar();
   updateGuide();
+  updateRoute();
   if (composer && GFX[gfx].post) composer.render(); else renderer.render(scene, camera);
 }
 

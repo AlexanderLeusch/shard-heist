@@ -124,6 +124,39 @@
     const T = TRAM_LOOP, nx = x + dx * BAIXA.pitch, nz = z + dz * BAIXA.pitch;
     return nx >= T.x0 && nx <= T.x1 && nz >= T.z0 && nz <= T.z1 ? 's' : 'r';
   }
+  // ### The way through the Baixa to a point on its street grid, as the corners of a path along the streets: the yellow arrows on
+  // ### the road follow it. From a street the path stays on that street to the crossing in line with the target and turns there;
+  // ### on a crossing it starts along the street the car is facing; from a pavement or a square it first goes to the nearest crossing.
+  // ### Every such path through a full grid is a shortest one.
+  function routeTo(x, z, heading, tx, tz){
+    if (![x, z, tx, tz].every(Number.isFinite)) return [];
+    const P = BAIXA.pitch, R = BAIXA.halfRoad, snap = v => clamp(Math.round(v / P), -3, 3) * P || 0;
+    const sx = snap(x), sz = snap(z), gx = snap(tx), gz = snap(tz);
+    const onNs = Math.abs(x - sx) <= R, onEw = Math.abs(z - sz) <= R;
+    const alongX = Math.abs(Math.sin(heading || 0)) > Math.abs(Math.cos(heading || 0));
+    let pts;
+    if (onNs && (!onEw || !alongX)) pts = [[sx, z], [sx, gz], [gx, gz]];
+    else if (onEw) pts = [[x, sz], [gx, sz], [gx, gz]];
+    else pts = [[x, z], [sx, sz], [sx, gz], [gx, gz]];
+    return pts.filter((p, i) => i === 0 || Math.hypot(p[0] - pts[i - 1][0], p[1] - pts[i - 1][1]) > 0.5);
+  }
+  // ### Where the arrows lie: one every `step` metres along the path, `lane` metres to the right of it, each with the direction
+  // ### it points in (as a heading). The first one is `lead` metres ahead of the start, and no more than `max` are returned.
+  function routeMarks(pts, step, lane, lead, max){
+    const out = [];
+    let carry = lead;
+    for (let i = 1; i < pts.length && out.length < max; i++){
+      const dx = pts[i][0] - pts[i - 1][0], dz = pts[i][1] - pts[i - 1][1], L = Math.hypot(dx, dz);
+      if (L < 0.01) continue;
+      const ux = dx / L, uz = dz / L, h = Math.atan2(ux, uz);
+      // a corner: start after it and stop before the next one, so the arrows of two streets do not overlap
+      const from = i > 1 ? Math.max(carry, lane + 2) : carry, to = i < pts.length - 1 ? L - lane - 2 : L;
+      let d = from;
+      for (; d <= to && out.length < max; d += step) out.push({ x: pts[i - 1][0] + ux * d - uz * lane, z: pts[i - 1][1] + uz * d + ux * lane, h });
+      carry = Math.max(0, d - L);
+    }
+    return out;
+  }
   // ### The tram rails. The track follows the trams' path: the lane centre 3.5 m right of each side of the loop, with a curve of
   // ### radius 3.5 m at each corner (the same curve the trams drive and the game draws). Each rail lies 0.72 m from the track's centre.
   const RAIL = Object.freeze({ half: 0.72, bed: 1.15, corner: 7 });
@@ -859,7 +892,7 @@
   }
 
   return Object.freeze({
-    MODES, VEH, REV_SPEED, REPAIR_AMOUNT, MAX_DT, STORY_ACTS, KEY_MAP, BAIXA, streetAt, TRAM_LOOP, tramNext, RAIL, trackOffset, railCrossings, railShake,
+    MODES, VEH, REV_SPEED, REPAIR_AMOUNT, MAX_DT, STORY_ACTS, KEY_MAP, BAIXA, streetAt, TRAM_LOOP, tramNext, RAIL, trackOffset, railCrossings, railShake, routeTo, routeMarks,
     EVIDENCE, guideTurn, isMode, isVeh, clamp, wrapAngle, mulberry32, shuffle, fmtTime, fmtTimeExact, frameDt,
     parsePick, parseBest, applyPick, actionAllowed,
     vehStats, zeroTo80, topSpeed, stepSpeed, collidePoint, HILL_BOX, HILL_GRID, hillHeight, hillMesh, gradeAt, slopeTop,
