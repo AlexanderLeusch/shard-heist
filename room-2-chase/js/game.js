@@ -5390,7 +5390,8 @@ const BOARD = {
   truck: { stand: [-2.0, 2.15], sill: [-1.45, 2.25, 1.22], seat: [-0.62, 1.86, 2.05], lean: 0.18, legs: 'sit' },
   bike: { stand: [-0.85, -0.5], sill: [-0.32, -0.5, 0.2], seat: [0, 0.9, -0.52], lean: -0.15, legs: 'astride' }
 };
-const BOARD_T = { open: 0.5, enter: 1.15, close: 0.45 };
+// how long each step of getting in takes, in seconds: quick, so the player is soon on the way again
+const BOARD_T = { open: 0.25, enter: 0.6, close: 0.25 };
 const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 // The passenger door of the vehicle (none on the motorcycle): 0 shut, 1 wide open
 function setDoor(k){
@@ -5447,7 +5448,7 @@ function updateWitness(dt, live){
   const B = BOARD[V.key], ch = Math.cos(car.heading), sh = Math.sin(car.heading);
   const toWorld = (lx, lz) => [car.x + lx * ch + lz * sh, car.z - lx * sh + lz * ch];
   const d = Math.hypot(W.x - car.x, W.z - car.z), slow = Math.abs(car.speed) < 3;
-  if (live && !W.boarding && d < 7 && slow){ W.boarding = 0.001; W.phase = 'walk'; W.t = 0; toast(`${WITNESS.name} walks to your car.`, '', 1800); }
+  if (live && !W.boarding && d < 7 && slow){ W.boarding = 0.001; W.phase = 'walk'; W.t = 0; toast(`${WITNESS.name} runs to your car.`, '', 1500); }
   // ### Waiting on the pavement under the golden light. She turns to face the player's car, shifts her weight, and waves: in bursts
   // ### of about three seconds while the car is far away, and all the time, with the whole arm, once it is closer than 45 m.
   if (!W.phase){
@@ -5468,16 +5469,16 @@ function updateWitness(dt, live){
     else {
       W.boarding += dt;
       const [tx, tz] = toWorld(B.stand[0], B.stand[1]), dx = tx - W.x, dz = tz - W.z, l = Math.hypot(dx, dz);
-      if (l > 0.06){ const step = Math.min(l, dt * 2.4); W.x += dx / l * step; W.z += dz / l * step; W.h = Math.atan2(dx, dz); }
-      const moving = l > 0.06, stride = moving ? W.boarding * 8.5 + 0.001 : 0;
+      if (l > 0.06){ const step = Math.min(l, dt * 5.2); W.x += dx / l * step; W.z += dz / l * step; W.h = Math.atan2(dx, dz); }
+      const moving = l > 0.06, stride = moving ? W.boarding * 14 + 0.001 : 0;
       W.g.position.set(W.x, groundH(W.x, W.z) + (moving ? Math.abs(Math.cos(stride)) * 0.025 : 0), W.z);
       W.face += wrapAngle(W.h - W.face) * Math.min(1, dt * 8); W.g.rotation.y = W.face;
       // she keeps waving for a moment as she sets off, then walks with both arms
-      W.wave = Math.max(0, W.wave - dt * 1.4);
+      W.wave = Math.max(0, W.wave - dt * 4);
       witnessPose({ stride, wave: W.wave, wavePhase: clock * 11 });
       W.marker.visible = false; W.ring.visible = false;
       // there, and the car is standing: she takes over in the car's own coordinates, and the car waits for her
-      if (l <= 0.06 && Math.abs(car.speed) < 1.5){
+      if (l <= 0.06 && Math.abs(car.speed) < 2.5){
         W.lock = { x: car.x, z: car.z, heading: car.heading };
         MODELS[V.key].g.add(W.g);
         W.phase = MODELS[V.key].door ? 'open' : 'enter'; W.t = 0;

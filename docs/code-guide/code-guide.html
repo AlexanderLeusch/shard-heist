@@ -103,8 +103,8 @@ pre .c{ color:#7fd4e2; }
   <h2>The game at a glance</h2>
   <p><b>Shard Heist</b> is a 3D police-chase game that runs entirely in the browser as a static website: one page, one stylesheet and three scripts. The player picks a map (Lisbon's Baixa, Highway or Countryside) and a getaway vehicle (Car, Motorcycle or Truck), collects glowing star shards, escapes up to four police cars and a helicopter, and reaches a finish gate before the clock runs out. Five wanted stars make the chase harder over time. All three maps have hills that slow the player down or speed them up. Crashes cause visible damage; repair kits remove it; police can bust the player when they box the vehicle in. Seven radio stations play while driving, all synthesised by the game. The story mode <b>The Necklace Job</b> is an option in the same main menu (section 10).</p>
   <div class="kpis">
-    <div class="kpi"><b>8,314</b><span>lines of game code</span></div>
-    <div class="kpi"><b>7,618</b><span>lines of JavaScript</span></div>
+    <div class="kpi"><b>8,315</b><span>lines of game code</span></div>
+    <div class="kpi"><b>7,619</b><span>lines of JavaScript</span></div>
     <div class="kpi"><b>285</b><span>named functions</span></div>
     <div class="kpi"><b>25</b><span>code sections</span></div>
     <div class="kpi"><b>161</b><span>automated tests</span></div>
@@ -149,14 +149,14 @@ pre .c{ color:#7fd4e2; }
   </div>
   <table>
     <tr><th>Language</th><th class="num">Lines</th><th class="num">Share</th><th class="num">Characters</th><th class="num">Share</th><th>Role in the game</th></tr>
-    <tr><td>JavaScript</td><td class="num">7,618</td><td class="num">91.6 %</td><td class="num">529,727</td><td class="num">89.2 %</td><td>All logic: rules (core.js), worlds, vehicles, AI, physics, audio, HUD, menus, error screen</td></tr>
+    <tr><td>JavaScript</td><td class="num">7,619</td><td class="num">91.6 %</td><td class="num">529,824</td><td class="num">89.2 %</td><td>All logic: rules (core.js), worlds, vehicles, AI, physics, audio, HUD, menus, error screen</td></tr>
     <tr><td>CSS</td><td class="num">521</td><td class="num">6.3 %</td><td class="num">44,417</td><td class="num">7.5 %</td><td>Look of the HUD, cockpit, menus, warnings, error screen</td></tr>
     <tr><td>HTML</td><td class="num">140</td><td class="num">1.7 %</td><td class="num">10,674</td><td class="num">1.8 %</td><td>Page skeleton, HUD panels, gauge and icons (inline SVG), script order, security policy</td></tr>
     <tr><td>GLSL</td><td class="num">29</td><td class="num">0.3 %</td><td class="num">2,600</td><td class="num">0.4 %</td><td>Sky gradient, force field and the damage dents (run on the GPU)</td></tr>
     <tr><td>SVG in JS strings</td><td class="num">6</td><td class="num">0.1 %</td><td class="num">6,203</td><td class="num">1.0 %</td><td>Map pictures and fallback vehicle icons in the start menu</td></tr>
     <tr><td><b>Python</b></td><td class="num"><b>0</b></td><td class="num"><b>0 %</b></td><td class="num"><b>0</b></td><td class="num"><b>0 %</b></td><td>Not used</td></tr>
   </table>
-  <p class="mono" style="color:var(--muted)">Game code: 8,314 lines, 593,621 characters. The tests (2,220 lines), the dev server and SRI checker are JavaScript too; the CI pipeline is YAML. About 890 of the JavaScript lines are comments, including the “###” explanations.</p>
+  <p class="mono" style="color:var(--muted)">Game code: 8,315 lines, 593,718 characters. The tests (2,220 lines), the dev server and SRI checker are JavaScript too; the CI pipeline is YAML. About 890 of the JavaScript lines are comments, including the “###” explanations.</p>
   <h3>External code that is loaded, not written</h3>
   <table>
     <tr><th>Library</th><th>Language</th><th>Purpose</th></tr>
@@ -288,10 +288,10 @@ composer.render()  or  renderer.render(scene, camera)               <span class=
     <tr><td class="num">4,596</td><td>HUD</td><td>Gauges, pedals, pursuit, radar</td><td><code>updateHud</code>, <code>drawRadar</code>, <code>initGauge</code></td></tr>
     <tr><td class="num">4,889</td><td>Game state</td><td>Runs, events, result cards, showroom menu and its previews, validated clicks</td><td><code>startRun</code>, <code>finish</code>, <code>showMenu</code>, <code>renderPreviews</code></td></tr>
     <tr><td class="num">4,898</td><td>Drivers &amp; leaderboard</td><td>Driver names from the menu, the leaderboard of each map on the end screen, the name field when nobody is signed in</td><td><code>setDriver</code>, <code>recordPending</code>, <code>boardSection</code>, <code>driverSection</code></td></tr>
-    <tr><td class="num">5,921</td><td>Physics</td><td>Driving model with slopes, collisions, cameras</td><td><code>updateCar</code>, <code>chaseCam</code>, <code>camClip</code></td></tr>
-    <tr><td class="num">6,237</td><td>Graphics quality</td><td>Ultra / Balanced, bloom composer</td><td><code>applyGfx</code>, <code>buildComposer</code></td></tr>
-    <tr><td class="num">6,277</td><td>Story mode</td><td>Three acts, radio timeline, letter, courier lorry, endings</td><td><code>startStoryAct</code>, <code>updateStory</code>, <code>showEnding</code>, <code>warmUp</code></td></tr>
-    <tr><td class="num">6,607</td><td>Loop</td><td>Resize handling and the frame loop</td><td><code>frame</code>, <code>resize</code></td></tr>
+    <tr><td class="num">5,922</td><td>Physics</td><td>Driving model with slopes, collisions, cameras</td><td><code>updateCar</code>, <code>chaseCam</code>, <code>camClip</code></td></tr>
+    <tr><td class="num">6,238</td><td>Graphics quality</td><td>Ultra / Balanced, bloom composer</td><td><code>applyGfx</code>, <code>buildComposer</code></td></tr>
+    <tr><td class="num">6,278</td><td>Story mode</td><td>Three acts, radio timeline, letter, courier lorry, endings</td><td><code>startStoryAct</code>, <code>updateStory</code>, <code>showEnding</code>, <code>warmUp</code></td></tr>
+    <tr><td class="num">6,608</td><td>Loop</td><td>Resize handling and the frame loop</td><td><code>frame</code>, <code>resize</code></td></tr>
   </table>
   <h3>room-2-chase/js/core.js: the rules</h3>
   <table>
