@@ -25,6 +25,7 @@ You were the detective on the Ashford necklace case; now you are inmate 4471, co
 | Clues (3) | Steam on the mirror, graffiti in the stall, scratches in the wall beside the door. Together they give the year the "unsinkable" ship sank. The code is always the same |
 | Endings (2) | **A:** the hatch opens in time and you climb down into the tunnel. **B:** time runs out and Hale takes you back to your cell. The earlier choice to jam the door buys one extra minute before Ending B |
 | Pressure | 10:00 clock, warnings at 5:00, 2:00, 1:00 and 0:30; every wrong code makes noise and costs 30 seconds |
+| Look | Modelled on a photo of a real prison washroom: green glazed tiles under yellowed cream cinder blocks streaked with rust, caged red emergency lamps, puddles that mirror the lamps and the steel, a striped prisoner's coat hanging to the floor, toilet rolls kicked about |
 | Controls | Arrow keys (or `W A S D`) to walk freely in the first person, drag to look around, click the pulsing markers or the objects, "Walk to" buttons to glide to a spot (touch screens), `P` / `Esc` pause, `M` sound, a volume slider on the pause card |
 
 Progress is saved in the browser after every accepted action, and a reload offers to continue.
@@ -118,6 +119,7 @@ shard-heist/
 | Static website, no backend, no build step | Runs anywhere, free hosting on GitHub Pages, nothing to install or keep running, no server to attack | No online leaderboard |
 | three.js r128 from a CDN, pinned to one version, with SRI hashes | A proven 3D engine instead of raw WebGL; the hashes make the browser refuse any file that is not exactly the one we tested | r128 is from 2021; upgrading means re-testing the post-processing add-ons |
 | Everything procedural (buildings, textures, vehicles, sounds), except four CC0 scans from Poly Haven in the escape room | Almost no image or audio files to license or download; the scans (concrete, cinder blocks, scratched steel and one HDRI for the steel's reflections, 1.7 MB) make the washroom photo-real where it matters | Stylised elsewhere |
+| Puddles in the escape room are real mirrors: the room is drawn a second time, smaller, from a camera under the floor | Reflections of what is really there (lamps, steel, the red glow) that move with you, instead of a fixed shine | A second, smaller drawing of the room while you move or look round; standing still it is not redrawn |
 | Rules split out into `core.js` | They can be tested in Node in milliseconds, and the rules are in one place | `game.js` still shares state between its sections |
 | Arcade physics (speed along the heading, collision circles) | Predictable, fun handling at 60 fps on modest hardware | No real tyre grip or weight transfer |
 | Engine sound from a small physical model: a pressure pulse per firing, a reflecting exhaust pipe, fixed muffler resonances, separate loops for load and overrun | Follows every rpm and gear change, each vehicle has its real engine layout, and the model can be tested in Node | Approximates real engines, it is not a recording; we checked it by measurement, and the group should judge it by ear |

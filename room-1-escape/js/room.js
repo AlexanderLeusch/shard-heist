@@ -80,22 +80,27 @@ function grime(g, w, h, n, color, maxR, lowBias){
     g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
   }
 }
-// Tiles: 8 x 8 glazed tiles of 15 cm, so one texture covers 1.2 m of wall
-const tileTex = repeatX => canvasTex(TEX, TEX, (g, w, h) => {
-  const n = 8, b = w / n, gw = Math.max(2, w / 220);
-  g.fillStyle = '#4f5853'; g.fillRect(0, 0, w, h);
+// ### Tiles: 12 x 12 glazed tiles of 15 cm in the old institutional green, so one picture covers 1.8 m of wall (the whole
+// ### height of the tiling). Over the years tiles broke and were replaced with whatever was in the store: cream, pale
+// ### mint, a darker bottle green, a sandy one. Every wall paints its own picture, so the odd tiles sit somewhere else.
+const TILE_ODD = [[.012, [200, 194, 164]], [.026, [140, 166, 136]], [.04, [54, 84, 62]], [.045, [176, 158, 120]]];
+const tileTex = () => canvasTex(TEX, TEX, (g, w, h) => {
+  const n = 12, b = w / n, gw = Math.max(2, w / 300);
+  g.fillStyle = '#34423a'; g.fillRect(0, 0, w, h);   // the grout, dark with dirt
   for (let i = 0; i < n; i++) for (let j = 0; j < n; j++){
-    const l = 188 + rnd() * 18 | 0;
-    g.fillStyle = `rgb(${l - 10},${l},${l - 16})`;
-    g.fillRect(i * b + gw, j * b + gw, b - gw * 2, b - gw * 2);
-    const gl = g.createLinearGradient(i * b, j * b, i * b + b, j * b + b);
-    gl.addColorStop(0, 'rgba(255,255,255,.14)'); gl.addColorStop(.5, 'rgba(255,255,255,0)'); gl.addColorStop(1, 'rgba(0,0,0,.08)');
-    g.fillStyle = gl; g.fillRect(i * b + gw, j * b + gw, b - gw * 2, b - gw * 2);
-    if (rnd() < 0.1){ g.strokeStyle = 'rgba(60,64,58,.55)'; g.lineWidth = 1.2; g.beginPath(); let x = i * b + rnd() * b, y = j * b; g.moveTo(x, y); for (let k = 0; k < 5; k++){ x += (rnd() - .5) * b * .4; y += b / 5; g.lineTo(x, y); } g.stroke(); }
+    const odd = rnd(), l = (rnd() - .5) * 16, x = i * b + gw, y = j * b + gw, s = b - gw * 2;
+    const c = (TILE_ODD.find(([p]) => odd < p) || [0, [88 + l, 120 + l, 94 + l * .8]])[1];
+    g.fillStyle = `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`; g.fillRect(x, y, s, s);
+    const gl = g.createLinearGradient(x, y, x + s, y + s);
+    gl.addColorStop(0, 'rgba(255,255,255,.12)'); gl.addColorStop(.5, 'rgba(255,255,255,0)'); gl.addColorStop(1, 'rgba(0,0,0,.1)');
+    g.fillStyle = gl; g.fillRect(x, y, s, s);
+    // crazing in the glaze and the odd crack right across a tile
+    if (rnd() < .12){ g.strokeStyle = 'rgba(30,40,32,.5)'; g.lineWidth = 1.2; g.beginPath(); let cx = x + rnd() * s, cy = y; g.moveTo(cx, cy); for (let k = 0; k < 5; k++){ cx += (rnd() - .5) * s * .4; cy += s / 5; g.lineTo(cx, cy); } g.stroke(); }
+    if (rnd() < .05){ g.fillStyle = 'rgba(40,36,28,.45)'; g.beginPath(); g.arc(x + (rnd() < .5 ? 0 : s), y + rnd() * s, 2 + rnd() * s * .12, 0, 7); g.fill(); }   // a chipped corner
   }
-  grime(g, w, h, 26, 'rgba(92,78,48,.16)', w * .12, true);
-  grime(g, w, h, 18, 'rgba(40,46,40,.14)', w * .06, false);
-}, [repeatX, 1.5]);
+  grime(g, w, h, 30, 'rgba(70,58,30,.18)', w * .08, true);
+  grime(g, w, h, 20, 'rgba(30,40,30,.14)', w * .05, false);
+}, [1, 1]);
 const concreteTex = canvasTex(TEX, TEX, (g, w, h) => {
   g.fillStyle = '#5a5d5b'; g.fillRect(0, 0, w, h);
   for (let i = 0; i < 16000; i++){ const v = rnd(); g.fillStyle = v > .5 ? `rgba(255,255,255,${(v - .5) * .12})` : `rgba(0,0,0,${v * .2})`; g.fillRect(rnd() * w, rnd() * h, 2, 2); }
@@ -134,7 +139,7 @@ const paintScratches = (g, w, h, won) => {
   g.clearRect(0, 0, w, h);
   const scratch = (text, x, y, size, rot, alpha) => {
     g.save(); g.translate(x, y); g.rotate(rot); g.font = `700 ${size}px "Arial Narrow", Arial, sans-serif`;
-    // on the pale tiles a scratch shows as a dark groove full of grime, with a bright chipped edge beside it
+    // in the green glaze a scratch shows as a dark groove full of grime, with a bright chipped edge beside it
     for (let k = 0; k < 3; k++){ g.strokeStyle = `rgba(38,40,36,${alpha * (1 - k * .2)})`; g.lineWidth = 2.6; g.strokeText(text, (rnd() - .5) * 2.5, (rnd() - .5) * 2.5); }
     g.strokeStyle = `rgba(255,255,250,${alpha * .5})`; g.lineWidth = 1; g.strokeText(text, 1.5, 1.5);
     g.restore();
@@ -229,10 +234,11 @@ const tileRelief = (() => {
   nc.putImageData(out, 0, 0);
   return { normal, gloss };
 })();
-// ### A tiled material: colour, relief and gloss share the same repeat, so the grout lines meet exactly.
-function tileMat(repeatX, repeatY = 1.5){
-  const map = tileTex(repeatX), mk = (img, aniso) => { const t = new THREE.CanvasTexture(img); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = aniso; t.repeat.set(repeatX, repeatY); return t; };
-  map.repeat.set(repeatX, repeatY);
+// ### A tiled material for w x h metres of wall: the colour picture (12 tiles across) and the relief and gloss (8 tiles
+// ### across) start at the same corner and share the 15 cm grid, so the grout lines meet exactly.
+function tileMat(w, h = TILE_H){
+  const map = tileTex(), mk = (img, aniso) => { const t = new THREE.CanvasTexture(img); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = aniso; t.repeat.set(w / 1.2, h / 1.2); return t; };
+  map.repeat.set(w / 1.8, h / 1.8);
   return new THREE.MeshStandardMaterial({ map, normalMap: mk(tileRelief.normal, ANISO), roughnessMap: mk(tileRelief.gloss, Math.min(ANISO, 4)), roughness: 1, metalness: 0 });
 }
 // ### Powder-coated stall partitions: a slightly mottled finish, scuffs, scratched tally marks and dirt rising from the floor.
@@ -261,17 +267,12 @@ const stainTex = canvasTex(256, 256, (g, w, h) => {
   for (let i = 0; i < 26; i++){ const x = w / 2 + (rnd() - .5) * w * .5, y = h / 2 + (rnd() - .5) * h * .5, r = 10 + rnd() * 50, gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(${60 + rnd() * 40 | 0},${50 + rnd() * 30 | 0},30,.3)`); gr.addColorStop(1, 'rgba(60,50,30,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
   g.strokeStyle = 'rgba(200,195,170,.25)'; g.lineWidth = 3; g.beginPath(); g.ellipse(w / 2, h / 2, w * .36, h * .3, 0, 0, 7); g.stroke();
 });
-const puddleTex = canvasTex(256, 256, (g, w, h) => {
-  g.fillStyle = '#fff'; g.beginPath();
-  for (let a = 0; a <= 64; a++){ const t = a / 64 * Math.PI * 2, r = w * (.34 + .08 * Math.sin(t * 3 + 1) + .05 * Math.sin(t * 7)); g.lineTo(w / 2 + Math.cos(t) * r, h / 2 + Math.sin(t) * r * .7); }
-  g.fill();
-});
 // ### Grilles: slots for the air vent, small holes for the intercom speaker.
 const grilleTex = canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#9aa2a4'; g.fillRect(0, 0, w, h); g.fillStyle = '#121414'; for (let y = 10; y < h - 8; y += 12) g.fillRect(8, y, w - 16, 6); });
 const speakerTex = canvasTex(128, 128, (g, w, h) => { g.fillStyle = '#a4abad'; g.fillRect(0, 0, w, h); g.fillStyle = '#181a1a'; for (let y = 0; y < 7; y++) for (let x = 0; x < 7; x++) if (Math.hypot(x - 3, y - 3) < 3.4){ g.beginPath(); g.arc(22 + x * 14, 22 + y * 14, 3.5, 0, 7); g.fill(); } });
 
 // soft gradients and small parts need no extra texture samples at grazing angles; the ceiling and steel need only a few
-for (const t of [aoTex, blobTex, stainTex, puddleTex, grilleTex, speakerTex]) t.anisotropy = 1;
+for (const t of [aoTex, blobTex, stainTex, grilleTex, speakerTex]) t.anisotropy = 1;
 ceilingTex.anisotropy = partitionTex.anisotropy = 4;
 
 // ---------- Scanned textures (Poly Haven, CC0) ----------
@@ -296,11 +297,13 @@ const SCAN = (() => {
     return t;
   };
 })();
-// ### Painted cinder blocks for the walls above the tiles (one picture is about a metre of wall), tinted the washed-out
-// ### institutional green of the rest of the room.
+// ### Painted cinder blocks for the walls above the tiles (one picture is about a metre of wall). The scan is a grey
+// ### block; the tint (linear, above 1) paints it the yellowed cream of the walls in the photo, keeping its pores and joints.
 function blockMat(w, h){
-  return new THREE.MeshStandardMaterial({ map: SCAN('wall-blocks-color.jpg', true, w, h), normalMap: SCAN('wall-blocks-normal.jpg', false, w, h, 4),
-    normalScale: new THREE.Vector2(1.2, 1.2), roughnessMap: SCAN('wall-blocks-rough.jpg', false, w, h, 2), roughness: 1.1, color: 0xf4f6ec });
+  const m = new THREE.MeshStandardMaterial({ map: SCAN('wall-blocks-color.jpg', true, w, h), normalMap: SCAN('wall-blocks-normal.jpg', false, w, h, 4),
+    normalScale: new THREE.Vector2(1.2, 1.2), roughnessMap: SCAN('wall-blocks-rough.jpg', false, w, h, 2), roughness: 1.1 });
+  m.color.setRGB(4.1, 3.75, 3.2);
+  return m;
 }
 // ### Stainless steel: the scanned scratches change the gloss and dent the surface a little; the vault HDRI does the rest.
 function steelMat(color, roughness, o){
@@ -312,7 +315,7 @@ function steelMat(color, roughness, o){
 // ### The surfaces of the cell: scanned textures for the concrete, the cinder blocks and the steel, painted canvas
 // ### textures for everything that tells the story (the tiles, the graffiti, the scratches, the steam, the sign).
 const M = {
-  tiles: w => tileMat(w / 1.2),
+  tiles: w => tileMat(w),
   floor: new THREE.MeshStandardMaterial({ map: concreteTex, roughness: .78 }),
   ceiling: new THREE.MeshStandardMaterial({ map: ceilingTex, roughness: .95, normalMap: SCAN('floor-concrete-normal.jpg', false, 3, 2.25, 4), normalScale: new THREE.Vector2(.8, .8) }),
   steel: steelMat(0xc9cfd2, 1.35),
@@ -323,7 +326,7 @@ const M = {
   worn: steelMat(0xb4bcc0, 1.7),
   water: new THREE.MeshStandardMaterial({ color: 0x5d6b5e, metalness: .1, roughness: .04, transparent: true, opacity: .88 }),
   chrome: new THREE.MeshStandardMaterial({ color: 0xe8ecee, metalness: 1, roughness: .12 }),
-  cove: new THREE.MeshStandardMaterial({ color: 0x3d4440, roughness: .35 }),
+  cove: new THREE.MeshStandardMaterial({ color: 0x24382c, roughness: .35 }),
   grille: new THREE.MeshStandardMaterial({ map: grilleTex, metalness: .5, roughness: .6 }),
   speaker: new THREE.MeshStandardMaterial({ map: speakerTex, metalness: .6, roughness: .5 }),
   plastic: new THREE.MeshStandardMaterial({ color: 0xd9dad3, roughness: .45 }),
@@ -332,7 +335,6 @@ const M = {
   ao: new THREE.MeshBasicMaterial({ map: aoTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
   blob: new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }),
   stain: new THREE.MeshStandardMaterial({ map: stainTex, transparent: true, depthWrite: false, roughness: .9, polygonOffset: true, polygonOffsetFactor: -3 }),
-  puddle: new THREE.MeshStandardMaterial({ color: 0x1d2220, alphaMap: puddleTex, transparent: true, opacity: .38, roughness: .03, metalness: .3, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4 }),
   mirror: new THREE.MeshStandardMaterial({ color: 0xdfe4e6, metalness: 1, roughness: .12 }),
   door: new THREE.MeshStandardMaterial({ color: 0x3e4b54, metalness: .55, roughness: .55 }),
   partition: new THREE.MeshStandardMaterial({ map: partitionTex, metalness: .35, roughness: .5 }),
@@ -343,7 +345,7 @@ const M = {
   wood: new THREE.MeshStandardMaterial({ color: 0x9c7a50, roughness: .7 }),
   mopHead: new THREE.MeshStandardMaterial({ color: 0xbdb7a6, roughness: 1 }),
   paper: new THREE.MeshStandardMaterial({ color: 0xe9dfc4, roughness: .9, side: THREE.DoubleSide }),
-  tube: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xe9fff2, emissiveIntensity: 2.4 }),
+  tube: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffe9d2, emissiveIntensity: 2.4 }),
   corridor: new THREE.MeshBasicMaterial({ map: corridorTex }),
   guard: new THREE.MeshBasicMaterial({ map: guardTex, transparent: true, opacity: 0, depthWrite: false }),
   graffiti: new THREE.MeshStandardMaterial({ map: graffitiTex, transparent: true, roughness: .8, depthWrite: false }),
@@ -355,6 +357,110 @@ const M = {
   yellow: new THREE.MeshStandardMaterial({ color: 0xf2c014, roughness: .5 }),
   black: new THREE.MeshStandardMaterial({ color: 0x141516, roughness: .6 })
 };
+
+// ---------- Water on the floor ----------
+// ### The puddles are real mirrors. When one is in view the room is drawn a second time, at 40 % of the width and height
+// ### of the screen, by a camera mirrored under the floor (the way three.js's Reflector does it, with an oblique near plane
+// ### that cuts away everything below the floor). Each point of a puddle looks that picture up where its mirror image
+// ### is, so the lamps, the steel and the red glow show in the water: bent a little by slow ripples and by the rings of
+// ### the drops that fall from the shower head. Where the water stands the concrete is darker, round it a damp rim;
+// ### the flatter you look across a puddle, the more it mirrors (Fresnel). The shapes are noise, so no two are alike.
+const WATER = (() => {
+  // fractal noise for the outlines, painted once (three octaves that tile), so the shader reads it instead of working it out
+  const noise = (() => {
+    const S = 128, data = new Uint8Array(S * S * 4), oct = [[4, .55], [8, .3], [16, .15]].map(([n, a]) => ({ n, a, g: Array.from({ length: n * n }, rnd) }));
+    const fade = t => t * t * (3 - 2 * t);
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++){
+      let v = 0;
+      for (const o of oct){
+        const fx = x / S * o.n, fy = y / S * o.n, ix = Math.floor(fx), iy = Math.floor(fy), sx = fade(fx - ix), sy = fade(fy - iy), at = (i, j) => o.g[(j % o.n) * o.n + i % o.n];
+        v += o.a * ((at(ix, iy) * (1 - sx) + at(ix + 1, iy) * sx) * (1 - sy) + (at(ix, iy + 1) * (1 - sx) + at(ix + 1, iy + 1) * sx) * sy);
+      }
+      const i = (y * S + x) * 4; data[i] = data[i + 1] = data[i + 2] = v * 255; data[i + 3] = 255;
+    }
+    const t = new THREE.DataTexture(data, S, S); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = t.minFilter = THREE.LinearFilter; t.needsUpdate = true;
+    return t;
+  })();
+  const rt = new THREE.WebGLRenderTarget(16, 16, { encoding: THREE.sRGBEncoding, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter });
+  const texMat = new THREE.Matrix4(), drip = new THREE.Vector4(3.715, 1.55, -99, 0);
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { tRefl: { value: rt.texture }, tNoise: { value: noise }, texMat: { value: texMat }, time: { value: 0 }, drip: { value: drip } },
+    vertexShader: `
+      uniform mat4 texMat; varying vec4 vProj; varying vec3 vWorld; varying vec2 vUv;
+      void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xyz; vUv = uv; vProj = texMat * w; gl_Position = projectionMatrix * viewMatrix * w; }`,
+    fragmentShader: `
+      uniform sampler2D tRefl, tNoise; uniform float time; uniform vec4 drip; varying vec4 vProj; varying vec3 vWorld; varying vec2 vUv;
+      void main(){
+        // the outline: an ellipse frayed by the noise; water inside, a damp rim round it
+        float n = texture2D(tNoise, vWorld.xz * 0.4).r * 0.75 + texture2D(tNoise, vWorld.xz * 1.9 + 0.37).r * 0.25;
+        float d = length((vUv - 0.5) * 2.0) * 1.25 + (n - 0.5) * 0.5;
+        float water = smoothstep(0.8, 0.68, d), damp = smoothstep(1.0, 0.6, d);
+        if (damp <= 0.0) discard;
+        // slow ripples, and rings running out from the last drop
+        vec2 w = vec2(sin(vWorld.x * 21.0 + time * 1.1) + sin(vWorld.z * 29.0 - time * 1.6), sin(vWorld.z * 17.0 + time * 1.3) + sin(vWorld.x * 25.0 - time * 0.9)) * 0.0015;
+        vec2 dv = vWorld.xz - drip.xy; float dl = length(dv), age = time - drip.z, front = dl - age * 0.3;
+        w += dv / max(dl, 0.001) * sin(front * 95.0) * exp(-front * front * 180.0) * exp(-age * 1.3) * 0.014;
+        vec4 p = vProj; p.xy += w * p.w;
+        // four taps a little apart: water on rough concrete never mirrors quite sharply
+        vec2 b = vec2(0.0015, 0.0025) * p.w;
+        vec3 refl = (sRGBToLinear(texture2DProj(tRefl, p + vec4(b, 0.0, 0.0))).rgb + sRGBToLinear(texture2DProj(tRefl, p - vec4(b, 0.0, 0.0))).rgb
+          + sRGBToLinear(texture2DProj(tRefl, p + vec4(b.y, -b.x, 0.0, 0.0))).rgb + sRGBToLinear(texture2DProj(tRefl, p - vec4(b.y, -b.x, 0.0, 0.0))).rgb) * 0.25;
+        refl *= 1.0 + smoothstep(0.6, 1.0, max(refl.r, max(refl.g, refl.b))) * 2.5;   // the lamps glint
+        float F = 0.3 + 0.7 * pow(1.0 - clamp(normalize(cameraPosition - vWorld).y, 0.0, 1.0), 4.0);
+        float a = mix(damp * 0.35, 0.55 + 0.45 * F, water);
+        gl_FragColor = linearToOutputTexel(vec4(refl, 1.0));
+        gl_FragColor = vec4(gl_FragColor.rgb * water * F, a);
+      }`,
+    transparent: true, depthWrite: false, premultipliedAlpha: true, polygonOffset: true, polygonOffsetFactor: -4
+  });
+  const boxes = [], mirror = new THREE.PerspectiveCamera(), frustum = new THREE.Frustum(), pv = new THREE.Matrix4();
+  const camPos = new THREE.Vector3(), look = new THREE.Vector3(), rot = new THREE.Matrix4(), plane = new THREE.Plane(), clip = new THREE.Vector4(), q = new THREE.Vector4(), size = new THREE.Vector2();
+  const N = new THREE.Vector3(0, 1, 0), P0 = new THREE.Vector3(0, .004, 0);
+  // the drop that falls from the shower head every few seconds
+  const drop = new THREE.Mesh(new THREE.SphereGeometry(.006, 8, 6), new THREE.MeshStandardMaterial({ color: 0xc8d4d8, roughness: .05, metalness: .5 }));
+  drop.scale.y = 1.7; drop.visible = false; scene.add(drop);
+  let dropT = 1.5, lastT = -1;
+  const lastView = new THREE.Matrix4();
+  return {
+    mat, rt,
+    // ### A puddle of w x d metres (the water fills about four fifths of it).
+    puddle(w, d, x, z){ const m = flat(w, d, mat, x, z, .005); m.renderOrder = 1; boxes.push(new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(x, .005, z), new THREE.Vector3(w, .02, d))); return m; },
+    resize(){ renderer.getDrawingBufferSize(size); rt.setSize(Math.max(1, size.x * .4 | 0), Math.max(1, size.y * .4 | 0)); lastT = -1; },
+    // ### Moves the ripples and the drop on, then draws the mirror picture again, but only when a puddle is in view and
+    // ### the view has changed (or a fifth of a second has passed, for the steam and the guard): standing still costs nothing.
+    update(t, dt){
+      mat.uniforms.time.value = t;
+      if ((dropT -= dt) < 0){ dropT += 2.8; drip.z = t; }   // it lands: a new ring
+      const fall = .64 - dropT;   // the drop hangs at the head for a moment, then falls 2 m in 0.64 s
+      drop.visible = dropT < 1.2;
+      drop.position.set(drip.x, fall > 0 ? 2.0 - 4.9 * fall * fall : 2.0, drip.y);
+      if (camera.position.y < .1) return;
+      pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); frustum.setFromProjectionMatrix(pv);
+      if (!boxes.some(b => frustum.intersectsBox(b))) return;
+      if (lastT >= 0 && t - lastT < .2 && camera.matrixWorld.elements.every((v, i) => Math.abs(v - lastView.elements[i]) < 1e-4)) return;
+      lastView.copy(camera.matrixWorld); lastT = t;
+      // the mirrored camera (three.js Reflector, for a floor at y = 0.004)
+      camPos.setFromMatrixPosition(camera.matrixWorld);
+      mirror.position.set(camPos.x, 2 * P0.y - camPos.y, camPos.z);
+      rot.extractRotation(camera.matrixWorld);
+      look.set(0, 0, -1).applyMatrix4(rot).add(camPos); look.y = 2 * P0.y - look.y;
+      mirror.up.set(0, 1, 0).applyMatrix4(rot); mirror.up.y = -mirror.up.y;
+      mirror.lookAt(look); mirror.far = camera.far; mirror.updateMatrixWorld();
+      mirror.projectionMatrix.copy(camera.projectionMatrix);
+      texMat.set(.5, 0, 0, .5, 0, .5, 0, .5, 0, 0, .5, .5, 0, 0, 0, 1).multiply(mirror.projectionMatrix).multiply(mirror.matrixWorldInverse);
+      // oblique near plane: the camera sees nothing below the floor
+      plane.setFromNormalAndCoplanarPoint(N, P0).applyMatrix4(mirror.matrixWorldInverse);
+      clip.set(plane.normal.x, plane.normal.y, plane.normal.z, plane.constant);
+      const e = mirror.projectionMatrix.elements;
+      q.set((Math.sign(clip.x) + e[8]) / e[0], (Math.sign(clip.y) + e[9]) / e[5], -1, (1 + e[10]) / e[14]);
+      clip.multiplyScalar(2 / clip.dot(q));
+      e[2] = clip.x; e[6] = clip.y; e[10] = clip.z + 1; e[14] = clip.w;
+      mat.visible = false;
+      renderer.setRenderTarget(rt); renderer.render(scene, mirror); renderer.setRenderTarget(null);
+      mat.visible = true;
+    }
+  };
+})();
 
 // ---------- The washroom ----------
 // ### The room is 8 m wide (x -4..4), 6 m deep (z -3..3) and 3 m high. The steel door is in the south wall, the sinks on the
@@ -378,10 +484,73 @@ const HOT = {};   // hotspot key -> meshes that can be clicked
 // ### Registers a clickable object (a hotspot) for the marker and the rules.
 const hot = (key, ...meshes) => { (HOT[key] = HOT[key] || []).push(...meshes); meshes.forEach(m => { if (m.material !== M.steam) m.material = m.material.clone(); m.userData.hot = key; }); };
 
-function wall(len, x, z, ry){
-  plane(len, TILE_H, M.tiles(len), x, TILE_H / 2, z, ry);
-  plane(len, H - TILE_H, blockMat(len, H - TILE_H), x, TILE_H + (H - TILE_H) / 2, z, ry);
-  const trim = box(len, .05, .03, M.partition, x, TILE_H, z); trim.rotation.y = ry; trim.position.x += Math.sin(ry) * .015; trim.position.z += Math.cos(ry) * .015;
+// ### A wall: green tiles up to 1.8 m, a dark green cap tile, cream blocks above, and its own coat of stains. runs are
+// ### [metres from the wall's left end as seen from the room, height] of pipe brackets and shower heads that rust or drip.
+function wall(len, x, z, ry, runs, corners){
+  const st = wallStains(len, runs, corners);
+  plane(len, TILE_H, stained(M.tiles(len), st, 0, TILE_H / H), x, TILE_H / 2, z, ry);
+  plane(len, H - TILE_H, stained(blockMat(len, H - TILE_H), st, TILE_H / H, 1), x, TILE_H + (H - TILE_H) / 2, z, ry);
+  const trim = box(len, .05, .03, M.cove, x, TILE_H, z); trim.rotation.y = ry; trim.position.x += Math.sin(ry) * .015; trim.position.z += Math.cos(ry) * .015;
+}
+// ### Lays a wall's stain picture over the tiles or the blocks (v0..v1 is the part of the picture that surface shows): the
+// ### colour is mixed towards the stain by its alpha, and stained glaze turns matt. That is one more texture read per
+// ### pixel, where a see-through layer over every wall would have lit each pixel of wall twice.
+function stained(m, tex, v0, v1){
+  const u = { stainMap: { value: tex }, stainV: { value: new THREE.Vector2(v0, v1 - v0) } };
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = 'uniform vec2 stainV;\nvarying vec2 vStainUv;\n' + sh.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\n  vStainUv = vec2(uv.x, stainV.x + uv.y * stainV.y);');
+    sh.fragmentShader = 'uniform sampler2D stainMap;\nvarying vec2 vStainUv;\n' + sh.fragmentShader
+      .replace('#include <map_fragment>', '#include <map_fragment>\n  vec4 stainC = sRGBToLinear(texture2D(stainMap, vStainUv));\n  diffuseColor.rgb = mix(diffuseColor.rgb, stainC.rgb, stainC.a);')
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  roughnessFactor = mix(roughnessFactor, 0.95, stainC.a);');
+  };
+  return m;
+}
+// ### Rust, water and dirt over a whole wall, one picture per wall so nothing repeats: brown runs from the old leaks in
+// ### the ceiling and under every pipe bracket, a dirty tide line where the tiles end with grime washed down from it,
+// ### limescale under the showers, dirt rising from the floor and mould in the corners (corners says at which end of the
+// ### wall the room has one; the walls beside the door have one only). Laid over the wall by stained().
+function wallStains(len, runs = [], corners = [true, true]){
+  const PX = COARSE ? 80 : 128;
+  const tex = canvasTex(Math.round(len * PX), H * PX, (g, w) => {
+    const Y = m => (H - m) * PX;   // metres above the floor -> pixels from the top
+    // a run: soft blobs down a wobbling line, thinner and fainter as the water dried on its way down
+    const run = (u, top, length, width, rgb, a) => {
+      let cx = u * PX; const steps = Math.max(2, Math.ceil(length * PX / 2));
+      for (let k = 0; k < steps; k++){
+        const t = k / steps, r = Math.max(.6, width * PX * (1 - t * .55) * (.6 + rnd() * .5));
+        cx += (rnd() - .5) * 1.1;
+        g.fillStyle = `rgba(${rgb},${a * (1 - t * t)})`; g.beginPath(); g.ellipse(cx, Y(top) + k * 2, r, r * 1.8, 0, 0, 7); g.fill();
+      }
+    };
+    const blot = (cx, cy, r, rgb, a) => { const gr = g.createRadialGradient(cx, cy, 0, cx, cy, r); gr.addColorStop(0, `rgba(${rgb},${a})`); gr.addColorStop(1, `rgba(${rgb},0)`); g.fillStyle = gr; g.fillRect(cx - r, cy - r, r * 2, r * 2); };
+    // water stains yellowing the blocks, and the leaks in the ceiling that caused them
+    for (let i = 0; i < len * 1.6; i++) blot(rnd() * w, Y(2.2 + rnd() * .8), (.15 + rnd() * .45) * PX, '140,98,42', .14 + rnd() * .14);
+    for (let i = 0; i < len * 1.2; i++){ const u = rnd() * len; run(u, H, .4 + rnd() * 1.4, .02 + rnd() * .05, '112,64,26', .045); if (rnd() < .5) run(u + (rnd() - .5) * .1, H, .3 + rnd() * .8, .008, '80,44,18', .05); }
+    // rust under the brackets and pipes, and wet streaks or limescale below the shower heads
+    for (const [u, top, kind] of runs){
+      if (kind === 'shower'){ for (let k = 0; k < 6; k++) run(u + (rnd() - .5) * .3, top, .5 + rnd() * 1.1, .01 + rnd() * .025, '214,214,196', .045); }
+      else for (let k = 0; k < 3; k++) run(u + (rnd() - .5) * .06, top, .5 + rnd() * .9, .008 + rnd() * .018, '128,58,18', .06);
+    }
+    // the tide line at the top of the tiles, with dirt washed down the glaze from it
+    for (let i = 0; i < len * 30; i++) blot(rnd() * w, Y(TILE_H - .02 - Math.pow(rnd(), 2) * .2), (.03 + rnd() * .1) * PX, '72,60,30', .08);
+    for (let i = 0; i < len * 2.5; i++) run(rnd() * len, TILE_H - .03, .2 + rnd() * .9, .01 + rnd() * .03, '60,54,30', .04);
+    // dirt and splashes rising from the floor
+    const fg = g.createLinearGradient(0, Y(.5), 0, Y(0)); fg.addColorStop(0, 'rgba(40,32,18,0)'); fg.addColorStop(.7, 'rgba(40,32,18,.22)'); fg.addColorStop(1, 'rgba(30,24,14,.5)');
+    g.fillStyle = fg; g.fillRect(0, Y(.5), w, .5 * PX);
+    for (let i = 0; i < len * 40; i++) blot(rnd() * w, Y(Math.pow(rnd(), 2) * .45), (.02 + rnd() * .07) * PX, '38,30,16', .12);
+    // mould creeping out of the room's corners: thick in the corner under the ceiling, thinning out along the ceiling
+    // and down the joint
+    corners.forEach((on, k) => {
+      if (!on) return;
+      for (let i = 0; i < 90; i++){
+        const along = Math.pow(rnd(), 2.2), down = Math.pow(rnd(), 2.2), fade = 1 - Math.max(along, down) * .85;
+        blot(k ? w - along * .9 * PX : along * .9 * PX, Y(H) + down * 1.5 * PX * (1 - along * .7), (.02 + rnd() * .06) * PX, '30,36,24', .28 * fade);
+      }
+    });
+  });
+  tex.anisotropy = 4;
+  return tex;
 }
 { // floor with an opening where the hatch is (shape coordinates are metres; y of the shape becomes -z in the room)
   const fs = new THREE.Shape(); fs.moveTo(-W / 2, -D / 2); fs.lineTo(W / 2, -D / 2); fs.lineTo(W / 2, D / 2); fs.lineTo(-W / 2, D / 2); fs.lineTo(-W / 2, -D / 2);
@@ -394,12 +563,12 @@ function wall(len, x, z, ry){
   fl.rotation.x = -Math.PI / 2; fl.receiveShadow = true; room.add(fl);
 }
 plane(W, D, M.ceiling, 0, H, 0, 0, Math.PI / 2);
-wall(W, 0, -D / 2, 0);            // north
+wall(W, 0, -D / 2, 0, [1, 3, 5, 7].map(u => [u, 2.72]));            // north, rust under the pipe brackets
 // south (door wall), built around the doorway so the open door shows the corridor in the briefing
-wall(3.45, -2.275, D / 2, Math.PI); wall(3.45, 2.275, D / 2, Math.PI);
+wall(3.45, -2.275, D / 2, Math.PI, [], [false, true]); wall(3.45, 2.275, D / 2, Math.PI, [], [true, false]);
 plane(1.1, H - 2.14, blockMat(1.1, H - 2.14), 0, 2.14 + (H - 2.14) / 2, D / 2, Math.PI);
-wall(D, -W / 2, 0, Math.PI / 2);  // west (sinks)
-wall(D, W / 2, 0, -Math.PI / 2);  // east
+wall(D, -W / 2, 0, Math.PI / 2, [[1.5, 2.72], [4.5, 2.72]]);  // west (sinks), rust where the pipes turn down
+wall(D, W / 2, 0, -Math.PI / 2, [[3.45, 1.98, 'shower'], [4.55, 1.98, 'shower']]);  // east, under the shower heads
 // skirting drain channel and floor drain
 cyl(.12, .12, .01, M.dark, 0, .006, .3, 24);
 for (let i = -2; i <= 2; i++) box(.22, .012, .012, M.dullSteel, 0, .012, .3 + i * .045);
@@ -410,13 +579,14 @@ pipe(W, 0, 2.78, -2.88, 'x'); pipe(W, 0, 2.66, -2.9, 'x'); pipe(D, -3.9, 2.78, 0
 pipe(1.9, -3.92, 1.85, -1.5); pipe(1.9, -3.92, 1.85, 1.5);
 for (const x of [-3, -1, 1, 3]) box(.06, .12, .1, M.dullSteel, x, 2.78, -2.9);
 
-// Lights: the caged tube in the middle, a lamp over the stall, corridor light through the window
-const hemi = new THREE.HemisphereLight(0xa9b8b0, 0x1a1c1b, .32); room.add(hemi);
-const mainLight = new THREE.SpotLight(0xe4f2e9, 3.2, 14, 1.3, .65, 1.6);
+// Lights: the caged tube in the middle (an old warm-white tube), a lamp over the stall, corridor light through the window
+// and two red emergency lamps (below)
+const hemi = new THREE.HemisphereLight(0xb4a292, 0x1e1410, .3); room.add(hemi);
+const mainLight = new THREE.SpotLight(0xffdcbc, 3.2, 14, 1.3, .65, 1.6);
 mainLight.position.set(-.6, 2.86, .3); mainLight.target.position.set(-.6, 0, .3);
 mainLight.castShadow = true; mainLight.shadow.mapSize.set(COARSE ? 1024 : 2048, COARSE ? 1024 : 2048); mainLight.shadow.bias = -.0005; mainLight.shadow.radius = 4;
 room.add(mainLight, mainLight.target);
-const stallLight = new THREE.SpotLight(0xffe6c4, 2.1, 7, .95, .7, 1.8);
+const stallLight = new THREE.SpotLight(0xffd6a6, 2.1, 7, .95, .7, 1.8);
 stallLight.position.set(2.75, 2.86, -1.8); stallLight.target.position.set(2.75, 0, -1.9);
 stallLight.castShadow = true; stallLight.shadow.mapSize.set(COARSE ? 512 : 1024, COARSE ? 512 : 1024); stallLight.shadow.bias = -.0008; stallLight.shadow.radius = 3;
 room.add(stallLight, stallLight.target);
@@ -425,8 +595,43 @@ windowLight.position.set(0, 1.7, 3.3); windowLight.target.position.set(0, .6, 0)
 const tube = box(1.3, .06, .14, M.tube, -.6, 2.93, .3); tube.castShadow = false;
 for (let i = 0; i < 5; i++){ const c = box(.012, .1, .2, M.dullSteel, -1.2 + i * .3, 2.93, .3); c.castShadow = false; }
 const stallTube = box(.6, .05, .1, M.tube.clone(), 2.75, 2.94, -1.8); stallTube.castShadow = false;
-stallTube.material.emissive.set(0xffe6c4); stallTube.material.emissiveIntensity = 1.8;
+stallTube.material.emissive.set(0xffd6a6); stallTube.material.emissiveIntensity = 1.8;
 plane(1.5, .56, M.sign, -1.9, 2.2, -D / 2 + .012);
+// ### Red emergency lamps, as in the photo: caged red domes over the door, over the mirror by the sinks and high in the
+// ### stall over the toilet. Each has a soft glow round the glass (the puddles mirror it too). Every light costs time at
+// ### every pixel, so only two of them really shine, without shadows: a point light over the door and a spot in the
+// ### stall aimed at the toilet (it stays inside the partition). The lamp over the mirror paints its red wash onto the
+// ### wall instead. They burn steadily.
+const glowTex = canvasTex(128, 128, (g, w, h) => {
+  const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+  gr.addColorStop(0, 'rgba(255,120,90,.9)'); gr.addColorStop(.12, 'rgba(255,50,25,.55)'); gr.addColorStop(.4, 'rgba(200,20,8,.16)'); gr.addColorStop(1, 'rgba(160,0,0,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+});
+glowTex.anisotropy = 1;
+const glowMat = new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
+const redGlass = new THREE.MeshStandardMaterial({ color: 0x5a0804, emissive: 0xff2412, emissiveIntensity: 2.6, roughness: .25 });
+function redLamp(x, y, z, ry, intensity, reach, aim){
+  const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = ry; room.add(g);
+  const part = (geo, mat, px, py, pz, rx = 0, rz = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(px, py, pz); m.rotation.set(rx, 0, rz); m.receiveShadow = true; g.add(m); return m; };
+  part(new THREE.BoxGeometry(.16, .16, .025), M.dullSteel, 0, 0, .0125);
+  part(new THREE.CylinderGeometry(.068, .072, .02, 20), M.dullSteel, 0, 0, .035, Math.PI / 2);
+  part(new THREE.SphereGeometry(.058, 16, 6, 0, Math.PI * 2, 0, Math.PI / 2), redGlass, 0, 0, .045, Math.PI / 2);
+  // the wire cage over the glass: three hoops and a ring
+  for (const rz of [0, Math.PI / 3, -Math.PI / 3]) part(new THREE.TorusGeometry(.068, .0035, 4, 12, Math.PI), M.dullSteel, 0, 0, .045, Math.PI / 2, rz).rotation.order = 'ZXY';
+  part(new THREE.TorusGeometry(.07, .004, 4, 18), M.dullSteel, 0, 0, .075);
+  const glow = new THREE.Sprite(glowMat); glow.position.set(0, 0, .08); glow.scale.setScalar(.55); g.add(glow);
+  if (!intensity){   // no light: a soft red wash on the wall round the lamp
+    const wash = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.6), new THREE.MeshBasicMaterial({ map: glowTex, color: 0x9a3a2a, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+    wash.position.set(0, -.15, .004); g.add(wash);
+    return;
+  }
+  const light = aim ? new THREE.SpotLight(0xff2a14, intensity, reach, .6, .6, 1.5) : new THREE.PointLight(0xff2a14, intensity, reach, 2);
+  light.position.set(0, -.08, .3); g.add(light);
+  if (aim){ light.target.position.set(...aim); room.add(light.target); }
+}
+redLamp(0, 2.5, D / 2 - .002, Math.PI, 1.8, 6);                       // over the door
+redLamp(-W / 2 + .002, 2.32, 0, Math.PI / 2, 0);                      // over the mirror
+redLamp(2.2, 2.45, -D / 2 + .002, 0, 4, 5, [3.1, .4, -2.6]);          // in the stall, over the toilet
 
 // The door with its barred window; Officer Hale's silhouette appears in it. It hangs on hinges on the west side (x -0.52)
 // and swings into the room; doorPivot turns it. Closed (rotation 0) it is exactly where it always was.
@@ -625,7 +830,7 @@ const TOILET = { x: 3.25, z: -2.82, top: .958 }, BOWL_Z = -2.418, BOWL_SZ = 1.22
   const wheel = new THREE.Mesh(new THREE.TorusGeometry(.03, .006, 6, 16), M.red); wheel.position.set(T.x + .55, .24, -2.9); add(wheel);
   // limescale and dirt on the floor round the foot, and the soft shadow under the unit
   flat(.75, .95, M.blob, T.x, -2.55, .002); flat(.62, .62, M.stain, T.x, BOWL_Z, .004);
-  flat(.5, .34, M.puddle, T.x - .25, -1.98, .005);
+  WATER.puddle(.7, .48, T.x - .25, -1.98);
 }
 // ### The toilet roll on a steel holder screwed to the east wall, with a strip of paper hanging down.
 {
@@ -640,7 +845,7 @@ hot('read:graffiti', graffiti);
 // The crooked tile, the dark hole behind it and the car key hidden there
 const TILE_POS = new THREE.Vector3(2.62, .58, -2.988);
 plane(.15, .15, M.dark, TILE_POS.x, TILE_POS.y, -2.996);
-const tile = box(.15, .15, .018, tileMat(1 / 8, 1 / 8), TILE_POS.x, TILE_POS.y, TILE_POS.z);
+const tile = box(.15, .15, .018, tileMat(.15, .15), TILE_POS.x, TILE_POS.y, TILE_POS.z);
 tile.rotation.z = .07;
 // the car key: a brass blade, a black plastic head and a worn leather fob, lying in the hollow
 const carKey = new THREE.Group();
@@ -686,7 +891,8 @@ const tunnelLight = new THREE.PointLight(0xffb066, 0, 5, 2); tunnelLight.positio
     aoEdge(H, .35, v3(sx * (W / 2 - .002), H / 2, sz * D / 2), v3(0, 0, -sz), v3(-sx, 0, 0));
   }
   for (const sx of [-1, 1]) aoEdge(1.9, .22, v3(SX0 + sx * .02, 1.1, -D / 2 + .002), v3(sx, 0, 0), v3(0, 0, 1));
-  flat(.9, 2.9, M.blob, -3.7, 0); flat(.7, .7, M.blob, 3.35, 2.45); flat(.8, .8, M.stain, 0, .3); flat(.9, .55, M.puddle, -3.2, .55, .005);
+  flat(.9, 2.9, M.blob, -3.7, 0); flat(.7, .7, M.blob, 3.35, 2.45); flat(.8, .8, M.stain, 0, .3); WATER.puddle(1.15, .75, -3.2, .55);
+  WATER.puddle(1.6, 1.3, -.25, .75);   // round the floor drain in the middle
   // the security camera high in the north-west corner, its red light blinking
   const cctv = new THREE.Group(); cctv.position.set(-3.72, 2.66, -2.72); cctv.rotation.set(-.42, -Math.PI * .75, 0, 'YXZ'); room.add(cctv);
   const part = (geo, mat, x, y, z, rx = 0) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.rotation.x = rx; m.castShadow = m.receiveShadow = true; cctv.add(m); return m; };
@@ -725,7 +931,7 @@ const tunnelLight = new THREE.PointLight(0xffb066, 0, 5, 2); tunnelLight.positio
     { const f = cyl(.014, .014, L, M.chrome, X, 1.38, Z + .03, 10); f.rotation.z = Math.PI / 2; }
     cyl(.014, .014, 1.6, M.chrome, X + L / 2 - .1, 2.18, Z + .03, 10);
     box(.08, .12, .04, M.worn, X + L / 2 + .12, 1.2, Z + .02); { const b = cyl(.02, .02, .02, M.chrome, X + L / 2 + .12, 1.2, Z + .045, 14); b.rotation.x = Math.PI / 2; }
-    flat(2.2, .7, M.stain, X, Z + .45); flat(.9, .4, M.puddle, X + .3, Z + .5, .005);
+    flat(2.2, .7, M.stain, X, Z + .45); WATER.puddle(1.15, .55, X + .3, Z + .5);
   }
   { // the window: wired, frosted glass glowing faintly with the yard lights, five bars and a heavy steel frame
     const X = .4, Y = 2.3, Z = -D / 2, w = .9, h = .46;
@@ -751,7 +957,7 @@ const tunnelLight = new THREE.PointLight(0xffb066, 0, 5, 2); tunnelLight.positio
     }
     box(.24, .01, .24, M.dullSteel, 3.55, .005, 1.0);
     for (let i = -2; i <= 2; i++) box(.2, .012, .018, M.dark, 3.55, .006, 1.0 + i * .04);
-    flat(1.3, 1.9, M.puddle, 3.45, 1.0, .005); flat(1.1, 1.6, M.stain, 3.5, 1.0);
+    WATER.puddle(1.3, 2.2, 3.35, 1.0); flat(1.1, 1.6, M.stain, 3.5, 1.0);
   }
   { // the steel bench bolted to the wall west of the door
     const X = -2.35, Z = D / 2;
@@ -780,6 +986,110 @@ const tunnelLight = new THREE.PointLight(0xffb066, 0, 5, 2); tunnelLight.positio
   // housings over both lamps and a cage over the stall lamp
   box(1.42, .035, .2, M.dullSteel, -.6, H - .02, .3); box(.7, .035, .16, M.dullSteel, 2.75, H - .02, -1.8);
   for (let i = 0; i < 3; i++) box(.012, .07, .15, M.dullSteel, 2.5 + i * .25, 2.94, -1.8);
+}
+
+// ### The prisoner's jacket, as in the photo: a long coat in broad black and sand stripes, hung by its collar on a hook
+// ### on the north wall under the red lamp, its hem slumped on the floor. Body and sleeves are tubes of cloth built
+// ### point by point: narrow where the collar is gathered on the hook, the shoulders sagging, soft vertical folds that
+// ### grow towards the hem. The stripes follow the cloth (texture v runs down the coat).
+{
+  const PERIOD = .13, L = 1.96;   // one black and one sand stripe; the coat is longer than the hook is high
+  const stripes = canvasTex(128, 256, (g, w, h) => {
+    for (let y = 0; y < h; y++){
+      const dark = y < h / 2, v = dark ? 26 + rnd() * 8 : 176 + rnd() * 18;
+      g.fillStyle = dark ? `rgb(${v + 4},${v},${v - 4})` : `rgb(${v + 14},${v},${v - 34})`; g.fillRect(0, y, w, 1);
+    }
+    for (let i = 0; i < 2600; i++){ const v = rnd() < .5 ? 255 : 0; g.fillStyle = `rgba(${v},${v},${v},${rnd() * .08})`; g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 3, 1); }   // the weave
+    grime(g, w, h, 8, 'rgba(60,44,24,.18)', 40, false);
+  }, [1, 1]);
+  const cloth = new THREE.MeshStandardMaterial({ map: stripes, roughness: .95 });
+  // a tube of cloth: fn(t, a) gives the point at t (0 top .. 1 bottom) and angle a, and how far the cloth there is pulled
+  // up against the hang (the stripes follow it); v0 + t * len is the length of cloth from the collar
+  const clothTube = (rows, cols, v0, len, fn) => {
+    const pos = [], uv = [], idx = [];
+    for (let i = 0; i <= rows; i++) for (let j = 0; j <= cols; j++){
+      const t = i / rows, p = fn(t, j / cols * Math.PI * 2); pos.push(p[0], p[1], p[2]); uv.push(j / cols * 3, -(v0 + t * len - (p[3] || 0)) / PERIOD);
+    }
+    for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++){ const a = i * (cols + 1) + j, b = a + cols + 1; idx.push(a, a + 1, b, b, a + 1, b + 1); }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const n = geo.attributes.normal;   // close the seam where the tube meets itself
+    for (let i = 0; i <= rows; i++){ const a = i * (cols + 1), b = a + cols; const x = n.getX(a) + n.getX(b), y = n.getY(a) + n.getY(b), z = n.getZ(a) + n.getZ(b), l = Math.hypot(x, y, z) || 1; n.setXYZ(a, x / l, y / l, z / l); n.setXYZ(b, x / l, y / l, z / l); }
+    return geo;
+  };
+  const ss = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const folds = (x, t) => (Math.sin(x * 30 + 1.3) * .6 + Math.sin(x * 53 + .4) * .25 + Math.sin(x * 13 + t * 4) * .5) * (.003 + .022 * ss(.12, 1, t));
+  const g = new THREE.Group(); g.position.set(1.15, 1.84, -D / 2); room.add(g);
+  // the body: gathered to a few centimetres at the hook, shoulders sagging down to either side, then hanging straight
+  // and widening a little to the hem; flat at the back against the wall, rounded and folded in front
+  const coat = (t, a) => {
+    const w = .03 + .135 * ss(.02, .14, t) + .03 * ss(.14, 1, t), d = .02 + .035 * ss(0, .2, t) + .015 * t;
+    const c = Math.cos(a), sn = Math.sin(a), x = w * Math.sign(c) * Math.pow(Math.abs(c), .6), f = folds(x, t);
+    let y = -t * L, z = .012 + (sn > 0 ? d * Math.pow(sn, .7) + f * sn : sn * .004);
+    z += .02 * Math.exp(-Math.pow((t - .07) / .04, 2)) * Math.max(sn, 0);   // cloth bunched under the collar
+    const floor = .006 - 1.84;   // below the floor the hem slumps forward instead
+    if (y < floor){ z += (floor - y) * (.55 + .3 * Math.sin(x * 23)); y = floor + (y - floor) * .05; }
+    // across the sagging shoulders a stripe runs downhill from the collar
+    const sag = .08 * Math.pow(Math.min(1, Math.abs(x) / .17), 1.5) * (1 - ss(.08, .4, t));
+    return [x + .012 * Math.sin(t * 5 + 1) * ss(.1, .5, t), y, z, sag + f * .2];
+  };
+  const m = new THREE.Mesh(clothTube(56, 32, 0, L, coat), cloth); m.castShadow = m.receiveShadow = true; g.add(m);
+  // the sleeves hang from the shoulders down both sides, in front of the body's edge and clearly apart from it
+  for (const sd of [-1, 1]){
+    const sl = clothTube(24, 12, .1, .9, (t, a) => {
+      // it grows out of the sloping shoulder, then hangs as a tube
+      const r = .022 + .03 * ss(0, .14, t) - .008 * t + .004 * Math.sin(t * 17 + a * 2), cx = sd * (.1 + .1 * ss(0, .3, t)), cy = -.15 - t * .87, cz = .035 + .025 * ss(0, .2, t) + .01 * t;
+      return [cx + Math.cos(a) * r * .85, cy, cz + Math.sin(a) * r, Math.abs(Math.cos(a)) * .02];
+    });
+    const sm = new THREE.Mesh(sl, cloth); sm.castShadow = sm.receiveShadow = true; g.add(sm);
+    const cuff = new THREE.Mesh(new THREE.CircleGeometry(.04, 12), M.dark); cuff.rotation.x = Math.PI / 2; cuff.scale.x = .85; cuff.position.set(sd * .2, -1.015, .07); g.add(cuff);
+  }
+  // a row of dark buttons down the front
+  for (let i = 0; i < 6; i++){
+    const t = .16 + i * .075, p = coat(t, Math.PI / 2);
+    const b = new THREE.Mesh(new THREE.CylinderGeometry(.011, .011, .006, 10), M.black); b.rotation.x = Math.PI / 2; b.position.set(p[0], p[1], p[2] + .002); g.add(b);
+  }
+  // the hook it hangs on, screwed to the tiles
+  box(.035, .07, .012, M.dullSteel, 1.15, 1.88, -D / 2 + .006);
+  const hk = new THREE.Mesh(new THREE.TorusGeometry(.02, .005, 6, 12, Math.PI * 1.2), M.steel); hk.position.set(1.15, 1.86, -D / 2 + .03); hk.rotation.set(0, Math.PI / 2, Math.PI * .9); add(hk);
+  flat(.7, .4, M.blob, 1.15, -D / 2 + .15);
+}
+// ### Toilet rolls dropped on the floor: lying on their sides at odd angles, one squashed, one with a long tail of paper
+// ### unrolled across the stall floor into the puddle by the toilet.
+{
+  const paperTex = canvasTex(128, 128, (g, w, h) => {
+    g.fillStyle = '#efe9d9'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 1400; i++){ g.fillStyle = `rgba(140,130,105,${rnd() * .12})`; g.fillRect(rnd() * w, rnd() * h, 2, 2); }
+    g.fillStyle = 'rgba(150,140,115,.35)'; for (let x = 0; x < w; x += 6) g.fillRect(x, 0, 3, 2);   // the perforation
+  }, [1, 1]);
+  const paper = new THREE.MeshStandardMaterial({ map: paperTex, roughness: .95, side: THREE.DoubleSide });
+  const card = new THREE.MeshStandardMaterial({ color: 0x8a6a45, roughness: .9, side: THREE.DoubleSide });
+  const R = .056, r = .021, LEN = .1;
+  const rollGeo = new THREE.LatheGeometry([[r + .002, -LEN / 2], [R - .005, -LEN / 2], [R, -LEN / 2 + .005], [R, LEN / 2 - .005], [R - .005, LEN / 2], [r + .002, LEN / 2]].map(([a, b]) => new THREE.Vector2(a, b)), 20);
+  const coreGeo = new THREE.CylinderGeometry(r, r, LEN + .002, 16, 1, true);
+  const roll = (x, z, yaw, squash = 1) => {
+    const grp = new THREE.Group(); grp.position.set(x, R * squash, z); grp.rotation.set(0, yaw, Math.PI / 2, 'YXZ'); room.add(grp);
+    for (const [geo, mat] of [[rollGeo, paper], [coreGeo, card]]){ const mm = new THREE.Mesh(geo, mat); mm.scale.set(squash, 1, 1); mm.castShadow = mm.receiveShadow = true; grp.add(mm); }
+    flat(.22, .2, M.blob, x, z);
+  };
+  // a strip of paper lying along a path on the floor, crumpled here and there, rising to the roll it came from
+  const strip = pts => {
+    const curve = new THREE.CatmullRomCurve3(pts.map(([x, z]) => new THREE.Vector3(x, 0, z))), n = 70, len = curve.getLength(), pos = [], uv = [], idx = [];
+    for (let i = 0; i <= n; i++){
+      const t = i / n, p = curve.getPointAt(t), tan = curve.getTangentAt(t);
+      const lift = .003 + Math.max(0, Math.sin(t * 26 + 1)) * .007 * (1 - t * .6);
+      for (const sd of [-1, 1]){ pos.push(p.x - tan.z * sd * .05, lift + sd * .003 * Math.sin(t * 41), p.z + tan.x * sd * .05); uv.push((sd + 1) / 2, t * len / .11); }
+    }
+    for (let i = 0; i < n; i++){ const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+    const mm = new THREE.Mesh(geo, paper); mm.receiveShadow = true; room.add(mm);
+  };
+  roll(2.98, -1.3, .5); strip([[2.98, -1.3], [3.12, -1.52], [3.0, -1.78], [3.14, -2.02]]);   // in the stall, into the puddle
+  roll(1.72, -2.68, 1.45);                                  // kicked into the stall corner
+  roll(-3.15, -1.6, -.45, .7);                              // squashed flat by the sinks
+  roll(.62, -1.62, 2.3); strip([[.62, -1.62], [.42, -1.48], [.2, -1.6], [.02, -1.42]]);   // in the middle of the room
 }
 
 // Environment map for the steel: a blurred stand-in of the room (tiled walls, dark floor, the bright tube), built once
@@ -892,7 +1202,7 @@ const SOLID = [
   [-4, -3.5, -1.3, 1.3], [-3.85, -3.51, 2.08, 2.42], [3.15, 3.55, 2.25, 2.65],
   [1.47, 1.53, -3, -.68], [1.47, 1.8, -.73, -.67], [3.7, 4, -.73, -.67], [3.68, 3.87, -.7, .2],
   [2.95, 3.55, -3, -2.14],
-  [-3.05, -.95, -3, -2.68], [-3.17, -1.53, 2.58, 3], [-1.35, -1.15, 2.78, 3], [2.5, 2.9, 1.15, 1.55]
+  [-3.05, -.95, -3, -2.68], [-3.17, -1.53, 2.58, 3], [-1.35, -1.15, 2.78, 3], [2.5, 2.9, 1.15, 1.55], [.88, 1.42, -3, -2.82]
 ];
 // ### Keeps the circle you stand in out of every solid and inside the walls; it slides along what it touches.
 function collide(p){
@@ -1504,7 +1814,9 @@ function frame(now){
   // while a mini game runs the room behind the card stands still, so it is not drawn again and the game runs smoothly;
   // a new size is applied just before drawing: resizing after it would clear the picture and show a black frame
   if (!mini){
-    if (sizeDirty){ sizeDirty = false; renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+    if (sizeDirty){ sizeDirty = false; renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth, innerHeight, false); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); WATER.resize(); }
+    camera.updateMatrixWorld();
+    WATER.update(clock, dt);
     renderer.render(scene, camera);
   }
   adaptResolution(elapsed);
@@ -1516,7 +1828,7 @@ function frame(now){
 // ### sharpness never pumps up and down.
 const PR_MAX = Math.min(window.devicePixelRatio || 1, COARSE ? 1.5 : 2), PR_MIN = Math.min(PR_MAX, .75);
 let pixelRatio = Math.min(PR_MAX, 1.5), perfT = 0, perfN = 0, perfGood = 0, perfWait = 4, sizeDirty = false;
-renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth, innerHeight, false);
+renderer.setPixelRatio(pixelRatio); renderer.setSize(innerWidth, innerHeight, false); WATER.resize();
 function adaptResolution(elapsed){
   if (elapsed > .25 || document.hidden || !overlay.hidden) return;   // a hitch (a tab switch, a card) says nothing about the graphics card
   perfT += elapsed; perfN++;
