@@ -237,6 +237,8 @@ button.bs-cell:not(:disabled):hover{background:rgba(255,122,26,.35)}
 .bs-cell.miss::after{content:"";position:absolute;inset:30%;border-radius:50%;border:2px solid rgba(220,235,255,.7)}
 .bs-cell.hit::after{content:"";position:absolute;inset:22%;border-radius:50%;background:radial-gradient(circle,#ffd27a,#ff7a1a 55%,#c0392b)}
 .bs-cell.sunk{filter:brightness(.55)}
+.bs-cell.water{background:rgba(120,170,220,.04)}
+.bs-cell.water::after{content:"";position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px;border-radius:50%;background:rgba(220,235,255,.35)}
 .bs-cell.sunk.hit::after{background:radial-gradient(circle,#ff9a5a,#7a1f12)}
 
 .ttt{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:6px;width:min(300px,80vw);aspect-ratio:1;padding:8px;border-radius:12px;background:linear-gradient(180deg,#123251,#0a1a2c);border:1px solid #2b5277}

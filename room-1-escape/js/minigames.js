@@ -11,11 +11,11 @@
   const TIME = 30;
   // ### The six games, in the order rules.js lists them, with the words on the card above each game.
   const INFO = {
-    battleship: { title: 'Sink the <em>fleet</em>', name: 'Battleship', how: 'Fire at the enemy waters on the right. A hit lets you fire again. Sink all three of the bot’s ships before it sinks yours.' },
+    battleship: { title: 'Sink the <em>fleet</em>', name: 'Battleship', how: 'Fire at the enemy waters on the right. A hit lets you fire again. Ships never touch, not even at a corner, so the water around a sunk ship is marked for you. Sink all three of the bot’s ships before it sinks yours.' },
     spotdiff: { title: 'Spot the <em>difference</em>', name: 'Spot the difference', how: 'Two photographs of the Titanic, five differences. Click them in either picture. A wrong click costs 2 seconds.' },
     tictactoe: { title: 'Anchors and <em>icebergs</em>', name: 'Tic-tac-toe', how: 'You play the anchors, the bot plays the icebergs. Get three in a row. A draw starts a new round.' },
     deckrun: { title: 'Run the <em>deck</em>', name: 'Deck run', how: 'Run to the bow. Jump over deck chairs, crates and barrels with Space, ↑ or a click. Three knocks and you are out.' },
-    deckclimb: { title: 'Climb the <em>decks</em>', name: 'Deck climb', how: 'Bounce from deck to deck up to the funnels. Steer with ← → or the mouse. Do not fall into the sea.' },
+    deckclimb: { title: 'Climb the <em>decks</em>', name: 'Deck climb', how: 'Bounce up through the ship: from the engine room past the crew quarters, second class and first class to the boat deck. Steer with ← → or the mouse. Lifebuoys bounce you higher. Do not fall.' },
     seagull: { title: 'The <em>seagull</em>', name: 'Seagull', how: 'Fly between the icebergs and the storm clouds. Flap with Space, ↑ or a click. Pass ten gaps.' }
   };
   const GAMES = Object.keys(INFO);
@@ -46,18 +46,39 @@
     if (!b[4] && rand() < .5) return 4;
     return free[Math.floor(rand() * free.length)];
   }
-  // ### Battleship: a fleet of straight ships on an n x n grid, no two ships on the same cell. A ship is a list of cell numbers.
-  function placeFleet(n, sizes, rand){
-    const used = new Set(), ships = [];
-    for (const size of sizes){
-      for (let tries = 0; tries < 500; tries++){
-        const across = rand() < .5, r = Math.floor(rand() * (across ? n : n - size + 1)), c = Math.floor(rand() * (across ? n - size + 1 : n));
-        const cells = Array.from({ length: size }, (_, k) => across ? r * n + c + k : (r + k) * n + c);
-        if (cells.some(x => used.has(x))) continue;
-        cells.forEach(x => used.add(x)); ships.push(cells); break;
-      }
+  // ### The cells around a cell on an n x n grid, the diagonals included.
+  function around(n, cell){
+    const r = Math.floor(cell / n), c = cell % n, out = [];
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++){
+      const rr = r + dr, cc = c + dc;
+      if ((dr || dc) && rr >= 0 && rr < n && cc >= 0 && cc < n) out.push(rr * n + cc);
     }
-    return ships;
+    return out;
+  }
+  // ### Battleship: a fleet of straight ships on an n x n grid. The real rule of the game: ships never touch, not even at a
+  // ### corner, so every cell around a ship is water. A ship is a list of cell numbers. If a fleet cannot be finished (very
+  // ### unlikely on 6 x 6), it starts again.
+  function placeFleet(n, sizes, rand){
+    for (let attempt = 0; attempt < 200; attempt++){
+      const blocked = new Set(), ships = [];
+      for (const size of sizes){
+        for (let tries = 0; tries < 200; tries++){
+          const across = rand() < .5, r = Math.floor(rand() * (across ? n : n - size + 1)), c = Math.floor(rand() * (across ? n - size + 1 : n));
+          const cells = Array.from({ length: size }, (_, k) => across ? r * n + c + k : (r + k) * n + c);
+          if (cells.some(x => blocked.has(x))) continue;
+          cells.forEach(x => { blocked.add(x); around(n, x).forEach(y => blocked.add(y)); });
+          ships.push(cells); break;
+        }
+      }
+      if (ships.length === sizes.length) return ships;
+    }
+    return [];
+  }
+  // ### The water around the sunk ships of a fleet: no ship can be there, so the game marks it for the player.
+  function waterAround(n, ships, shots){
+    const water = new Set();
+    for (const s of ships) if (s.every(c => shots.has(c))) s.forEach(c => around(n, c).forEach(x => { if (!s.includes(x)) water.add(x); }));
+    return water;
   }
   const sunk = (ship, shots) => ship.every(c => shots.has(c));
   const fleetSunk = (ships, shots) => ships.every(s => sunk(s, shots));
@@ -179,10 +200,11 @@
         const s = shipAt(mine, i);
         el.className = 'bs-cell' + (s ? ' ship' : '') + (botShots.has(i) ? (s ? ' hit' : ' miss') : '') + (s && sunk(s, botShots) ? ' sunk' : '');
       });
+      const water = waterAround(N, theirs, myShots);
       [...gTheirs.children].forEach((el, i) => {
-        const s = shipAt(theirs, i), shot = myShots.has(i);
-        el.className = 'bs-cell' + (shot ? (s ? ' hit' : ' miss') : '') + (s && sunk(s, myShots) ? ' ship sunk' : '');
-        el.disabled = shot || turn !== 'me';
+        const s = shipAt(theirs, i), shot = myShots.has(i), free = water.has(i) && !shot;
+        el.className = 'bs-cell' + (shot ? (s ? ' hit' : ' miss') : '') + (free ? ' water' : '') + (s && sunk(s, myShots) ? ' ship sunk' : '');
+        el.disabled = shot || free || turn !== 'me';
       });
       api.status(turn === 'me' ? 'Your turn: fire at the enemy waters.' : 'The bot is aiming…');
     }
@@ -201,7 +223,7 @@
       const b = e.target.closest('[data-cell]');
       if (!b || turn !== 'me' || api.over) return;
       const c = Number(b.dataset.cell);
-      if (myShots.has(c)) return;
+      if (myShots.has(c) || waterAround(N, theirs, myShots).has(c)) return;
       myShots.add(c);
       const s = shipAt(theirs, c);
       api.sound(s ? (sunk(s, myShots) ? 'good' : 'hit') : 'splash');
@@ -380,18 +402,233 @@
     };
   };
 
-  // ### 5. Deck climb: bounce up from deck to deck to the top of the funnels; fall and you are in the sea.
+  // ### 5. Deck climb: bounce up through the ship, from the boiler rooms at the bottom, past the crew quarters, second class
+  // ### and first class, to the boat deck with its funnels at the top. Each level is painted once, in detail, on its own
+  // ### canvas when the game starts, so drawing a frame costs only five pictures and the platforms.
+  const CLIMB_LEVELS = [
+    { id: 'engine', name: 'Engine room' }, { id: 'crew', name: 'Crew quarters' }, { id: 'second', name: 'Second class' },
+    { id: 'first', name: 'First class' }, { id: 'deck', name: 'Boat deck' }
+  ];
+  // ### Paints one level of the ship on g (w x h, the level's own coordinates). r is a fixed random sequence.
+  function paintLevel(id, g, w, h, r){
+    const rivets = (y0, y1, step, color) => { g.fillStyle = color; for (let y = y0; y < y1; y += step) for (let x = 6; x < w; x += 18) { g.beginPath(); g.arc(x, y, 1.3, 0, 7); g.fill(); } };
+    const porthole = (x, y, rad, glass) => {
+      g.fillStyle = '#b08a3e'; g.beginPath(); g.arc(x, y, rad + 3, 0, 7); g.fill();
+      const gl = g.createRadialGradient(x - rad * .3, y - rad * .3, 1, x, y, rad); gl.addColorStop(0, glass[0]); gl.addColorStop(1, glass[1]);
+      g.fillStyle = gl; g.beginPath(); g.arc(x, y, rad, 0, 7); g.fill();
+      g.fillStyle = '#6e5424'; for (let k = 0; k < 6; k++){ const a = k * Math.PI / 3; g.beginPath(); g.arc(x + Math.cos(a) * (rad + 1.5), y + Math.sin(a) * (rad + 1.5), 1, 0, 7); g.fill(); }
+    };
+    const lamp = (x, y, color, glow) => {
+      const gr = g.createRadialGradient(x, y, 1, x, y, glow); gr.addColorStop(0, color); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(x - glow, y - glow, glow * 2, glow * 2);
+      g.fillStyle = '#fff3c4'; g.beginPath(); g.arc(x, y, 3, 0, 7); g.fill();
+    };
+    if (id === 'engine'){
+      // riveted steel bulkheads in the heat of the furnaces
+      const bg = g.createLinearGradient(0, 0, 0, h); bg.addColorStop(0, '#2a2522'); bg.addColorStop(1, '#3b2a20');
+      g.fillStyle = bg; g.fillRect(0, 0, w, h);
+      g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 2; for (let y = 40; y < h; y += 80){ g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+      for (let x = 60; x < w; x += 120){ g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
+      rivets(46, h, 80, 'rgba(160,140,120,.35)');
+      // three Scotch boilers with glowing furnace doors at the bottom
+      for (let k = 0; k < 3; k++){
+        const bx = 20 + k * 112, by = h - 150;
+        const bgr = g.createLinearGradient(bx, 0, bx + 96, 0); bgr.addColorStop(0, '#3a332e'); bgr.addColorStop(.45, '#6d625a'); bgr.addColorStop(1, '#2b2522');
+        g.fillStyle = bgr; g.beginPath(); g.ellipse(bx + 48, by + 60, 48, 70, 0, 0, 7); g.fill();
+        g.strokeStyle = '#2a2420'; g.lineWidth = 1.5; for (let a = 0; a < 3; a++){ g.beginPath(); g.ellipse(bx + 48, by + 60, 48, 70 - a * 20, 0, 0, 7); g.stroke(); }
+        for (let d = 0; d < 2; d++){
+          const fx = bx + 22 + d * 30, fy = by + 92;
+          const fire = g.createRadialGradient(fx + 9, fy + 10, 1, fx + 9, fy + 10, 30); fire.addColorStop(0, 'rgba(255,190,80,.9)'); fire.addColorStop(1, 'rgba(255,90,20,0)');
+          g.fillStyle = fire; g.fillRect(fx - 22, fy - 20, 62, 62);
+          g.fillStyle = '#1b1612'; g.fillRect(fx, fy, 18, 20); g.fillStyle = '#ff9a30'; for (let s = 0; s < 4; s++) g.fillRect(fx + 2, fy + 3 + s * 4, 14, 2);
+        }
+        g.fillStyle = '#ddd'; g.beginPath(); g.arc(bx + 48, by + 22, 7, 0, 7); g.fill(); g.strokeStyle = '#c0392b'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(bx + 48, by + 22); g.lineTo(bx + 52, by + 17); g.stroke();
+      }
+      // coal heaps and a shovel
+      g.fillStyle = '#121212'; for (let k = 0; k < 4; k++){ g.beginPath(); g.ellipse(40 + k * 95, h - 4, 34, 12, 0, Math.PI, 0); g.fill(); }
+      // pipes with valves and gauges
+      g.lineCap = 'round';
+      for (let k = 0; k < 4; k++){
+        const py = 40 + k * 78, col = ['#8a5a3a', '#6f7478', '#8a5a3a', '#5d6a72'][k];
+        g.strokeStyle = col; g.lineWidth = 9; g.beginPath(); g.moveTo(-5, py); g.lineTo(w + 5, py); g.stroke();
+        g.strokeStyle = 'rgba(255,255,255,.18)'; g.lineWidth = 2; g.beginPath(); g.moveTo(-5, py - 3); g.lineTo(w + 5, py - 3); g.stroke();
+        for (let x = 30 + k * 23; x < w; x += 110){ g.fillStyle = '#4b4b4b'; g.fillRect(x - 3, py - 7, 6, 14); }
+        const vx = 70 + r() * (w - 140);
+        g.strokeStyle = '#b03a2e'; g.lineWidth = 2.5; g.beginPath(); g.arc(vx, py - 15, 8, 0, 7); g.moveTo(vx - 8, py - 15); g.lineTo(vx + 8, py - 15); g.moveTo(vx, py - 23); g.lineTo(vx, py - 7); g.stroke();
+      }
+      g.strokeStyle = '#7d6a4c'; g.lineWidth = 7; g.beginPath(); g.moveTo(w - 30, 0); g.lineTo(w - 30, h - 160); g.quadraticCurveTo(w - 30, h - 140, w - 50, h - 140); g.stroke();
+      for (let k = 0; k < 3; k++){ const gx = 40 + k * 130, gy = 150 + (k % 2) * 90; g.fillStyle = '#2b2b2b'; g.beginPath(); g.arc(gx, gy, 13, 0, 7); g.fill(); g.fillStyle = '#efe6cf'; g.beginPath(); g.arc(gx, gy, 10, 0, 7); g.fill(); g.strokeStyle = '#111'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(gx, gy); g.lineTo(gx + 6 * Math.cos(r() * 6), gy + 6 * Math.sin(r() * 6)); g.stroke(); }
+      // steam and the red glow of the stokehold
+      for (let k = 0; k < 10; k++){ g.fillStyle = `rgba(220,220,220,${.05 + r() * .06})`; g.beginPath(); g.arc(r() * w, r() * h * .7, 14 + r() * 26, 0, 7); g.fill(); }
+      const heat = g.createLinearGradient(0, h, 0, h - 220); heat.addColorStop(0, 'rgba(255,90,20,.32)'); heat.addColorStop(1, 'rgba(255,90,20,0)'); g.fillStyle = heat; g.fillRect(0, h - 220, w, 220);
+      lamp(w * .3, 18, 'rgba(255,200,120,.5)', 40); lamp(w * .75, 18, 'rgba(255,200,120,.5)', 40);
+    } else if (id === 'crew'){
+      // painted steel, rivets, bunks, lockers and portholes
+      g.fillStyle = '#7c8a7c'; g.fillRect(0, 0, w, h);
+      g.fillStyle = '#5d6a5e'; g.fillRect(0, 0, w, 14); for (let y = 130; y < h; y += 130) g.fillRect(0, y, w, 6);
+      g.strokeStyle = 'rgba(0,0,0,.18)'; g.lineWidth = 1; for (let x = 0; x < w; x += 60){ g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); }
+      rivets(20, h, 65, 'rgba(40,50,40,.35)');
+      for (let row = 0; row < 4; row++){
+        const y0 = 24 + row * 130;
+        // a two-high bunk with blankets and a pillow
+        const bx = row % 2 ? 190 : 20;
+        g.fillStyle = '#4a4f4a'; g.fillRect(bx, y0 + 10, 4, 96); g.fillRect(bx + 140, y0 + 10, 4, 96);
+        for (let b = 0; b < 2; b++){
+          const yy = y0 + 40 + b * 48;
+          g.fillStyle = '#3d423d'; g.fillRect(bx, yy, 144, 5);
+          g.fillStyle = ['#7a2e2a', '#2e4a6a', '#5b5236'][(row + b) % 3]; g.fillRect(bx + 4, yy - 9, 136, 9);
+          g.fillStyle = '#e9e4d6'; g.fillRect(bx + 8, yy - 13, 26, 9);
+        }
+        // lockers
+        const lx = row % 2 ? 22 : 196;
+        for (let l = 0; l < 4; l++){
+          g.fillStyle = '#5f6c6f'; g.fillRect(lx + l * 34, y0 + 24, 31, 86);
+          g.fillStyle = 'rgba(0,0,0,.35)'; for (let v = 0; v < 4; v++) g.fillRect(lx + l * 34 + 6, y0 + 32 + v * 4, 19, 1.5);
+          g.fillStyle = '#c9b46a'; g.fillRect(lx + l * 34 + 24, y0 + 64, 3, 8);
+        }
+        porthole(row % 2 ? 160 : 180, y0 + 6, 9, ['#3c5f85', '#0d1b2c']);
+        lamp(row % 2 ? 100 : 270, y0 + 2, 'rgba(255,220,140,.55)', 34);
+      }
+      // a coat hanging on a hook, a sign
+      g.fillStyle = '#efe6cf'; g.fillRect(w - 118, 2, 108, 12); g.fillStyle = '#2a2418'; g.font = '700 9px Arial, sans-serif'; g.fillText('CREW ONLY · E DECK', w - 113, 11);
+    } else if (id === 'second'){
+      // oak panelling, white ceiling beams, cabin doors, a library corner
+      const bg = g.createLinearGradient(0, 0, w, 0); bg.addColorStop(0, '#6b4526'); bg.addColorStop(.5, '#865a33'); bg.addColorStop(1, '#6b4526');
+      g.fillStyle = bg; g.fillRect(0, 0, w, h);
+      for (let x = 0; x < w; x += 45){ g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(x, 0, 3, h); g.fillStyle = 'rgba(255,220,170,.06)'; g.fillRect(x + 6, 0, 30, h); }
+      g.strokeStyle = 'rgba(40,20,8,.35)'; g.lineWidth = 1; for (let k = 0; k < 120; k++){ const x = r() * w, y = r() * h; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 4, y + 10, x, y + 22); g.stroke(); }
+      for (let y = 0; y < h; y += 130){ g.fillStyle = '#eee7d6'; g.fillRect(0, y, w, 10); g.fillStyle = 'rgba(0,0,0,.2)'; g.fillRect(0, y + 10, w, 3); }
+      for (let row = 0; row < 4; row++){
+        const y0 = 14 + row * 130;
+        // two cabin doors with brass numbers
+        for (let d = 0; d < 2; d++){
+          if (row === 3 && d === 1) continue;   // the bookcase stands there
+          const dx = row % 2 ? 40 + d * 200 : 110 + d * 160;
+          g.fillStyle = '#4a2e18'; g.fillRect(dx, y0 + 18, 48, 96); g.strokeStyle = '#c9a052'; g.lineWidth = 1.5; g.strokeRect(dx + 6, y0 + 26, 36, 36); g.strokeRect(dx + 6, y0 + 68, 36, 38);
+          g.fillStyle = '#d8b25a'; g.beginPath(); g.arc(dx + 40, y0 + 70, 2.5, 0, 7); g.fill();
+          g.font = '700 10px Georgia, serif'; g.fillText('D' + (40 + row * 4 + d * 2), dx + 14, y0 + 14);
+        }
+        // wall lamps with pleated shades
+        for (let l = 0; l < 2; l++){ const lx = row % 2 ? 150 + l * 160 : 70 + l * 200; lamp(lx, y0 + 40, 'rgba(255,214,150,.5)', 30); g.fillStyle = '#efe0c0'; g.beginPath(); g.moveTo(lx - 7, y0 + 34); g.lineTo(lx + 7, y0 + 34); g.lineTo(lx + 10, y0 + 44); g.lineTo(lx - 10, y0 + 44); g.fill(); }
+        porthole(row % 2 ? 330 : 30, y0 + 50, 10, ['#5b7fa6', '#13253a']);
+      }
+      // a bookcase in the library
+      g.fillStyle = '#3c2412'; g.fillRect(236, h - 140, 90, 120);
+      for (let s = 0; s < 4; s++) for (let b = 0; b < 9; b++){ g.fillStyle = ['#7a2e2a', '#2e4a6a', '#5b5236', '#3a5a3a', '#8a6a2a'][(s + b) % 5]; g.fillRect(240 + b * 9.5, h - 134 + s * 29, 8, 24); }
+      g.fillStyle = '#2f5a3a'; g.fillRect(0, h - 12, w, 12);
+    } else if (id === 'first'){
+      // the Grand Staircase: white and gold panels, arched windows, the clock "Honour and Glory", a chandelier, red carpet
+      g.fillStyle = '#efe6cf'; g.fillRect(0, 0, w, h);
+      for (let x = 10; x < w; x += 70) for (let y = 10; y < h; y += 100){
+        g.strokeStyle = '#c9a052'; g.lineWidth = 2; g.strokeRect(x, y, 56, 84); g.strokeStyle = 'rgba(160,120,50,.4)'; g.lineWidth = 1; g.strokeRect(x + 5, y + 5, 46, 74);
+        g.strokeStyle = 'rgba(160,120,50,.5)'; g.beginPath(); g.moveTo(x + 28, y + 24); g.bezierCurveTo(x + 14, y + 34, x + 42, y + 50, x + 28, y + 60); g.stroke();
+      }
+      // arched windows with the glow of the sea at night
+      for (let k = 0; k < 2; k++){
+        const ax = 40 + k * 220, ay = 60;
+        g.fillStyle = '#c9a052'; g.beginPath(); g.moveTo(ax - 4, ay + 120); g.lineTo(ax - 4, ay + 30); g.arc(ax + 36, ay + 30, 40, Math.PI, 0); g.lineTo(ax + 76, ay + 120); g.fill();
+        const gl = g.createLinearGradient(0, ay, 0, ay + 120); gl.addColorStop(0, '#1b2f52'); gl.addColorStop(1, '#4f6f9a');
+        g.fillStyle = gl; g.beginPath(); g.moveTo(ax, ay + 116); g.lineTo(ax, ay + 30); g.arc(ax + 36, ay + 30, 36, Math.PI, 0); g.lineTo(ax + 72, ay + 116); g.fill();
+        g.strokeStyle = '#c9a052'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(ax + 36, ay - 6); g.lineTo(ax + 36, ay + 116); g.moveTo(ax, ay + 60); g.lineTo(ax + 72, ay + 60); g.stroke();
+      }
+      // the carved clock
+      const cx = w / 2, cy = 260;
+      g.fillStyle = '#7a5428'; g.fillRect(cx - 60, cy - 46, 120, 92);
+      g.fillStyle = '#9a6f38'; g.beginPath(); g.ellipse(cx - 40, cy, 14, 36, 0, 0, 7); g.ellipse(cx + 40, cy, 14, 36, 0, 0, 7); g.fill();
+      g.fillStyle = '#f7f1df'; g.beginPath(); g.arc(cx, cy, 22, 0, 7); g.fill(); g.strokeStyle = '#3a2a10'; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, 22, 0, 7); g.moveTo(cx, cy); g.lineTo(cx, cy - 15); g.moveTo(cx, cy); g.lineTo(cx + 10, cy + 4); g.stroke();
+      g.fillStyle = '#3a2a10'; g.font = 'italic 9px Georgia, serif'; g.textAlign = 'center'; g.fillText('Honour and Glory', cx, cy + 40); g.textAlign = 'start';
+      // a chandelier
+      const chx = w / 2, chy = 60;
+      g.strokeStyle = '#b08a3e'; g.lineWidth = 2; g.beginPath(); g.moveTo(chx, 0); g.lineTo(chx, chy); g.stroke();
+      for (let k = -3; k <= 3; k++){ g.beginPath(); g.moveTo(chx, chy); g.quadraticCurveTo(chx + k * 10, chy + 18, chx + k * 14, chy + 8); g.stroke(); lamp(chx + k * 14, chy + 6, 'rgba(255,230,160,.55)', 18); }
+      for (let k = 0; k < 14; k++){ g.fillStyle = 'rgba(255,255,255,.8)'; g.beginPath(); g.arc(chx - 36 + k * 5.5, chy + 22 + Math.sin(k) * 3, 1.6, 0, 7); g.fill(); }
+      // oil paintings and the gilded balustrade at the bottom
+      g.fillStyle = '#b08a3e'; g.fillRect(30, 360, 70, 56); g.fillRect(w - 100, 360, 70, 56);
+      g.fillStyle = '#4f6a5a'; g.fillRect(36, 366, 58, 44); g.fillStyle = '#7a4a3a'; g.fillRect(w - 94, 366, 58, 44);
+      g.fillStyle = '#e0c48a'; g.beginPath(); g.arc(65, 392, 6, 0, 7); g.fill(); g.fillStyle = '#32503e'; g.fillRect(w - 94, 396, 58, 14);
+      g.fillStyle = '#8c1d1d'; g.fillRect(0, h - 26, w, 26); g.fillStyle = '#c9a052'; g.fillRect(0, h - 28, w, 3);
+      for (let x = 6; x < w; x += 16){ g.fillStyle = '#c9a052'; g.fillRect(x, h - 60, 3, 32); g.beginPath(); g.arc(x + 1.5, h - 60, 3, 0, 7); g.fill(); }
+      g.fillStyle = '#7a5428'; g.fillRect(0, h - 64, w, 5);
+    } else {
+      // the boat deck at night: stars, funnels with smoke, lifeboats in their davits, ventilators, a mast and the railing
+      const sky = g.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#081329'); sky.addColorStop(.7, '#1e3560'); sky.addColorStop(1, '#3a5480');
+      g.fillStyle = sky; g.fillRect(0, 0, w, h);
+      for (let k = 0; k < 120; k++){ g.fillStyle = `rgba(255,255,255,${.3 + r() * .7})`; g.fillRect(r() * w, r() * h * .7, 1.5, 1.5); }
+      g.fillStyle = '#f3ecd0'; g.beginPath(); g.arc(w - 60, 60, 18, 0, 7); g.fill();
+      for (let k = 0; k < 4; k++){
+        const fx = 22 + k * 84, fy = h - 330;
+        g.fillStyle = 'rgba(60,60,66,.55)'; for (let s = 0; s < 5; s++){ g.beginPath(); g.arc(fx + 26 - s * 10, fy - 14 - s * 18, 12 + s * 5, 0, 7); g.fill(); }
+        const fg = g.createLinearGradient(fx, 0, fx + 56, 0); fg.addColorStop(0, '#b07c2a'); fg.addColorStop(.4, '#e0aa4c'); fg.addColorStop(1, '#9a6a24');
+        g.fillStyle = fg; g.fillRect(fx, fy, 56, 230); g.fillStyle = '#151515'; g.fillRect(fx, fy, 56, 40);
+        g.fillStyle = 'rgba(0,0,0,.25)'; for (let b = 0; b < 3; b++) g.fillRect(fx, fy + 70 + b * 50, 56, 2);
+      }
+      // the officers' quarters and the wheelhouse
+      g.fillStyle = '#ece8dc'; g.fillRect(0, h - 120, w, 70); g.fillStyle = '#7a5428'; for (let x = 10; x < w; x += 26) g.fillRect(x, h - 104, 14, 16);
+      // lifeboats in davits
+      for (let k = 0; k < 4; k++){
+        const lx = 14 + k * 88, ly = h - 150;
+        g.strokeStyle = '#ddd'; g.lineWidth = 3; g.beginPath(); g.moveTo(lx, ly + 40); g.quadraticCurveTo(lx, ly - 8, lx + 14, ly - 8); g.moveTo(lx + 70, ly + 40); g.quadraticCurveTo(lx + 70, ly - 8, lx + 56, ly - 8); g.stroke();
+        g.fillStyle = '#f5f2ea'; g.beginPath(); g.moveTo(lx + 4, ly + 4); g.lineTo(lx + 66, ly + 4); g.quadraticCurveTo(lx + 60, ly + 22, lx + 35, ly + 22); g.quadraticCurveTo(lx + 10, ly + 22, lx + 4, ly + 4); g.fill();
+        g.fillStyle = '#8f2a20'; g.fillRect(lx + 6, ly + 4, 58, 3);
+      }
+      // ventilator cowls
+      for (let k = 0; k < 3; k++){ const vx = 60 + k * 110, vy = h - 70; g.fillStyle = '#f0ebe0'; g.fillRect(vx, vy - 26, 8, 26); g.beginPath(); g.arc(vx + 10, vy - 28, 10, Math.PI * .6, Math.PI * 2.1); g.fill(); g.fillStyle = '#8f2a20'; g.beginPath(); g.arc(vx + 12, vy - 30, 5, 0, 7); g.fill(); }
+      g.fillStyle = '#b98a57'; g.fillRect(0, h - 50, w, 50);
+      g.strokeStyle = '#8f6539'; g.lineWidth = 1; for (let y = h - 44; y < h; y += 8){ g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+    }
+  }
+  // ### How each level's platforms look: steel grating, steel shelves, oak planks, red carpet on gilded marble, teak.
+  function paintPlatform(g, level, x, y, w){
+    if (level === 'engine'){
+      g.fillStyle = '#4a4a4a'; g.fillRect(x, y, w, 8);
+      g.strokeStyle = '#2a2a2a'; g.lineWidth = 1; for (let k = 4; k < w; k += 6){ g.beginPath(); g.moveTo(x + k, y); g.lineTo(x + k - 4, y + 8); g.stroke(); }
+      g.fillStyle = '#e0b030'; g.fillRect(x, y, w, 2);
+      g.strokeStyle = '#7a7a7a'; g.lineWidth = 2; g.beginPath(); g.moveTo(x + 2, y - 12); g.lineTo(x + w - 2, y - 12); g.moveTo(x + 2, y - 12); g.lineTo(x + 2, y); g.moveTo(x + w - 2, y - 12); g.lineTo(x + w - 2, y); g.stroke();
+    } else if (level === 'crew'){
+      g.fillStyle = '#5c6466'; g.fillRect(x, y, w, 8); g.fillStyle = '#879092'; g.fillRect(x, y, w, 2);
+      g.fillStyle = '#2f3537'; for (let k = 5; k < w; k += 12){ g.beginPath(); g.arc(x + k, y + 5, 1.2, 0, 7); g.fill(); }
+      g.fillStyle = '#3f4547'; g.fillRect(x + 6, y + 8, 3, 6); g.fillRect(x + w - 9, y + 8, 3, 6);
+    } else if (level === 'second'){
+      const og = g.createLinearGradient(0, y, 0, y + 9); og.addColorStop(0, '#a87442'); og.addColorStop(1, '#5e3a1c');
+      g.fillStyle = og; g.fillRect(x, y, w, 9);
+      g.strokeStyle = 'rgba(40,20,8,.5)'; g.lineWidth = 1; for (let k = 18; k < w; k += 22){ g.beginPath(); g.moveTo(x + k, y); g.lineTo(x + k, y + 9); g.stroke(); }
+      g.strokeStyle = '#c9a052'; g.lineWidth = 2; g.beginPath(); g.moveTo(x, y - 10); g.lineTo(x + w, y - 10); g.stroke();
+      g.lineWidth = 1.2; for (let k = 4; k < w; k += 10){ g.beginPath(); g.moveTo(x + k, y - 10); g.lineTo(x + k, y); g.stroke(); }
+    } else if (level === 'first'){
+      g.fillStyle = '#f2ece0'; g.fillRect(x, y + 4, w, 6); g.fillStyle = '#c9a052'; g.fillRect(x, y + 9, w, 2);
+      g.fillStyle = '#9c1f22'; g.fillRect(x + 3, y, w - 6, 5); g.fillStyle = '#d6b45a'; g.fillRect(x + 3, y, w - 6, 1);
+      g.strokeStyle = '#c9a052'; g.lineWidth = 1.5; for (let k = 6; k < w; k += 12){ g.beginPath(); g.moveTo(x + k, y); g.quadraticCurveTo(x + k + 3, y - 6, x + k, y - 12); g.stroke(); }
+      g.fillStyle = '#7a5428'; g.fillRect(x, y - 14, w, 3);
+    } else {
+      g.fillStyle = '#c4935e'; g.fillRect(x, y, w, 9);
+      g.strokeStyle = '#8f6539'; g.lineWidth = 1; g.beginPath(); g.moveTo(x, y + 4.5); g.lineTo(x + w, y + 4.5); g.stroke();
+      g.strokeStyle = '#f1ece2'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, y - 9); g.lineTo(x + w, y - 9); g.stroke();
+      for (let k = 4; k < w; k += 12){ g.beginPath(); g.moveTo(x + k, y - 9); g.lineTo(x + k, y); g.stroke(); }
+    }
+  }
   BUILD.deckclimb = api => {
-    const W = 360, H = 480, GOAL = 2000;
+    const W = 360, H = 480, GOAL = 2000, BOTTOM = H - 30, TOP = -GOAL - 80;
     const c = api.canvas(W, H), g = c.getContext('2d');
+    // the five levels share the height from the boiler floor to the boat deck; the deck level also holds the sky above it
+    const bandH = Math.ceil((BOTTOM - TOP) / 5);
+    const levelAt = y => CLIMB_LEVELS[clampN(Math.floor((BOTTOM - y) / bandH), 0, 4)].id;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const bands = CLIMB_LEVELS.map((lv, i) => {
+      const top = BOTTOM - (i + 1) * bandH - (i === 4 ? 400 : 0), h = BOTTOM - i * bandH - top;
+      const cv = document.createElement('canvas'); cv.width = W * dpr; cv.height = h * dpr;
+      const bg = cv.getContext('2d'); bg.scale(dpr, dpr);
+      paintLevel(lv.id, bg, W, h, seq(1912 + i * 7));
+      return { ...lv, top, h, cv };
+    });
     const p = { x: W / 2, y: H - 60, vx: 0, vy: -760 };
-    let camY = 0, best = 0, steer = 0, aim = null;
-    const plats = [{ x: 0, y: H - 30, w: W, move: 0 }];
+    let camY = 0, best = 0, steer = 0, aim = null, shown = '';
+    const plats = [{ x: 0, y: BOTTOM, w: W, move: 0, floor: true }];
     for (let y = H - 110; y > -GOAL - 40; y -= 62 + api.rand() * 34){
       const w = 70 + api.rand() * 30;
       plats.push({ x: api.rand() * (W - w), y, w, move: api.rand() < .2 ? (api.rand() < .5 ? -60 : 60) : 0, spring: api.rand() < .08 });
     }
-    plats.push({ x: 0, y: -GOAL - 80, w: W, move: 0, top: true });
+    plats.push({ x: 0, y: TOP, w: W, move: 0, top: true });
+    plats.forEach(pl => { pl.level = pl.top ? 'deck' : levelAt(pl.y); });
     return {
       key(code, down){
         if (code === 'ArrowLeft' || code === 'KeyA') steer = down ? -1 : (steer === -1 ? 0 : steer);
@@ -399,7 +636,7 @@
         if (down) aim = null;
       },
       point(x, y, type){ if (type === 'move' || type === 'down') aim = x; },
-      start(){ api.status('Climb to the funnels.'); },
+      start(){ api.status('Engine room · climb to the boat deck.'); },
       update(dt){
         const target = aim !== null ? clampN((aim - p.x) * 6, -330, 330) : steer * 330;
         p.vx += (target - p.vx) * Math.min(1, dt * 10);
@@ -409,40 +646,46 @@
         for (const pl of plats){
           if (pl.move){ pl.x += pl.move * dt; if (pl.x < 0 || pl.x + pl.w > W) pl.move = -pl.move; }
           if (p.vy > 0 && prevY <= pl.y && p.y >= pl.y && p.x > pl.x - 8 && p.x < pl.x + pl.w + 8){
-            if (pl.top){ p.y = pl.y; p.vy = 0; return api.win('You reached the funnels.'); }
+            if (pl.top){ p.y = pl.y; p.vy = 0; return api.win('You made it out onto the boat deck.'); }
             p.y = pl.y; p.vy = pl.spring ? -1150 : -760; api.sound(pl.spring ? 'good' : 'jump');
           }
         }
         camY = Math.min(camY, p.y - H * .45);
         best = Math.max(best, H - 60 - p.y);
-        api.status(`Height: ${Math.max(0, Math.round(best / 10))} m of ${GOAL / 10} m`);
-        if (p.y - camY > H + 40) api.lose('You fell into the sea.');
+        const here = CLIMB_LEVELS.find(l => l.id === levelAt(p.y)).name;
+        if (here !== shown && shown) api.sound('tick');
+        shown = here;
+        api.status(`${here} · ${Math.max(0, Math.round(best / 10))} m of ${GOAL / 10} m`);
+        if (p.y - camY > H + 40) api.lose('You fell back down into the boiler room.');
       },
       draw(){
-        const k = clampN(-camY / GOAL, 0, 1);
-        const sky = g.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, mix('#f6b26b', '#0e1b33', k)); sky.addColorStop(1, mix('#ffe0b0', '#3b5a85', k));
-        g.fillStyle = sky; g.fillRect(0, 0, W, H);
+        g.fillStyle = '#05080c'; g.fillRect(0, 0, W, H);
+        for (const b of bands) if (b.top - camY < H && b.top + b.h - camY > 0) g.drawImage(b.cv, 0, b.top - camY, W, b.h);
+        // the steel deck between two levels
+        g.fillStyle = '#1d1f21';
+        for (let i = 1; i < 5; i++){ const y = BOTTOM - i * bandH - camY; if (y > -10 && y < H + 10){ g.fillRect(0, y - 5, W, 10); g.fillStyle = '#5a5e62'; g.fillRect(0, y - 5, W, 2); g.fillStyle = '#1d1f21'; } }
         g.save(); g.translate(0, -camY);
-        // the sea at the bottom
-        g.fillStyle = '#21486e'; g.fillRect(0, H - 30, W, 400);
-        // the hull side behind the decks: portholes in rows
-        g.fillStyle = 'rgba(20,22,24,.55)'; g.fillRect(30, -GOAL - 60, W - 60, GOAL + H);
-        g.fillStyle = 'rgba(255,214,140,.35)';
-        for (let y = H - 60; y > -GOAL; y -= 40) for (let x = 44; x < W - 44; x += 22) g.fillRect(x, y, 4, 4);
-        // the funnels at the top
-        for (let i = 0; i < 4; i++){ const fx = 30 + i * 82; g.fillStyle = '#d39a3a'; g.fillRect(fx, -GOAL - 230, 52, 150); g.fillStyle = '#151515'; g.fillRect(fx, -GOAL - 230, 52, 26); }
         for (const pl of plats){
           if (pl.y - camY < -30 || pl.y - camY > H + 30) continue;
-          g.fillStyle = pl.top ? '#ece8dc' : '#b98a57'; g.fillRect(pl.x, pl.y, pl.w, 9);
-          g.strokeStyle = '#f1ece2'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(pl.x, pl.y - 9); g.lineTo(pl.x + pl.w, pl.y - 9); g.stroke();
-          for (let x = pl.x + 4; x < pl.x + pl.w; x += 12){ g.beginPath(); g.moveTo(x, pl.y - 9); g.lineTo(x, pl.y); g.stroke(); }
+          if (pl.floor){ g.fillStyle = '#2a2420'; g.fillRect(0, pl.y, W, 40); g.fillStyle = '#e0b030'; g.fillRect(0, pl.y, W, 2); continue; }
+          if (pl.top){ g.fillStyle = '#c4935e'; g.fillRect(0, pl.y, W, 14); continue; }
+          paintPlatform(g, pl.level, pl.x, pl.y, pl.w);
           if (pl.spring) drawBuoy(g, pl.x + pl.w / 2, pl.y - 4, 7);
         }
-        // the climber
-        g.fillStyle = '#ff7a1a'; g.fillRect(p.x - 8, p.y - 26, 16, 20); g.fillRect(p.x - 7, p.y - 7, 5, 7); g.fillRect(p.x + 2, p.y - 7, 5, 7);
+        // the climber in an orange jumpsuit
+        const legs = p.vy < 0 ? 2 : -1;
+        g.fillStyle = '#ff7a1a'; g.fillRect(p.x - 8, p.y - 26, 16, 20); g.fillRect(p.x - 7, p.y - 7 - legs, 5, 7); g.fillRect(p.x + 2, p.y - 7 + legs, 5, 7);
+        g.fillStyle = '#d9661a'; g.fillRect(p.x - 12, p.y - 25, 4, 12); g.fillRect(p.x + 8, p.y - 25, 4, 12);
+        g.fillStyle = '#1c1c1c'; g.fillRect(p.x - 4, p.y - 22, 8, 3);
         g.fillStyle = '#e8c39e'; g.beginPath(); g.arc(p.x, p.y - 32, 7, 0, 7); g.fill();
+        g.fillStyle = '#3a2a1a'; g.beginPath(); g.arc(p.x, p.y - 34, 7, Math.PI, 0); g.fill();
         g.restore();
-        g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(W - 14, 20, 6, H - 40); g.fillStyle = '#ff7a1a'; const f = clampN(best / GOAL, 0, 1); g.fillRect(W - 14, 20 + (H - 40) * (1 - f), 6, (H - 40) * f);
+        // the level you are in, and how far there is still to climb
+        g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(W - 16, 20, 8, H - 40);
+        CLIMB_LEVELS.forEach((lv, i) => { const y = 20 + (H - 40) * (1 - (i + 1) / 5); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(W - 19, y, 14, 1); });
+        g.fillStyle = '#ff7a1a'; const f = clampN(best / GOAL, 0, 1); g.fillRect(W - 16, 20 + (H - 40) * (1 - f), 8, (H - 40) * f);
+        g.fillStyle = 'rgba(10,13,15,.75)'; g.fillRect(8, 8, 128, 22);
+        g.fillStyle = '#ff7a1a'; g.font = '700 12px "JetBrains Mono", monospace'; g.fillText(shown.toUpperCase() || 'ENGINE ROOM', 14, 23);
       }
     };
   };
@@ -580,5 +823,5 @@
     return { stop(){ if (!stopped){ api.over = true; cleanup(); } }, get timeLeft(){ return left; } };
   }
 
-  return Object.freeze({ TIME, INFO, GAMES, DIFFS, pickGames, tttWinner, tttBot, placeFleet, fleetSunk, bsBot, pickDiffs, hitDiff, overlap, open });
+  return Object.freeze({ TIME, INFO, GAMES, DIFFS, pickGames, tttWinner, tttBot, placeFleet, fleetSunk, bsBot, around, waterAround, pickDiffs, hitDiff, overlap, CLIMB_LEVELS, open });
 });

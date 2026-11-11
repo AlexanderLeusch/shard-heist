@@ -53,7 +53,7 @@ test('tic-tac-toe: lines, draws, and a bot that always wins when it can and can 
   assert.ok(wins > 40, `the bot can be beaten (${wins} of 200)`);
 });
 
-test('battleship: fleets of three straight ships that never overlap, and a bot that only fires at new cells', () => {
+test('battleship: fleets of three straight ships that never overlap or touch, and a bot that only fires at new cells', () => {
   const rand = seeded(11);
   for (let i = 0; i < 100; i++){
     const f = M.placeFleet(6, [3, 2, 2], rand);
@@ -67,10 +67,24 @@ test('battleship: fleets of three straight ships that never overlap, and a bot t
       const step = rows.size === 1 ? 1 : 6;
       s.slice(1).forEach((c, k) => assert.equal(c - s[k], step, 'no gaps'));
     }
+    // the real rule: ships never touch, not even at a corner
+    for (const sh of f) for (const c of sh) for (const nb of M.around(6, c)) assert.ok(sh.includes(nb) || !all.includes(nb), 'ships touch at cell ' + c);
     const shots = new Set();
     while (!M.fleetSunk(f, shots)){ const c = M.bsBot(6, f, shots, rand); assert.ok(!shots.has(c) && c >= 0 && c < 36); shots.add(c); }
     assert.ok(shots.size <= 36);
   }
+});
+
+test('battleship: the water around a sunk ship is marked, and only around sunk ships', () => {
+  assert.deepEqual(M.around(6, 0).sort((a, b) => a - b), [1, 6, 7], 'a corner has three neighbours');
+  assert.equal(M.around(6, 14).length, 8);
+  const ships = [[0, 1, 2], [20, 26]];
+  assert.equal(M.waterAround(6, ships, new Set([0, 1])).size, 0, 'nothing while the ship still floats');
+  assert.deepEqual([...M.waterAround(6, ships, new Set([0, 1, 2]))].sort((a, b) => a - b), [3, 6, 7, 8, 9]);
+});
+
+test('deck climb: five levels from the engine room up to the boat deck', () => {
+  assert.deepEqual(M.CLIMB_LEVELS.map(l => l.name), ['Engine room', 'Crew quarters', 'Second class', 'First class', 'Boat deck']);
 });
 
 test('spot the difference: five differences each game, found only once and only near the right place', () => {

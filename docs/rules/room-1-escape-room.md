@@ -70,11 +70,11 @@ At the start of every game, **three different games out of six** are dealt at ra
 
 | Game | How to win in 30 seconds |
 |---|---|
-| **Battleship** | Two 6 × 6 grids, three ships each (3, 2 and 2 cells). Fire at the enemy waters; a hit lets you fire again. Sink all enemy ships before the bot sinks yours. The bot fires at random or, half the time, next to one of its hits. |
+| **Battleship** | Two 6 × 6 grids, three ships each (3, 2 and 2 cells). As in the real game, ships never touch, not even at a corner; once a ship is sunk, the water around it is marked and cannot be fired at. Fire at the enemy waters; a hit lets you fire again. Sink all enemy ships before the bot sinks yours. The bot fires at random or, half the time, next to one of its hits. |
 | **Spot the difference** | Two pictures of the Titanic at night; the right one has 5 changes, chosen from 9. Click all five, in either picture. A wrong click costs 2 seconds. |
 | **Tic-tac-toe** | Your anchors against the bot's icebergs, you start. Three in a row wins, a draw starts a new round. The bot always takes a winning cell, blocks three times out of four, likes the centre, otherwise plays at random. |
 | **Deck run** | Run along the boat deck to the bow; jump (Space, ↑ or a click) over deck chairs, crates, barrels and coils of rope. Three knocks and you are out. |
-| **Deck climb** | Bounce up from deck to deck to the funnels; steer with ← → or the mouse. Lifebuoys bounce you higher. Falling into the sea loses. |
+| **Deck climb** | Bounce up through the Titanic in five levels: the engine room (boilers, furnaces, pipes), the crew quarters (bunks and lockers), second class (oak-panelled corridors and the library), first class (the Grand Staircase with its clock and chandelier) and the boat deck with the funnels and lifeboats. Steer with ← → or the mouse. Lifebuoys bounce you higher. Falling back down loses. |
 | **Seagull** | Fly the seagull over the sea, the Titanic in the background; flap with Space, ↑ or a click through ten gaps between storm clouds and icebergs. |
 
 ## The lock
