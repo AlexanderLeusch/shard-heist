@@ -34,5 +34,5 @@ In April 2012 the Starfall necklace, lent by the Ashford family to Lisbon's nava
 | **Refused action** | The player tried something not allowed. Nothing changes, and the player is told why. |
 | **State** | Everything the game remembers at one moment: where you are, items, time left, and so on. |
 | **Scene** | A place you can stand in room 1 (the door, the sinks, ...). |
-| **Hotspot** | Something you can use in a scene, shown as a pulsing marker or a "Walk to" button. |
+| **Hotspot** | Something you can use in a scene, shown as a pulsing marker (or, on a touch screen, a "Walk to" button). |
 | **Tick** | One step of the clock, many times per second. |

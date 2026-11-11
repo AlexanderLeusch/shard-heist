@@ -1161,8 +1161,8 @@ mergeStatic();
 // ---------- Camera: walking and looking around ----------
 // ### You walk freely through the washroom in the first person: the arrow keys (or W A S D) walk, dragging the mouse or a
 // ### finger turns your head. Where you stand decides which part of the room the rules see you in (the door, the sinks or
-// ### the stall), so the markers of that part appear as you walk in. The "Walk to" buttons still glide you to a spot (the
-// ### only way to move on a touch screen), and the hatch, the briefing and the endings use the same glide.
+// ### the stall), so the markers of that part appear as you walk in. A touch screen has no arrow keys, so there the "Walk
+// ### to" buttons glide you to a spot instead; the hatch, the briefing and the endings use the same glide.
 const VIEWS = {
   intro: { pos: [0, 1.62, 2.2], look: [0, 1.4, -3] },
   door: { pos: [-.9, 1.62, 1.2], look: [1.25, .95, 3] },
@@ -1300,8 +1300,9 @@ if (COARSE) $('lookHint').textContent = 'Drag to look around · tap the markers'
 
 // ---------- Hotspots: markers and clicking objects ----------
 // ### visibleHotspots() from rules.js says what can be used right now. Objects get a pulsing marker (a real button, so it
-// ### works with a keyboard and on touch screens); the "Walk to" buttons glide you to another part of the room, and the
-// ### hatch gets a marker of its own so you can kneel down at it. Clicking an object in the 3D view does the same as its marker.
+// ### works with a keyboard and on touch screens), and the hatch gets a marker of its own so you can kneel down at it.
+// ### Clicking an object in the 3D view does the same as its marker. With a keyboard you walk with the arrow keys; only a
+// ### touch screen shows the "Walk to" buttons that glide you to another part of the room.
 const ANCHORS = {
   'take:mop': [3.35, .9, 2.45], 'wedge': [.38, 1.02, 2.86], 'tap': [-3.94, 1.08, -.53],
   'read:mirror': [-3.97, 1.75, .45], 'play:mirror': [-3.97, 1.75, .45], 'read:graffiti': [1.53, 1.5, -1.9], 'play:tile': [2.62, .58, -2.97], 'take:carkey': [2.62, .58, -2.97],
@@ -1324,7 +1325,7 @@ function renderHotspots(){
     b.className = h.action === 'go' ? 'mk go' : 'mk'; b.innerHTML = '<i></i><span></span>'; b.querySelector('span').textContent = h.label;
     mk.appendChild(b); markerEls.push({ el: b, at: new THREE.Vector3(...(ANCHORS[keyOf(h)] || [0, 1, 0])) });
   }
-  $('goBar').hidden = !go.children.length;
+  $('goBar').hidden = !COARSE || !go.children.length;
 }
 // ### Places the 2D markers over their 3D objects.
 function updateMarkers(){
@@ -1478,12 +1479,18 @@ function showBrief(i){
     return;
   }
   stopCine();
-  const body = text ? (text.startsWith('<div') ? text : `<p>${text}</p>`) : `<div class="howto">
-      <b>Arrow keys</b><span>Walk around the washroom (W A S D work too)</span>
-      <b>Drag</b><span>Look around with the mouse</span>
-      <b>Markers</b><span>Click a pulsing marker or the object itself to use it</span>
+  // ### How to play: you walk with the arrow keys; a touch screen has none, so it gets the "Walk to" buttons instead.
+  const moving = COARSE ? `
+      <b>Walk to</b><span>Buttons at the bottom take you to another part of the room</span>
+      <b>Drag</b><span>Look around with your finger</span>
+      <b>Markers</b><span>Tap a pulsing marker or the object itself to use it</span>` : `
+      <b>↑ ↓</b><span>Arrow keys up and down: walk forwards and backwards</span>
+      <b>← →</b><span>Arrow keys left and right: step to the side (W A S D work too)</span>
+      <b>Drag</b><span>Hold the mouse button and move the mouse to turn your head and look around</span>
+      <b>Walk in</b><span>Walk to the sinks or into the toilet stall: what you can use there gets a pulsing marker</span>
+      <b>Markers</b><span>Click a pulsing marker or the object itself to use it</span>`;
+  const body = text ? (text.startsWith('<div') ? text : `<p>${text}</p>`) : `<div class="howto">${moving}
       <b>Mini games</b><span>The crooked tile, the mirror and the scratches each open a mini game of ${MiniGames.TIME} s. Win it to get the clue</span>
-      <b>Walk to</b><span>Buttons bottom right glide you straight to another part of the room</span>
       <b>Items</b><span>What you pick up appears bottom left and is used automatically</span>
       <b>Clues</b><span>Everything you read is kept in your clue notes</span>
       <b>P / Esc</b><span>Pause. The clock keeps running while you read and try the lock</span>

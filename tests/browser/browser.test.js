@@ -318,9 +318,12 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       for (let i = 0; i < 2; i++) await click('[data-do="next"]');
       assert.ok(!(await evaluate("document.getElementById('overlay').classList.contains('cine')")), 'the scene ends with card 3');
       assert.match(await text('#card'), /Drag/);
+      assert.match(await text('#card'), /Arrow keys up and down: walk forwards and backwards/, 'the card explains walking with the arrow keys');
+      assert.doesNotMatch(await text('#card'), /Buttons at the bottom/, 'no walk buttons on a computer with a keyboard');
       await click('[data-do="start"]');
       await waitFor("document.getElementById('overlay').hidden && !document.getElementById('hud').classList.contains('off')", 10000, 'clock to start');
       assert.equal(await text('#place'), 'The Door');
+      assert.equal(await evaluate("document.getElementById('goBar').hidden"), true, 'the "Walk to" buttons are only shown on touch screens');
       await waitFor("document.getElementById('time').textContent !== '10:00'", 120000, 'clock to run');
       assert.deepEqual(errors, []);
     });
@@ -339,6 +342,8 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       assert.deepEqual(errors, []);
     });
 
+    // ### From here on the tests move between the parts of the room with the touch-screen "Walk to" buttons (hidden on a
+    // ### computer, but still in the page), so they do not have to steer a walk with the arrow keys every time.
     await t.test('escape room rejected: the car key cannot be taken while the tile is on, and the sinks have nothing to take', async () => {
       await hs('go:stall');
       assert.equal(await evaluate("!!document.querySelector('[data-hotspot=\"take:carkey\"]')"), false);

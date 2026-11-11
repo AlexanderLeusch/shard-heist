@@ -26,7 +26,7 @@ You were the detective on the Ashford necklace case; now you are inmate 4471, co
 | Endings (2) | **A:** the hatch opens in time and you climb down into the tunnel. **B:** time runs out and Hale takes you back to your cell. The earlier choice to jam the door buys one extra minute before Ending B |
 | Pressure | 10:00 clock, warnings at 5:00, 2:00, 1:00 and 0:30; every wrong code makes noise and costs 30 seconds |
 | Look | Modelled on a photo of a real prison washroom: green glazed tiles under yellowed cream cinder blocks streaked with rust, caged red emergency lamps, puddles that mirror the lamps and the steel, a striped prisoner's coat hanging to the floor, toilet rolls kicked about |
-| Controls | Arrow keys (or `W A S D`) to walk freely in the first person, drag to look around, click the pulsing markers or the objects, "Walk to" buttons to glide to a spot (touch screens), `P` / `Esc` pause, `M` sound, a volume slider on the pause card |
+| Controls | Arrow keys (or `W A S D`) to walk freely in the first person, drag to look around, click the pulsing markers or the objects, "Walk to" buttons only on touch screens (no arrow keys there), `P` / `Esc` pause, `M` sound, a volume slider on the pause card |
 
 Progress is saved in the browser after every accepted action, and a reload offers to continue.
 
