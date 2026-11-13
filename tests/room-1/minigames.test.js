@@ -87,6 +87,35 @@ test('deck climb: five levels from the engine room up to the boat deck', () => {
   assert.deepEqual(M.CLIMB_LEVELS.map(l => l.name), ['Engine room', 'Crew quarters', 'Second class', 'First class', 'Boat deck']);
 });
 
+test('seagull: the clouds above a gap leave no way through, end exactly at the gap, and the icebergs are hit by their outline', () => {
+  const rand = seeded(9);
+  for (let n = 0; n < 200; n++){
+    const gap = 95 + rand() * 47, clouds = M.cloudStack(gap, rand);
+    assert.ok(clouds.length >= 2, 'more than one cloud');
+    const lowest = Math.max(...clouds.flatMap(c => c.puffs.map(p => c.dy + p.dy + p.r)));
+    assert.ok(Math.abs(lowest - gap) < 1e-9, 'the lowest cloud ends at the gap');
+    // from the top of the screen down to just above the gap, the seagull (radius 6) hits a cloud somewhere in the column
+    for (let y = 16; y < gap - 10; y += 2){
+      let blocked = false;
+      for (let x = -20; x <= 20 && !blocked; x += 2) blocked = M.hitsClouds(clouds, 0, x, y, 6);
+      assert.ok(blocked, `a way through the clouds at y = ${y} (gap at ${gap.toFixed(1)})`);
+    }
+    assert.ok(!M.hitsClouds(clouds, 0, 0, gap + 64, 6), 'the middle of the gap is free');
+  }
+  const berg = M.icebergPoly(0, 300, 54, 100);
+  assert.ok(M.inPoly(berg, 25, 290), 'inside near the base');
+  assert.ok(M.inPoly(berg, 24, 205), 'just under the peak');
+  assert.ok(!M.inPoly(berg, 3, 220), 'not in the empty corner beside the peak');
+  assert.ok(!M.inPoly(berg, 25, 195), 'not above the peak');
+});
+
+test('deck run: every obstacle is a plain box, so what you see is exactly what knocks you down', () => {
+  for (const [k, b] of Object.entries(M.RUN_KINDS)){
+    assert.ok(Number.isInteger(b.w) && Number.isInteger(b.h) && b.w > 0 && b.h > 0, k);
+    assert.ok(b.h <= 30, `${k} can be jumped`);
+  }
+});
+
 test('spot the difference: five differences each game, found only once and only near the right place', () => {
   const d = M.pickDiffs(seeded(5));
   assert.equal(d.length, 5);

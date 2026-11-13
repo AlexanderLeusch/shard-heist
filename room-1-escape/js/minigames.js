@@ -159,13 +159,85 @@
     g.strokeStyle = color || '#f4f1ea'; g.lineWidth = 2.2 * s; g.lineCap = 'round';
     g.beginPath(); g.moveTo(x - 10 * s, y - up); g.quadraticCurveTo(x - 5 * s, y - 6 * s - up * .4, x, y); g.quadraticCurveTo(x + 5 * s, y - 6 * s - up * .4, x + 10 * s, y - up); g.stroke();
   }
-  // ### An iceberg: a jagged white lump, darker on its shaded side. Its base sits at y.
-  function drawIceberg(g, x, y, w, h, flip){
-    g.fillStyle = '#e8f4f8';
-    g.beginPath(); g.moveTo(x, y); g.lineTo(x + w * .12, y - h * .55); g.lineTo(x + w * .3, y - h * .7); g.lineTo(x + w * .45, y - h); g.lineTo(x + w * .62, y - h * .62); g.lineTo(x + w * .8, y - h * .72); g.lineTo(x + w, y); g.closePath(); g.fill();
-    g.fillStyle = 'rgba(120,170,195,.45)';
+  // ### An iceberg: a jagged white lump, darker on its shaded side. Its base sits at y. icebergPoly gives its outline, which
+  // ### is also exactly what the seagull can hit, so what you see is what counts.
+  function icebergPoly(x, y, w, h){
+    return [[x, y], [x + w * .12, y - h * .55], [x + w * .3, y - h * .7], [x + w * .45, y - h], [x + w * .62, y - h * .62], [x + w * .8, y - h * .72], [x + w, y]];
+  }
+  function drawIceberg(g, x, y, w, h){
+    const pts = icebergPoly(x, y, w, h);
+    const gr = g.createLinearGradient(x, y - h, x + w, y); gr.addColorStop(0, '#f6fbff'); gr.addColorStop(1, '#cfe3ee');
+    g.fillStyle = gr; g.beginPath(); pts.forEach(([px, py], i) => i ? g.lineTo(px, py) : g.moveTo(px, py)); g.closePath(); g.fill();
+    g.fillStyle = 'rgba(110,160,190,.45)';
     g.beginPath(); g.moveTo(x + w * .45, y - h); g.lineTo(x + w * .62, y - h * .62); g.lineTo(x + w * .8, y - h * .72); g.lineTo(x + w, y); g.lineTo(x + w * .5, y); g.closePath(); g.fill();
-    if (flip) return;
+  }
+  // ### Whether the point px, py lies inside the polygon pts (ray casting).
+  function inPoly(pts, px, py){
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++){
+      const [xi, yi] = pts[i], [xj, yj] = pts[j];
+      if ((yi > py) !== (yj > py) && px < (xj - xi) * (py - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  }
+  // ### A stack of separate, slightly overlapping clouds above a gap whose top edge is at y = bottom. Each cloud is a few
+  // ### round puffs ({ dx, dy, r } around the cloud's centre); the lowest cloud ends exactly at bottom, the highest reaches
+  // ### past the top of the screen, and neighbouring clouds overlap, so no bird fits between them.
+  function cloudStack(bottom, rand){
+    const clouds = [];
+    let cy = bottom - 18, k = 0;
+    while (cy > -24 && k++ < 20){
+      const cx = (k % 2 ? -6 : 6) + (rand() - .5) * 8;
+      const puffs = [{ dx: 0, dy: 0, r: 18 + rand() * 3 }];
+      const n = 3 + Math.floor(rand() * 3);
+      for (let i = 0; i < n; i++){ const a = i / n * Math.PI * 2 + rand(); puffs.push({ dx: Math.cos(a) * (14 + rand() * 10), dy: Math.sin(a) * 6, r: 11 + rand() * 6 }); }
+      // shift the cloud so its lowest puff touches bottom (the first cloud) or overlaps the cloud below it a little
+      const low = Math.max(...puffs.map(p => p.dy + p.r));
+      if (!clouds.length) cy = bottom - low;
+      clouds.push({ dx: cx, dy: cy, puffs });
+      cy -= 24 + rand() * 6;
+    }
+    return clouds;
+  }
+  // ### Whether a circle (x, y, r) touches any puff of a cloud stack drawn at column x0.
+  function hitsClouds(clouds, x0, x, y, r){
+    return clouds.some(c => c.puffs.some(p => Math.hypot(x0 + c.dx + p.dx - x, c.dy + p.dy - y) < p.r * .92 + r));
+  }
+  // ### The night of 14 April 1912 in the North Atlantic: clear, moonless and icy cold. A sky full of stars over a black,
+  // ### glassy sea, the faint northern lights that survivors remembered, and ice on the horizon. Painted once per game.
+  function paintNight(w, h, horizon, seed){
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    const cv = document.createElement('canvas'); cv.width = Math.round(w * dpr * 1.2); cv.height = Math.round(h * dpr * 1.2);
+    const g = cv.getContext('2d'); g.scale(cv.width / w, cv.height / h);
+    const r = seq(seed);
+    const sky = g.createLinearGradient(0, 0, 0, horizon); sky.addColorStop(0, '#02050c'); sky.addColorStop(.55, '#08162a'); sky.addColorStop(1, '#1b3550');
+    g.fillStyle = sky; g.fillRect(0, 0, w, horizon);
+    // northern lights: soft green curtains
+    for (let k = 0; k < 3; k++){
+      const y0 = 30 + k * 16 + r() * 10;
+      const gr = g.createLinearGradient(0, y0 - 30, 0, y0 + 40); gr.addColorStop(0, 'rgba(80,255,170,0)'); gr.addColorStop(.5, `rgba(80,255,170,${.06 + r() * .05})`); gr.addColorStop(1, 'rgba(80,255,170,0)');
+      g.fillStyle = gr; g.beginPath(); g.moveTo(0, y0 + 20);
+      for (let x = 0; x <= w; x += 40) g.lineTo(x, y0 + Math.sin(x / 70 + k * 2) * 14 - 30);
+      for (let x = w; x >= 0; x -= 40) g.lineTo(x, y0 + Math.sin(x / 60 + k) * 10 + 34);
+      g.fill();
+    }
+    // stars, a few of them brighter, and the Milky Way as a faint band
+    const band = g.createLinearGradient(0, 0, w, horizon); band.addColorStop(.3, 'rgba(200,215,255,0)'); band.addColorStop(.5, 'rgba(200,215,255,.06)'); band.addColorStop(.7, 'rgba(200,215,255,0)');
+    g.fillStyle = band; g.fillRect(0, 0, w, horizon);
+    for (let i = 0; i < 260; i++){
+      const x = r() * w, y = Math.pow(r(), 1.3) * (horizon - 6), s = r();
+      g.fillStyle = `rgba(${220 + s * 35 | 0},${230 + s * 25 | 0},255,${.35 + s * .65})`;
+      g.beginPath(); g.arc(x, y, s > .95 ? 1.3 : s > .7 ? .9 : .55, 0, 7); g.fill();
+    }
+    // the sea: almost black, flat as glass, with starlight on it and a pale line of haze at the horizon
+    const sea = g.createLinearGradient(0, horizon, 0, h); sea.addColorStop(0, '#0e2236'); sea.addColorStop(1, '#02070e');
+    g.fillStyle = sea; g.fillRect(0, horizon, w, h - horizon);
+    const haze = g.createLinearGradient(0, horizon - 14, 0, horizon + 4); haze.addColorStop(0, 'rgba(170,200,225,0)'); haze.addColorStop(1, 'rgba(170,200,225,.18)');
+    g.fillStyle = haze; g.fillRect(0, horizon - 14, w, 18);
+    for (let i = 0; i < 70; i++){ const y = horizon + 2 + Math.pow(r(), 1.6) * (h - horizon), x = r() * w, l = 4 + r() * 14 * (y - horizon) / (h - horizon + 1); g.fillStyle = `rgba(200,220,240,${.06 + r() * .16})`; g.fillRect(x, y, l, .8); }
+    // distant icebergs on the horizon
+    for (let k = 0; k < 3; k++){ const bx = 60 + k * w / 3 + r() * 80, bw = 26 + r() * 30; g.globalAlpha = .55; drawIceberg(g, bx, horizon + 1, bw, 8 + r() * 10); g.globalAlpha = 1; }
+    return cv;
   }
   // ### A lifebuoy ring: white with four red bands.
   function drawBuoy(g, x, y, r){
@@ -325,79 +397,137 @@
     return {};
   };
 
-  // ### 4. Deck run: run along the boat deck to the bow and jump over what is in the way.
+  // ### 4. Deck run: run along the icy boat deck to the bow on the night of the collision, and jump over what is in the way.
+  // ### Every obstacle is drawn exactly as big as the box that can knock you down, and your own box is your body.
+  const RUN_KINDS = {
+    crate: { w: 30, h: 30 }, trunk: { w: 46, h: 22 }, barrel: { w: 24, h: 30 }, ice: { w: 36, h: 16 }
+  };
   BUILD.deckrun = api => {
-    const W = 640, H = 300, GROUND = 250, LEN = 4400, SPEED = 230;
+    const W = 640, H = 300, GROUND = 250, LEN = 4400, SPEED = 230, RAIL = 222;
     const c = api.canvas(W, H), g = c.getContext('2d');
+    const night = paintNight(W, 205, 170, 1912);
     const p = { x: 90, y: GROUND, vy: 0, hurt: 0 };
-    let dist = 0, lives = 3, t = 0;
-    const KINDS = [{ k: 'chair', w: 42, h: 24 }, { k: 'crate', w: 30, h: 34 }, { k: 'barrel', w: 26, h: 28 }, { k: 'rope', w: 38, h: 14 }];
-    const obs = [];
-    for (let x = 520; x < LEN - 200; x += 230 + api.rand() * 170) obs.push({ x, ...KINDS[Math.floor(api.rand() * KINDS.length)] });
+    let dist = 0, lives = 3, t = 0, breath = 0;
+    const kinds = Object.keys(RUN_KINDS), obs = [];
+    for (let x = 520; x < LEN - 200; x += 230 + api.rand() * 170){ const k = kinds[Math.floor(api.rand() * kinds.length)]; obs.push({ x, k, ...RUN_KINDS[k] }); }
+    const flakes = Array.from({ length: 40 }, () => ({ x: api.rand() * W, y: api.rand() * H, s: .4 + api.rand() * .9 }));
     const jump = () => { if (p.y >= GROUND - .5 && !api.over){ p.vy = -610; api.sound('jump'); } };
+    const R = Math.round;
+    const body = () => ({ x: p.x - 7, y: p.y - 47, w: 14, h: 47 });
+    const wrap = (v, span) => ((v % span) + span) % span;
+    function drawObstacle(o, sx){
+      const x = R(sx), y = GROUND - o.h, w = o.w, h = o.h;
+      if (o.k === 'crate'){
+        g.fillStyle = '#8a6136'; g.fillRect(x, y, w, h);
+        g.fillStyle = '#6d4a26'; g.fillRect(x, y, w, 3); g.fillRect(x, y + h - 3, w, 3); g.fillRect(x, y, 3, h); g.fillRect(x + w - 3, y, 3, h);
+        g.strokeStyle = '#5a3c1e'; g.lineWidth = 2; g.beginPath(); g.moveTo(x + 3, y + 3); g.lineTo(x + w - 3, y + h - 3); g.stroke();
+        g.fillStyle = '#eef6fb'; g.fillRect(x, y, w, 4); g.fillStyle = '#ffffff'; g.fillRect(x + 2, y, w - 6, 2);   // snow on the lid
+      } else if (o.k === 'trunk'){
+        g.fillStyle = '#3d4a5c'; g.fillRect(x, y, w, h);
+        g.fillStyle = '#b08a3e'; g.fillRect(x, y + 4, w, 2); g.fillRect(x, y + h - 6, w, 2); g.fillRect(x + 6, y, 3, h); g.fillRect(x + w - 9, y, 3, h);
+        g.fillStyle = '#d8b25a'; g.fillRect(x + w / 2 - 3, y + 8, 6, 5);
+        g.fillStyle = '#eef6fb'; g.fillRect(x, y, w, 3);
+      } else if (o.k === 'barrel'){
+        const gr = g.createLinearGradient(x, 0, x + w, 0); gr.addColorStop(0, '#5e3a1c'); gr.addColorStop(.45, '#8f5e30'); gr.addColorStop(1, '#4e2f16');
+        g.fillStyle = gr; g.fillRect(x, y, w, h);
+        g.fillStyle = '#2d3236'; g.fillRect(x, y + 5, w, 3); g.fillRect(x, y + h - 8, w, 3);
+        g.fillStyle = '#eef6fb'; g.fillRect(x, y, w, 3);
+      } else {
+        // a block of ice that broke off the iceberg and landed on the deck
+        const gr = g.createLinearGradient(x, y, x + w, y + h); gr.addColorStop(0, '#e9f7ff'); gr.addColorStop(1, '#6fa9cc');
+        g.fillStyle = gr; g.fillRect(x, y, w, h);
+        g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(x + 3, y + 3, w * .4, 2);
+        g.strokeStyle = 'rgba(30,85,125,.9)'; g.lineWidth = 1; g.strokeRect(x + .5, y + .5, w - 1, h - 1);
+        g.beginPath(); g.moveTo(x + w * .6, y); g.lineTo(x + w * .5, y + h); g.stroke();
+      }
+    }
     return {
       key(code, down){ if (down && (code === 'Space' || code === 'ArrowUp' || code === 'KeyW')) jump(); },
       point(x, y, type){ if (type === 'down') jump(); },
-      start(){ api.status(`Lives: ${lives} · Distance to the bow: ${LEN} m`); },
+      start(){ api.status(`Lives: ♥♥♥ · Distance to the bow: ${LEN / 10} m`); },
       update(dt){
-        t += dt;
+        t += dt; breath = (breath + dt) % 1.6;
         dist = Math.min(LEN, dist + SPEED * dt);
         p.vy += 1700 * dt; p.y = Math.min(GROUND, p.y + p.vy * dt); if (p.y >= GROUND) p.vy = 0;
         p.hurt = Math.max(0, p.hurt - dt);
-        const box = { x: p.x - 9, y: p.y - 40, w: 18, h: 40 };
+        for (const f of flakes){ f.y += 30 * f.s * dt; f.x -= (SPEED * .6 + 20) * f.s * dt; if (f.y > H) f.y -= H; if (f.x < 0) f.x += W; }
+        const me = body();
         for (const o of obs){
           if (o.hitDone) continue;
           const sx = o.x - dist + p.x;
-          if (p.hurt <= 0 && overlap(box, { x: sx + 3, y: GROUND - o.h + 3, w: o.w - 6, h: o.h - 3 })){
+          // the box that knocks you down is the drawn box, with one pixel of grace on each side
+          if (p.hurt <= 0 && overlap(me, { x: sx + 1, y: GROUND - o.h + 1, w: o.w - 2, h: o.h - 1 })){
             o.hitDone = true; lives--; p.hurt = 1; api.sound('bad');
-            if (lives <= 0) return api.lose('Three knocks. You went down on the deck.');
+            if (lives <= 0) return api.lose('Three knocks. You slipped and went down on the icy deck.');
           }
         }
         api.status(`Lives: ${'♥'.repeat(lives)} · Distance to the bow: ${Math.ceil((LEN - dist) / 10)} m`);
         if (dist >= LEN) api.win('You reached the bow.');
       },
       draw(){
-        const sky = g.createLinearGradient(0, 0, 0, 180); sky.addColorStop(0, '#f2a65a'); sky.addColorStop(1, '#ffd9a0');
-        g.fillStyle = sky; g.fillRect(0, 0, W, 180);
-        g.fillStyle = '#ffe7b0'; g.beginPath(); g.arc(520, 150, 26, 0, 7); g.fill();
-        g.fillStyle = '#2f5f86'; g.fillRect(0, 160, W, 40);
-        g.strokeStyle = 'rgba(255,230,190,.35)'; for (let i = 0; i < 12; i++){ const x = ((i * 97 - dist * .2) % W + W) % W; g.beginPath(); g.moveTo(x, 172 + i % 3 * 8); g.lineTo(x + 18, 172 + i % 3 * 8); g.stroke(); }
-        // funnels and lifeboats passing behind (parallax)
+        g.drawImage(night, 0, 0, W, 205);
+        // the funnels and the deckhouse behind, lit coldly from the stars and warmly from the windows (parallax)
         for (let i = 0; i < 6; i++){
-          const fx = ((i * 260 - dist * .55) % 1560 + 1560) % 1560 - 160;
-          g.fillStyle = '#d39a3a'; g.fillRect(fx, 40, 46, 160); g.fillStyle = '#151515'; g.fillRect(fx, 40, 46, 22);
+          const fx = R(wrap(i * 260 - dist * .55, 1560) - 160);
+          g.fillStyle = 'rgba(70,75,85,.55)'; for (let s = 0; s < 4; s++){ g.beginPath(); g.arc(fx + 20 - s * 14, 34 - s * 9, 10 + s * 5, 0, 7); g.fill(); }
+          const fg = g.createLinearGradient(fx, 0, fx + 46, 0); fg.addColorStop(0, '#7d6844'); fg.addColorStop(.4, '#a98b55'); fg.addColorStop(1, '#6a5638');
+          g.fillStyle = fg; g.fillRect(fx, 40, 46, 160); g.fillStyle = '#0d0f12'; g.fillRect(fx, 40, 46, 22);
+          g.fillStyle = 'rgba(230,242,250,.75)'; g.fillRect(fx, 62, 46, 2);
         }
-        g.fillStyle = '#ece8dc'; g.fillRect(0, 196, W, 20);
-        g.fillStyle = '#9aa0a3'; for (let i = 0; i < 8; i++){ const lx = ((i * 120 - dist * .8) % 960 + 960) % 960 - 120; g.beginPath(); g.ellipse(lx + 40, 190, 42, 9, 0, 0, Math.PI); g.fill(); }
-        // the deck: planks and the railing
-        g.fillStyle = '#b98a57'; g.fillRect(0, GROUND, W, H - GROUND);
-        g.strokeStyle = '#8f6539'; g.lineWidth = 1; for (let y = GROUND + 8; y < H; y += 9){ g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
-        for (let i = 0; i < 20; i++){ const x = ((i * 48 - dist) % 960 + 960) % 960 - 20; g.beginPath(); g.moveTo(x, GROUND); g.lineTo(x - 12, H); g.stroke(); }
-        g.strokeStyle = '#f1ece2'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, 222); g.lineTo(W, 222); g.stroke();
-        for (let i = 0; i < 24; i++){ const x = ((i * 34 - dist) % 816 + 816) % 816 - 10; g.beginPath(); g.moveTo(x, 222); g.lineTo(x, GROUND); g.stroke(); }
-        // the bow
-        const bx = LEN - dist + p.x + 40;
-        if (bx < W + 40){ g.fillStyle = '#16181a'; g.beginPath(); g.moveTo(bx, GROUND); g.lineTo(bx + 120, 200); g.lineTo(bx + 120, H); g.lineTo(bx, H); g.fill(); g.fillStyle = '#c0392b'; g.fillRect(bx + 20, 150, 4, 100); g.fillRect(bx + 24, 150, 24, 14); }
-        // obstacles
-        for (const o of obs){
-          const sx = o.x - dist + p.x; if (sx < -60 || sx > W + 60) continue;
-          const y = GROUND - o.h;
-          if (o.k === 'chair'){ g.fillStyle = '#6b3f1f'; g.fillRect(sx, y + 12, o.w, 6); g.fillRect(sx + o.w - 8, y, 6, o.h); g.fillRect(sx + 2, y + 18, 4, 6); g.fillRect(sx + o.w - 12, y + 18, 4, 6); }
-          else if (o.k === 'crate'){ g.fillStyle = '#9c6b34'; g.fillRect(sx, y, o.w, o.h); g.strokeStyle = '#5e3d18'; g.lineWidth = 2; g.strokeRect(sx + 1, y + 1, o.w - 2, o.h - 2); g.beginPath(); g.moveTo(sx, y); g.lineTo(sx + o.w, y + o.h); g.stroke(); }
-          else if (o.k === 'barrel'){ g.fillStyle = '#7a4a22'; g.fillRect(sx, y, o.w, o.h); g.fillStyle = '#333'; g.fillRect(sx, y + 5, o.w, 3); g.fillRect(sx, y + o.h - 8, o.w, 3); }
-          else { g.fillStyle = '#d7c49a'; g.beginPath(); g.ellipse(sx + o.w / 2, y + o.h / 2 + 2, o.w / 2, o.h / 2, 0, 0, 7); g.fill(); g.strokeStyle = '#a8946a'; g.beginPath(); g.ellipse(sx + o.w / 2, y + o.h / 2 + 2, o.w / 4, o.h / 4, 0, 0, 7); g.stroke(); }
+        // the white deckhouse wall from the boat deck up, with its lit windows, frosted along the top
+        const wg = g.createLinearGradient(0, 196, 0, GROUND); wg.addColorStop(0, '#c3cfd8'); wg.addColorStop(1, '#9aa8b3');
+        g.fillStyle = wg; g.fillRect(0, 196, W, GROUND - 196);
+        for (let i = 0; i < 26; i++){
+          const wx = R(wrap(i * 30 - dist * .8, 780) - 30), lit = i % 3;
+          g.fillStyle = '#5d6871'; g.fillRect(wx - 1, 203, 14, 14);
+          g.fillStyle = lit ? '#f2c66d' : '#2c353d'; g.fillRect(wx, 204, 12, 12);
+          g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(wx, 204, 12, 2);
         }
-        // the runner: an inmate in an orange jumpsuit
+        g.fillStyle = '#eef5f9'; g.fillRect(0, 196, W, 2);
+        // lifeboats in their davits, frosted
+        for (let i = 0; i < 8; i++){
+          const lx = R(wrap(i * 120 - dist * .8, 960) - 120);
+          g.strokeStyle = '#e8eff4'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(lx + 2, 196); g.quadraticCurveTo(lx + 2, 176, lx + 14, 176); g.moveTo(lx + 78, 196); g.quadraticCurveTo(lx + 78, 176, lx + 66, 176); g.stroke();
+          g.fillStyle = '#e9eef2'; g.beginPath(); g.moveTo(lx + 6, 180); g.lineTo(lx + 74, 180); g.quadraticCurveTo(lx + 68, 196, lx + 40, 196); g.quadraticCurveTo(lx + 12, 196, lx + 6, 180); g.fill();
+          g.fillStyle = '#ffffff'; g.fillRect(lx + 8, 178, 64, 3);
+        }
+        // the frosted deck: pale grey planks, rime between them, patches of snow and glints of ice
+        const dg = g.createLinearGradient(0, GROUND, 0, H); dg.addColorStop(0, '#a9b6c0'); dg.addColorStop(1, '#7f8d98');
+        g.fillStyle = dg; g.fillRect(0, GROUND, W, H - GROUND);
+        g.strokeStyle = 'rgba(60,72,82,.55)'; g.lineWidth = 1;
+        for (let y = GROUND + 8.5; y < H; y += 9){ g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+        for (let i = 0; i < 20; i++){ const x = R(wrap(i * 48 - dist, 960) - 20) + .5; g.beginPath(); g.moveTo(x, GROUND); g.lineTo(x - 12, H); g.stroke(); }
+        for (let i = 0; i < 14; i++){
+          const sx = R(wrap(i * 137 - dist, 1918) - 100), sy = GROUND + 6 + (i * 13) % 40;
+          g.fillStyle = 'rgba(240,248,252,.75)'; g.beginPath(); g.ellipse(sx, sy, 26 + (i % 4) * 8, 3 + (i % 3), 0, 0, 7); g.fill();
+          if (i % 2){ g.fillStyle = '#ffffff'; g.fillRect(sx + 10, sy - 1, 2, 2); }
+        }
+        g.fillStyle = 'rgba(240,248,252,.9)'; g.fillRect(0, GROUND, W, 2);
+        // the railing, with icicles under the top rail
+        g.strokeStyle = '#e6eef3'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, RAIL); g.lineTo(W, RAIL); g.moveTo(0, RAIL + 12); g.lineTo(W, RAIL + 12); g.stroke();
+        g.lineWidth = 1.5; for (let i = 0; i < 24; i++){ const x = R(wrap(i * 34 - dist, 816) - 10) + .5; g.beginPath(); g.moveTo(x, RAIL); g.lineTo(x, GROUND); g.stroke(); }
+        g.fillStyle = 'rgba(225,242,252,.9)';
+        for (let i = 0; i < 40; i++){ const x = R(wrap(i * 21 - dist, 840) - 20), l = 3 + (i * 7) % 6; g.beginPath(); g.moveTo(x, RAIL + 1); g.lineTo(x + 3, RAIL + 1); g.lineTo(x + 1.5, RAIL + 1 + l); g.fill(); }
+        // the bow, with its frosted mast and flag
+        const bx = R(LEN - dist + p.x + 40);
+        if (bx < W + 40){ g.fillStyle = '#16181a'; g.beginPath(); g.moveTo(bx, GROUND); g.lineTo(bx + 120, 200); g.lineTo(bx + 120, H); g.lineTo(bx, H); g.fill(); g.fillStyle = '#e8eff4'; g.fillRect(bx, GROUND - 2, 120, 3); g.fillStyle = '#c0392b'; g.fillRect(bx + 20, 150, 4, 100); g.fillRect(bx + 24, 150, 24, 14); }
+        for (const o of obs){ const sx = o.x - dist + p.x; if (sx > -60 && sx < W + 60) drawObstacle(o, sx); }
+        // the runner: an inmate in an orange jumpsuit, breathing out little clouds in the cold
         if (!(p.hurt > 0 && Math.floor(p.hurt * 10) % 2)){
-          const run = p.y < GROUND ? 0 : Math.sin(t * 16) * 7;
-          g.strokeStyle = '#ff7a1a'; g.lineWidth = 6; g.lineCap = 'round';
-          g.beginPath(); g.moveTo(p.x, p.y - 16); g.lineTo(p.x + run, p.y); g.moveTo(p.x, p.y - 16); g.lineTo(p.x - run, p.y); g.stroke();
-          g.beginPath(); g.moveTo(p.x, p.y - 16); g.lineTo(p.x + 2, p.y - 34); g.stroke();
-          g.beginPath(); g.moveTo(p.x + 2, p.y - 30); g.lineTo(p.x + 10 - run * .6, p.y - 20); g.moveTo(p.x + 2, p.y - 30); g.lineTo(p.x - 6 + run * .6, p.y - 20); g.stroke();
-          g.fillStyle = '#e8c39e'; g.beginPath(); g.arc(p.x + 3, p.y - 41, 6, 0, 7); g.fill();
+          const x = R(p.x), y = R(p.y), run = p.y < GROUND ? 3 : Math.sin(t * 16) * 6;
+          g.lineCap = 'round'; g.strokeStyle = '#e8640f'; g.lineWidth = 5;
+          g.beginPath(); g.moveTo(x, y - 17); g.lineTo(x + run, y - 1); g.moveTo(x, y - 17); g.lineTo(x - run, y - 1); g.stroke();
+          g.strokeStyle = '#ff7a1a'; g.lineWidth = 7; g.beginPath(); g.moveTo(x, y - 18); g.lineTo(x + 1, y - 33); g.stroke();
+          g.lineWidth = 4; g.beginPath(); g.moveTo(x + 1, y - 31); g.lineTo(x + 8 - run * .6, y - 22); g.moveTo(x + 1, y - 31); g.lineTo(x - 6 + run * .6, y - 22); g.stroke();
+          g.fillStyle = '#1c1c1c'; g.fillRect(x - 4, y - 3, 8, 3);
+          g.fillStyle = '#e8c39e'; g.beginPath(); g.arc(x + 2, y - 40, 6, 0, 7); g.fill();
+          g.fillStyle = '#3a2a1a'; g.beginPath(); g.arc(x + 2, y - 42, 6, Math.PI, 0); g.fill();
+          if (breath < .5){ g.fillStyle = `rgba(235,245,255,${.5 - breath})`; g.beginPath(); g.arc(x + 12 + breath * 20, y - 41 - breath * 6, 3 + breath * 8, 0, 7); g.fill(); }
         }
+        // snow drifting past
+        g.fillStyle = 'rgba(255,255,255,.8)'; for (const f of flakes){ g.beginPath(); g.arc(f.x, f.y, f.s * 1.3, 0, 7); g.fill(); }
         // progress to the bow
-        g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(20, 14, W - 40, 6); g.fillStyle = '#ff7a1a'; g.fillRect(20, 14, (W - 40) * dist / LEN, 6);
+        g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(20, 14, W - 40, 6); g.fillStyle = '#ff7a1a'; g.fillRect(20, 14, R((W - 40) * dist / LEN), 6);
       }
     };
   };
@@ -690,15 +820,32 @@
     };
   };
 
-  // ### 6. Seagull: flap through the gaps between icebergs and storm clouds, the Titanic sailing in the background.
+  // ### 6. Seagull: fly over the black, icy sea where the Titanic sank, between icebergs and clouds; the ship sails in the
+  // ### distance with all her lights on. What you can hit is what you see: the outline of each iceberg and the round puffs
+  // ### of each cloud.
   BUILD.seagull = api => {
-    const W = 640, H = 360, SEA = 300, GAP = 128, SPEED = 175, NEED = 10;
+    const W = 640, H = 360, SEA = 300, GAP = 128, SPEED = 175, NEED = 10, TOP = 16;
     const c = api.canvas(W, H), g = c.getContext('2d');
+    const night = paintNight(W, H, SEA, 1415);
     const b = { x: 150, y: 160, vy: 0, f: 0 };
     let started = false, passed = 0, scroll = 0;
     const pipes = [];
-    for (let i = 0; i < NEED + 2; i++) pipes.push({ x: 520 + i * 230, gap: 95 + api.rand() * (SEA - 95 - GAP - 30) });
+    for (let i = 0; i < NEED + 2; i++){
+      const gap = 95 + api.rand() * (SEA - 95 - GAP - 30);
+      pipes.push({ x: 520 + i * 230, gap, clouds: cloudStack(gap, api.rand) });
+    }
+    const floes = Array.from({ length: 10 }, (_, i) => ({ x: i * 70 + api.rand() * 40, y: SEA + 10 + api.rand() * 50, w: 10 + api.rand() * 22 }));
     const flap = () => { if (api.over) return; started = true; b.vy = -330; api.sound('jump'); };
+    const bergOf = (pp, x) => icebergPoly(x + 2, SEA + 6, 54, SEA + 6 - (pp.gap + GAP));
+    function drawClouds(clouds, x0){
+      for (const cl of clouds){
+        const cx = x0 + cl.dx, cy = cl.dy;
+        // the shaded underside first, then the moonless-night grey of the cloud, then a cold rim of starlight on top
+        g.fillStyle = '#3c4a5c'; for (const p of cl.puffs){ g.beginPath(); g.arc(cx + p.dx, cy + p.dy + 2, p.r, 0, 7); g.fill(); }
+        g.fillStyle = '#6a7b8f'; for (const p of cl.puffs){ g.beginPath(); g.arc(cx + p.dx, cy + p.dy, p.r - 1, 0, 7); g.fill(); }
+        g.fillStyle = 'rgba(190,210,230,.35)'; for (const p of cl.puffs){ g.beginPath(); g.arc(cx + p.dx - 2, cy + p.dy - 3, p.r * .6, 0, 7); g.fill(); }
+      }
+    }
     return {
       key(code, down){ if (down && (code === 'Space' || code === 'ArrowUp' || code === 'KeyW')) flap(); },
       point(x, y, type){ if (type === 'down') flap(); },
@@ -707,33 +854,36 @@
         b.f += dt * (started ? 14 : 6);
         if (!started){ b.y = 160 + Math.sin(b.f * .5) * 6; return; }
         scroll += SPEED * dt;
+        for (const f of floes){ f.x -= SPEED * .9 * dt; if (f.x < -40) f.x += W + 80; }
         b.vy = Math.min(520, b.vy + 1100 * dt); b.y += b.vy * dt;
-        if (b.y < 8){ b.y = 8; b.vy = 0; }
-        const box = { x: b.x - 10, y: b.y - 6, w: 20, h: 10 };
+        if (b.y < TOP){ b.y = TOP; b.vy = 0; }
         for (const pp of pipes){
           const x = pp.x - scroll;
           if (!pp.done && x + 50 < b.x){ pp.done = true; passed++; api.sound('tick'); api.status(`Gaps: ${passed} of ${NEED}`); if (passed >= NEED) return api.win('Ten gaps. The seagull is through.'); }
-          if (overlap(box, { x: x + 4, y: 0, w: 42, h: pp.gap - 6 }) || overlap(box, { x: x + 2, y: pp.gap + GAP + 8, w: 46, h: SEA })) return api.lose('The seagull crashed.');
+          if (x > b.x + 60 || x < b.x - 80) continue;
+          const poly = bergOf(pp, x);
+          const hitIce = [[0, 0], [7, 0], [-7, 0], [0, 5], [0, -5], [5, 4], [-5, 4]].some(([dx, dy]) => inPoly(poly, b.x + dx, b.y + dy));
+          if (hitIce || hitsClouds(pp.clouds, x + 25, b.x, b.y, 6)) return api.lose('The seagull crashed.');
         }
-        if (b.y > SEA - 4) api.lose('The seagull fell into the sea.');
+        if (b.y > SEA - 4) api.lose('The seagull fell into the icy sea.');
       },
       draw(){
-        const sky = g.createLinearGradient(0, 0, 0, SEA); sky.addColorStop(0, '#25385e'); sky.addColorStop(.6, '#e48a62'); sky.addColorStop(1, '#ffcf8f');
-        g.fillStyle = sky; g.fillRect(0, 0, W, SEA);
-        g.fillStyle = '#ffe2a8'; g.beginPath(); g.arc(470, SEA - 10, 34, 0, 7); g.fill();
-        // the Titanic far away, drifting slowly
-        drawTitanic(g, ((380 - scroll * .08) % (W + 330) + W + 330) % (W + 330) - 300, SEA - 2, .9, { silhouette: 'rgba(40,30,40,.75)' });
-        const sea = g.createLinearGradient(0, SEA, 0, H); sea.addColorStop(0, '#2c5577'); sea.addColorStop(1, '#0e2236');
-        g.fillStyle = sea; g.fillRect(0, SEA, W, H - SEA);
-        g.strokeStyle = 'rgba(255,220,180,.35)'; g.lineWidth = 1.5;
-        for (let i = 0; i < 16; i++){ const x = ((i * 71 - scroll * .9) % (W + 40) + W + 40) % (W + 40) - 20; const y = SEA + 8 + (i % 4) * 12; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 8, y - 3, x + 16, y); g.stroke(); }
+        g.drawImage(night, 0, 0, W, H);
+        // the Titanic far away with all her lights on, drifting slowly
+        g.save(); g.globalAlpha = .9;
+        drawTitanic(g, ((380 - scroll * .08) % (W + 330) + W + 330) % (W + 330) - 300, SEA - 1, .9, { lights: true });
+        g.fillStyle = 'rgba(4,10,20,.45)'; g.fillRect(0, 150, W, SEA - 150);   // the night over the ship
+        g.restore();
+        // reflections of the ship's lights and floating ice
+        for (const f of floes){ g.fillStyle = 'rgba(225,240,250,.75)'; g.beginPath(); g.ellipse(f.x, f.y, f.w, f.w * .18, 0, 0, 7); g.fill(); g.fillStyle = 'rgba(120,170,200,.4)'; g.fillRect(f.x - f.w * .6, f.y + 1, f.w * 1.2, 1); }
         for (const pp of pipes){
-          const x = pp.x - scroll; if (x < -60 || x > W + 10) continue;
-          // a storm cloud hanging down from the top
-          g.fillStyle = '#3b3f4a'; g.fillRect(x + 6, 0, 38, pp.gap - 14);
-          g.beginPath(); for (let k = 0; k < 4; k++) g.arc(x + 6 + k * 12.6, pp.gap - 16, 11, 0, 7); g.fill();
-          // an iceberg rising from the sea
-          drawIceberg(g, x - 4, SEA + 6, 58, SEA + 6 - (pp.gap + GAP));
+          const x = pp.x - scroll; if (x < -80 || x > W + 60) continue;
+          drawClouds(pp.clouds, x + 25);
+          const poly = bergOf(pp, x), top = pp.gap + GAP;
+          // the much bigger part of the iceberg under the water, then the part you can hit
+          g.fillStyle = 'rgba(120,180,210,.18)'; g.beginPath(); g.moveTo(x - 10, SEA + 6); g.lineTo(x + 66, SEA + 6); g.lineTo(x + 50, H); g.lineTo(x + 4, H); g.fill();
+          drawIceberg(g, x + 2, SEA + 6, 54, SEA + 6 - top);
+          g.fillStyle = 'rgba(255,255,255,.9)'; g.fillRect(poly[3][0] - 1, poly[3][1] + 2, 2, 6);
         }
         drawGull(g, b.x, b.y, 1.8, b.f, '#ffffff');
         g.fillStyle = '#f2b134'; g.beginPath(); g.moveTo(b.x + 3, b.y - 1); g.lineTo(b.x + 9, b.y + 1); g.lineTo(b.x + 3, b.y + 3); g.fill();
@@ -759,25 +909,35 @@
     host.innerHTML = `<div class="mg" data-game="${id}"><div class="mg-bar"><div class="mg-timer"><i></i></div><output class="mg-secs">${TIME}</output></div>
       <div class="mg-stage"></div><p class="mg-status" aria-live="polite"></p></div>`;
     const stage = host.querySelector('.mg-stage'), bar = host.querySelector('.mg-timer i'), secs = host.querySelector('.mg-secs'), statusEl = host.querySelector('.mg-status');
-    let left = TIME, raf = 0, last = 0, timers = [], canvas = null, logical = null, stopped = false, lastStatus = '';
+    let left = TIME, raf = 0, last = 0, timers = [], canvas = null, logical = null, stopped = false, lastStatus = '', resizer = null, game = null;
     const api = {
       rand, stage, over: false,
       status(t){ if (t !== lastStatus){ statusEl.textContent = t; lastStatus = t; } },
       sound(n){ if (opts.sound) opts.sound(n); },
       later(fn, ms){ timers.push(setTimeout(() => { if (!api.over && !stopped) fn(); }, ms)); },
       penalty(s){ left = Math.max(0, left - s); },
+      // ### The canvas always has exactly as many pixels as it shows on the screen (fit() runs again when its size changes),
+      // ### so the games stay sharp at any size and on high-density screens. The games draw in their own w x h units.
       canvas(w, h){
         canvas = document.createElement('canvas'); logical = { w, h };
-        const dpr = Math.min(2, window.devicePixelRatio || 1);
-        canvas.width = w * dpr; canvas.height = h * dpr; canvas.className = 'mg-canvas';
-        canvas.style.aspectRatio = `${w} / ${h}`;
-        canvas.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
-        stage.appendChild(canvas); return canvas;
+        canvas.className = 'mg-canvas'; canvas.style.aspectRatio = `${w} / ${h}`;
+        stage.appendChild(canvas);
+        const ctx = canvas.getContext('2d');
+        const fit = () => {
+          const r = canvas.getBoundingClientRect(), dpr = Math.min(3, window.devicePixelRatio || 1);
+          const bw = Math.max(w, Math.round((r.width || w) * dpr)), bh = Math.round(bw * h / w);
+          if (canvas.width !== bw || canvas.height !== bh){ canvas.width = bw; canvas.height = bh; }
+          ctx.setTransform(bw / w, 0, 0, bh / h, 0, 0);
+          if (game && game.draw) game.draw();
+        };
+        fit();
+        if (typeof ResizeObserver === 'function'){ resizer = new ResizeObserver(fit); resizer.observe(canvas); }
+        return canvas;
       },
       win(reason){ finish(true, reason); },
       lose(reason){ finish(false, reason); }
     };
-    const game = BUILD[id](api) || {};
+    game = BUILD[id](api) || {};
     function finish(won, reason){
       if (api.over) return;
       api.over = true; api.status(reason || (won ? 'Won!' : 'Lost.'));
@@ -815,6 +975,7 @@
     function cleanup(){
       stopped = true; cancelAnimationFrame(raf); timers.forEach(clearTimeout); timers = [];
       removeEventListener('keydown', onKey, true); removeEventListener('keyup', onKey, true);
+      if (resizer) resizer.disconnect();
     }
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
     if (game.start) game.start();
@@ -823,5 +984,5 @@
     return { stop(){ if (!stopped){ api.over = true; cleanup(); } }, get timeLeft(){ return left; } };
   }
 
-  return Object.freeze({ TIME, INFO, GAMES, DIFFS, pickGames, tttWinner, tttBot, placeFleet, fleetSunk, bsBot, around, waterAround, pickDiffs, hitDiff, overlap, CLIMB_LEVELS, open });
+  return Object.freeze({ TIME, INFO, GAMES, DIFFS, pickGames, tttWinner, tttBot, placeFleet, fleetSunk, bsBot, around, waterAround, pickDiffs, hitDiff, overlap, icebergPoly, inPoly, cloudStack, hitsClouds, RUN_KINDS, CLIMB_LEVELS, open });
 });
