@@ -1177,7 +1177,7 @@ const EYE = 1.62, WALK_SPEED = 1.7, BODY = .26, LOOK_SPEED = .0042;
 // lookYaw and lookPitch are where the mouse points the head; yaw and pitch follow them within a few milliseconds, so uneven
 // mouse events never make the picture jerk
 const cam = { pos: new THREE.Vector3(...VIEWS.intro.pos), yaw: 0, pitch: 0, lookYaw: 0, lookPitch: 0, from: null, t: 1, dur: 1,
-  vel: new THREE.Vector3(), stride: 0, bob: 0 };
+  vel: new THREE.Vector3(), stride: 0, bob: 0, sway: 0 };
 camera.rotation.order = 'YXZ';
 // ### The camera angles that look at a point.
 const anglesTo = (pos, look) => { const d = new THREE.Vector3(...look).sub(new THREE.Vector3(...pos)); return { yaw: Math.atan2(d.x, -d.z), pitch: Math.atan2(d.y, Math.hypot(d.x, d.z)) }; };
@@ -1236,8 +1236,10 @@ function walkInto(zone){
   if (S.scene === 'hatch' && zone !== 'stall') act('go', 'stall', true);
   if (S.scene !== zone) act('go', zone, true);
 }
-// ### One step of walking: speed builds up and fades out smoothly, you slide along walls, your head bobs a little with each
-// ### stride (not with reduced motion) and the floor answers with soft footsteps.
+// ### One step of walking: speed builds up and fades out smoothly, you slide along walls, and the floor answers with soft
+// ### footsteps. The head moves as in a real walk (not with reduced motion): it dips a little at every footfall and rises
+// ### over the standing leg, and the body shifts its weight from one foot to the other, so the view sways gently from side
+// ### to side once every two steps and tilts with it.
 function walk(dt){
   // a card (a clue, the lock, a mini game, the pause) stops you on the spot; the mini games use the arrow keys themselves
   if (!canWalk()){ cam.vel.set(0, 0, 0); cam.bob *= .9; return; }
@@ -1262,8 +1264,10 @@ function walk(dt){
   } else cam.vel.set(0, 0, 0);
   // stand up again after the hatch, and a gentle bob that fades in and out with the speed
   if (S.scene !== 'hatch') cam.pos.y += (EYE - cam.pos.y) * (1 - Math.exp(-dt * 6));
-  const amp = REDUCED ? 0 : .016 * Math.min(1, speed / WALK_SPEED);
-  cam.bob += (Math.sin(cam.stride / .8 * Math.PI * 2) * amp - cam.bob) * (1 - Math.exp(-dt * 12));
+  const gait = REDUCED ? 0 : Math.min(1, speed / WALK_SPEED), steps = cam.stride / .8, kb = 1 - Math.exp(-dt * 12);
+  // lowest at each footfall (when the footstep sounds), highest halfway through the step
+  cam.bob += ((Math.abs(Math.sin(Math.PI * steps)) - .64) * .026 * gait - cam.bob) * kb;
+  cam.sway += (Math.sin(Math.PI * steps) * .011 * gait - cam.sway) * kb;
 }
 // ### Moves the camera each frame: a glide when one runs, otherwise walking and looking.
 function updateCamera(dt){
@@ -1273,14 +1277,15 @@ function updateCamera(dt){
     cam.pos.lerpVectors(cam.from.pos, camTarget.pos, e);
     cam.lookYaw = cam.yaw = cam.from.yaw + (camTarget.yaw - cam.from.yaw) * e;
     cam.lookPitch = cam.pitch = cam.from.pitch + (camTarget.pitch - cam.from.pitch) * e;
-    cam.bob *= .9;
+    cam.bob *= .9; cam.sway *= .9;
   } else {
     const k = 1 - Math.exp(-dt * 30);
     cam.yaw += (cam.lookYaw - cam.yaw) * k; cam.pitch += (cam.lookPitch - cam.pitch) * k;
     walk(dt);
   }
-  camera.position.set(cam.pos.x, cam.pos.y + cam.bob, cam.pos.z);
-  camera.rotation.set(clamp(cam.pitch, -1.4, 1.4), -cam.yaw, 0);
+  // the weight shift moves the eye sideways (to the right of where you look) and tilts the head a little with it
+  camera.position.set(cam.pos.x + Math.cos(cam.yaw) * cam.sway, cam.pos.y + cam.bob, cam.pos.z + Math.sin(cam.yaw) * cam.sway);
+  camera.rotation.set(clamp(cam.pitch, -1.4, 1.4), -cam.yaw, -cam.sway * .45);
 }
 let drag = null;
 canvas.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, moved: 0, id: e.pointerId }; try { canvas.setPointerCapture(e.pointerId); } catch (err) {} initAudio(); });
@@ -1308,7 +1313,7 @@ const handScene = new THREE.Scene(), handCam = new THREE.PerspectiveCamera();
 handScene.add(new THREE.HemisphereLight(0xb9c6bf, 0x1c1410, .42));
 {
   const key = new THREE.DirectionalLight(0xe8ecdf, .62); key.position.set(.2, 1, -.4); handScene.add(key);
-  const red = new THREE.PointLight(0xff2a1a, .25, 3); red.position.set(-.8, .5, -.6); handScene.add(red);   // the emergency lamps
+  const red = new THREE.PointLight(0xff2a1a, .12, 3); red.position.set(-.8, .5, -.6); handScene.add(red);   // the emergency lamps
 }
 const HAND_MAT = {
   skin: new THREE.MeshStandardMaterial({ color: 0xa06e55, roughness: .66 }),
@@ -1333,15 +1338,15 @@ function buildHand(side){
   // four fingers from index (towards the middle of the picture) to the little finger
   [[-.027, .047, .031, .0088], [-.009, .052, .034, .0086], [.009, .049, .032, .0082], [.026, .038, .025, .0072]].forEach(([x, l1, l2, r], i) => {
     const base = new THREE.Group(); base.position.set(side * x, 0, -.09 + Math.abs(x) * .25); arm.add(base);
-    mesh(new THREE.SphereGeometry(r * 1.15, 10, 8), HAND_MAT.skin, base);   // knuckle
+    mesh(new THREE.SphereGeometry(r * 1.04, 10, 8), HAND_MAT.skin, base);   // knuckle
     mesh(new THREE.CylinderGeometry(r * .95, r, l1, 9).rotateX(Math.PI / 2).translate(0, 0, -l1 / 2), HAND_MAT.skin, base);
     const mid = new THREE.Group(); mid.position.z = -l1; base.add(mid);
-    mesh(new THREE.SphereGeometry(r * .95, 10, 8), HAND_MAT.skin, mid);
+    mesh(new THREE.SphereGeometry(r * .93, 10, 8), HAND_MAT.skin, mid);
     mesh(new THREE.CylinderGeometry(r * .8, r * .92, l2, 9).rotateX(Math.PI / 2).translate(0, 0, -l2 / 2), HAND_MAT.skin, mid);
     mesh(new THREE.SphereGeometry(r * .8, 10, 8).translate(0, 0, -l2), HAND_MAT.skin, mid);
     mesh(new THREE.SphereGeometry(1, 8, 6).scale(r * .62, r * .25, r * .9).translate(0, r * .62, -l2 + r * .55), HAND_MAT.nail, mid);
     // a relaxed hand: the fingers hang a little lower towards the little finger
-    base.rotation.set(-.32 - i * .06, side * (i - 1.5) * -.035, 0); mid.rotation.x = -.55 - i * .05;
+    base.rotation.set(-.22 - i * .07, side * (i - 1.5) * -.03, 0); mid.rotation.x = -.38 - i * .06;
   });
   // the thumb, from the side of the palm forward and in, under the index finger
   const thumb = new THREE.Group(); thumb.position.set(-side * .036, -.008, -.03); arm.add(thumb);
@@ -1379,8 +1384,11 @@ function bakeArm(arm){
   }
 }
 const HANDS = { r: buildHand(1), l: buildHand(-1), reach: 0, swayX: 0, swayY: 0, lastYaw: null, lastPitch: 0, down: 1 };
-// where each hand rests in the picture (x, y, z from the eye) and how it is turned (pitch, yaw, roll)
-const HAND_REST = { r: [.17, -.175, -.41, -.05, .2, -.38], l: [-.17, -.183, -.42, -.05, -.18, .4] };
+// ### Where each hand is (x, y, z from the eye) and how it is turned (pitch, yaw, roll). At rest the arms hang relaxed:
+// ### the hands low at the edge of the picture, thumbs up and palms turned towards each other, the forearms rising from
+// ### below. To use something the right hand turns palm down and reaches forward into the middle of the picture.
+const HAND_REST = { r: [.16, -.25, -.36, -.12, .2, -1.0], l: [-.16, -.256, -.37, -.12, -.18, 1.0] };
+const HAND_REACH = [.12, -.165, -.5, .3, .35, -.35];
 // ### The right hand reaches out when you use something (a marker, a click or a key).
 function reachHand(){ if (!REDUCED) HANDS.reach = 1; }
 // ### Moves the hands each frame: hidden in the endings, sway with the head, swing with the stride, reach when you act.
@@ -1395,16 +1403,19 @@ function updateHands(dt){
   HANDS.swayX += (clamp(-dyaw * 1.4, -.05, .05) * still - HANDS.swayX) * k;
   HANDS.swayY += (clamp(-dpitch * 1.4, -.04, .04) * still - HANDS.swayY) * k;
   HANDS.reach = Math.max(0, HANDS.reach - dt / .5);
-  const sp = Math.min(1, Math.hypot(cam.vel.x, cam.vel.z) / WALK_SPEED) * still, ph = cam.stride / .8 * Math.PI * 2;
-  const breathe = Math.sin(clock * 1.7) * .0025 * still, reach = Math.sin(HANDS.reach * Math.PI);
+  // walking: the arms swing like pendulums, opposite to the legs and to each other, one swing every two steps; the hand
+  // that swings forward rises into the picture and turns up a little, the other drops back out of it
+  const sp = Math.min(1, Math.hypot(cam.vel.x, cam.vel.z) / WALK_SPEED) * still, ph = cam.stride / .8 * Math.PI;
+  const breathe = Math.sin(clock * 1.7) * .0025 * still, reach = Math.sin(HANDS.reach * Math.PI) ** .7;
+  const lerp = (a, b, t) => a + (b - a) * t;
   for (const key of ['r', 'l']){
     const h = HANDS[key], [x, y, z, rx, ry, rz] = HAND_REST[key], side = key === 'r' ? 1 : -1;
-    const swing = Math.sin(ph + (side > 0 ? 0 : Math.PI)) * sp;
-    const out = key === 'r' ? reach : 0;
-    h.arm.position.set(x + HANDS.swayX + Math.cos(ph) * .006 * sp - out * .03,
-      y + HANDS.swayY + breathe + Math.abs(swing) * -.008 - HANDS.down * .35 + out * .05,
-      z + swing * .018 - out * .13);
-    h.arm.rotation.set(rx + swing * .05 + out * .2, ry - out * .2, rz, 'YXZ');
+    const swing = Math.sin(ph + (side > 0 ? Math.PI : 0)) * sp;
+    const out = key === 'r' ? reach : 0, R = HAND_REACH;
+    h.arm.position.set(lerp(x - side * swing * .018, R[0], out) + HANDS.swayX,
+      lerp(y + swing * .05, R[1], out) + HANDS.swayY + breathe - HANDS.down * .35,
+      lerp(z - swing * .085, R[2], out));
+    h.arm.rotation.set(lerp(rx + swing * .15, R[3], out), lerp(ry + swing * side * .08, R[4], out), lerp(rz, R[5], out), 'YXZ');
     h.arm.visible = HANDS.down < .98;
   }
 }
