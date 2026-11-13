@@ -121,6 +121,9 @@ test('dev server: answers over HTTP with the right status codes', async () => {
     assert.match(ok.headers['content-type'], /text\/html/);
     assert.equal(ok.headers['x-content-type-options'], 'nosniff');
     assert.equal((await get('/room-2-chase/js/game.js')).statusCode, 200);
+    const hand = await get('/room-1-escape/models/hand-right.glb');
+    assert.equal(hand.statusCode, 200, 'the escape room can load its hand models');
+    assert.equal(hand.headers['content-type'], 'model/gltf-binary');
     assert.equal((await get('/missing.js')).statusCode, 404);
     assert.equal((await get('/.git/config')).statusCode, 403);
     assert.equal((await get('/', 'POST')).statusCode, 405);
@@ -352,4 +355,17 @@ test('all three vehicles have reversing lights, and the hills are visible at nig
   assert.equal((game.match(/reverseLamps\((g|root), /g) || []).length, 3, 'one call per vehicle');
   assert.match(game, /new THREE\.MeshBasicMaterial\(\{ vertexColors: true, fog: false \}\)/, 'the hills paint their own colours');
   assert.match(game, /facade\(style, x - w \/ 2, x \+ w \/ 2, low - 3, base \+ h,/, 'houses reach below their lowest corner');
+});
+
+test('escape room: the real hand models are shipped with their licence and are what room.js loads', () => {
+  const dir = path.join(ROOT, 'room-1-escape', 'models');
+  for (const side of ['right', 'left']){
+    const buf = fs.readFileSync(path.join(dir, `hand-${side}.glb`));
+    assert.equal(buf.readUInt32LE(0), 0x46546C67, `hand-${side}.glb is a binary glTF file`);
+    const json = JSON.parse(buf.subarray(20, 20 + buf.readUInt32LE(12)).toString());
+    assert.equal(json.skins[0].joints.length, 25, 'one joint for the wrist and each finger bone, as room.js expects');
+    for (const n of ['wrist', 'thumb-phalanx-distal', 'index-finger-phalanx-proximal', 'pinky-finger-phalanx-distal']) assert.ok(json.nodes.some(x => x.name === n), n);
+  }
+  assert.match(fs.readFileSync(path.join(dir, 'LICENSE-hands.txt'), 'utf8'), /MIT License/);
+  assert.match(fs.readFileSync(path.join(ROOT, 'room-1-escape', 'js', 'room.js'), 'utf8'), /fetch\('models\/hand-' \+ n \+ '\.glb'\)/);
 });
