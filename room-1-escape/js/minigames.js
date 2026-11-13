@@ -14,7 +14,7 @@
     battleship: { title: 'Sink the <em>fleet</em>', name: 'Battleship', how: 'Fire at the enemy waters on the right. A hit lets you fire again. Ships never touch, not even at a corner, so the water around a sunk ship is marked for you. Sink all three of the bot’s ships before it sinks yours.' },
     spotdiff: { title: 'Spot the <em>difference</em>', name: 'Spot the difference', how: 'Two photographs of the Titanic, five differences. Click them in either picture. A wrong click costs 2 seconds.' },
     tictactoe: { title: 'Anchors and <em>icebergs</em>', name: 'Tic-tac-toe', how: 'You play the anchors, the bot plays the icebergs. Get three in a row. A draw starts a new round.' },
-    deckrun: { title: 'Run the <em>deck</em>', name: 'Deck run', how: 'Run to the bow. Jump over deck chairs, crates and barrels with Space, ↑ or a click. Three knocks and you are out.' },
+    deckrun: { title: 'Run the <em>deck</em>', name: 'Deck run', how: 'Run to the bow as a sailor. Jump over crates, trunks, barrels and ice with Space, ↑ or a click. Three knocks and you are out.' },
     deckclimb: { title: 'Climb the <em>decks</em>', name: 'Deck climb', how: 'Bounce up through the ship: from the engine room past the crew quarters, second class and first class to the boat deck. Steer with ← → or the mouse. Lifebuoys bounce you higher. Do not fall.' },
     seagull: { title: 'The <em>seagull</em>', name: 'Seagull', how: 'Fly between the icebergs and the storm clouds. Flap with Space, ↑ or a click. Pass ten gaps.' }
   };
@@ -397,31 +397,350 @@
     return {};
   };
 
-  // ### 4. Deck run: run along the icy boat deck to the bow on the night of the collision, and jump over what is in the way.
+  // ### 4. Deck run: run along the icy decks of the Titanic to the bow on the night of the collision. First along the side of
+  // ### the ship under the deck above, past its round portholes; then out onto the open deck with the railing and its life
+  // ### rings, benches, ventilators, lifeboats, a funnel and the foremast with the crow's nest. Everything that belongs to
+  // ### the ship is painted once into long tiles that scroll with the deck; only the sky and the sea stay behind.
   // ### Every obstacle is drawn exactly as big as the box that can knock you down, and your own box is your body.
   const RUN_KINDS = {
     crate: { w: 30, h: 30 }, trunk: { w: 46, h: 22 }, barrel: { w: 24, h: 30 }, ice: { w: 36, h: 16 }
   };
+  const RUN = { GROUND: 250, H: 300, LEN: 4400, PROMENADE_END: 1700, RAIL: 196, BOW0: 4420, BOW: 4680 };
+
+  // ### A tapered limb from a to b (widths wa and wb), with round ends, for the sailor.
+  function limb2(g, a, b, wa, wb, color){
+    const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l;
+    g.fillStyle = color; g.beginPath();
+    g.moveTo(a[0] + nx * wa / 2, a[1] + ny * wa / 2); g.lineTo(b[0] + nx * wb / 2, b[1] + ny * wb / 2);
+    g.lineTo(b[0] - nx * wb / 2, b[1] - ny * wb / 2); g.lineTo(a[0] - nx * wa / 2, a[1] - ny * wa / 2); g.closePath(); g.fill();
+    g.beginPath(); g.arc(a[0], a[1], wa / 2, 0, 7); g.arc(b[0], b[1], wb / 2, 0, 7); g.fill();
+  }
+  const at = (p, len, ang) => [p[0] + Math.sin(ang) * len, p[1] + Math.cos(ang) * len];
+  // ### A sailor of 1912 running to the right with his feet at x, y: a navy jumper with the square white-striped collar and a
+  // ### black neckerchief, bell-bottom trousers, boots, and the round sailor's cap whose two ribbons fly behind him. Arms and
+  // ### legs are two-part limbs that move through a real running stride; the limbs on the far side are drawn darker.
+  function drawSailor(g, x, y, t, air, vy){
+    const ph = t * 11, lean = air ? .08 : .2;
+    const TH = 13.5, SH = 13.5, UA = 10, FA = 9.5, TORSO = 19;
+    const legPose = (q, near) => {
+      if (air) return near ? [.95 - Math.min(.5, Math.max(0, vy) / 900), 1.55] : [-.35, .7];
+      return [.62 * Math.sin(q), .15 + 1.3 * Math.max(0, Math.cos(q))];
+    };
+    // lay the legs out from a hip at 0, 0, then move the whole body so the lower foot stands on the deck
+    const legs = [[ph + Math.PI, false], [ph, true]].map(([q, near]) => {
+      const [th, bend] = legPose(q, near), hip = [0, 0], knee = at(hip, TH, th), sa = th - bend, ankle = at(knee, SH, sa);
+      const toe = [ankle[0] + Math.cos(sa) * 6.5, ankle[1] - Math.sin(sa) * 6.5 + 1.5];
+      return { near, knee, ankle, toe };
+    });
+    const low = Math.max(...legs.map(l => Math.max(l.ankle[1] + 2.5, l.toe[1] + 1.5)));
+    const ox = x, oy = air ? y - 30 : y - low;
+    const P = p => [ox + p[0], oy + p[1]];
+    const hip = [ox, oy], shoulder = [ox + Math.sin(lean) * TORSO, oy - Math.cos(lean) * TORSO];
+    const NAVY = '#1f2c4f', NAVY_FAR = '#141c33', TROUSER = '#1a2440', TROUSER_FAR = '#10162a', SKIN = '#e0ad86', SKIN_FAR = '#b98663';
+    const arm = (q, near) => {
+      const ua = air ? (near ? -1.9 : 1.1) : -.8 * Math.sin(q), fa = ua + (air ? .6 : 1.45);
+      const s = [shoulder[0] + (near ? 1 : -1), shoulder[1] + 2], e = at(s, UA, ua), h = at(e, FA, fa);
+      limb2(g, s, e, 5.2, 4.4, near ? NAVY : NAVY_FAR); limb2(g, e, h, 4.4, 3.6, near ? NAVY : NAVY_FAR);
+      g.fillStyle = near ? SKIN : SKIN_FAR; g.beginPath(); g.arc(h[0], h[1], 2.1, 0, 7); g.fill();
+    };
+    const leg = l => {
+      const k = P(l.knee), a = P(l.ankle), tt = P(l.toe), c = l.near ? TROUSER : TROUSER_FAR;
+      limb2(g, hip, k, 7, 5.6, c); limb2(g, k, a, 5.6, 6.4, c);   // bell-bottoms widen at the ankle
+      limb2(g, a, tt, 4.2, 3.4, l.near ? '#0b0b0d' : '#060607');
+    };
+    arm(ph, false); leg(legs[0]);
+    // torso: the jumper, a little wider at the shoulders, with a belt line
+    const n = [Math.cos(lean), Math.sin(lean)];
+    g.fillStyle = NAVY; g.beginPath();
+    g.moveTo(hip[0] - n[0] * 5, hip[1] - n[1] * 5); g.lineTo(hip[0] + n[0] * 5.5, hip[1] + n[1] * 5.5);
+    g.lineTo(shoulder[0] + n[0] * 6, shoulder[1] + n[1] * 6); g.lineTo(shoulder[0] - n[0] * 5.5, shoulder[1] - n[1] * 5.5); g.closePath(); g.fill();
+    g.beginPath(); g.arc(shoulder[0], shoulder[1] + 1, 5.6, 0, 7); g.fill();
+    g.strokeStyle = '#0d1428'; g.lineWidth = 1.2; g.beginPath(); g.moveTo(hip[0] - n[0] * 5, hip[1] - n[1] * 5 - 1); g.lineTo(hip[0] + n[0] * 5.5, hip[1] + n[1] * 5.5 - 1); g.stroke();
+    leg(legs[1]);
+    // the square sailor's collar on the back, light blue with three white stripes, and the black neckerchief in front
+    const back = [shoulder[0] - n[0] * 5.8, shoulder[1] - n[1] * 5.8];
+    g.fillStyle = '#5d7fb3'; g.beginPath(); g.moveTo(shoulder[0] - n[0] * 1, shoulder[1] - 2); g.lineTo(back[0] - 1, back[1] - 1); g.lineTo(back[0] - 1 + Math.sin(lean) * 9, back[1] + 9); g.lineTo(shoulder[0] + 1, shoulder[1] + 6); g.closePath(); g.fill();
+    g.strokeStyle = '#f4f6f8'; g.lineWidth = .7; g.beginPath(); g.moveTo(back[0] + .3, back[1] + .5); g.lineTo(back[0] + .3 + Math.sin(lean) * 8, back[1] + 8.5); g.moveTo(back[0] + 1.6, back[1] + .5); g.lineTo(back[0] + 1.6 + Math.sin(lean) * 8, back[1] + 8.5); g.stroke();
+    g.fillStyle = '#0b0b0d'; g.beginPath(); g.moveTo(shoulder[0] + 3, shoulder[1] + 1); g.lineTo(shoulder[0] + 6, shoulder[1] + 3); g.lineTo(shoulder[0] + 4, shoulder[1] + 8); g.closePath(); g.fill();
+    // neck and head: face, ear, short dark hair, nose
+    const neck = [shoulder[0] + 2, shoulder[1] - 2], head = [shoulder[0] + 3.5, shoulder[1] - 8.5];
+    limb2(g, neck, [head[0], head[1] + 3], 3.4, 3.4, SKIN);
+    g.fillStyle = SKIN; g.beginPath(); g.ellipse(head[0], head[1], 4.3, 5.1, .1, 0, 7); g.fill();
+    g.fillStyle = '#4a3020'; g.beginPath(); g.ellipse(head[0] - 1.3, head[1] - 1.6, 3.6, 3.6, 0, Math.PI * .75, Math.PI * 1.95); g.fill();
+    g.fillStyle = '#c8916b'; g.beginPath(); g.arc(head[0] - .8, head[1] + .3, 1.1, 0, 7); g.fill();
+    g.fillStyle = SKIN; g.beginPath(); g.moveTo(head[0] + 4, head[1] - .2); g.lineTo(head[0] + 5.6, head[1] + 1.4); g.lineTo(head[0] + 4, head[1] + 1.8); g.fill();
+    g.fillStyle = '#2a1a10'; g.fillRect(head[0] + 2.2, head[1] - 1, 1.1, 1.1);
+    // the round sailor's cap: a white top over a navy band, tilted back, with two black ribbons flying behind
+    const flap = Math.sin(t * 18) * 1.5;
+    g.strokeStyle = '#0b0b0d'; g.lineWidth = 1.1; g.beginPath();
+    g.moveTo(head[0] - 3.5, head[1] - 4); g.quadraticCurveTo(head[0] - 9, head[1] - 4 + flap, head[0] - 13, head[1] - 1 - flap);
+    g.moveTo(head[0] - 3.5, head[1] - 3.4); g.quadraticCurveTo(head[0] - 8, head[1] - 1 - flap, head[0] - 12, head[1] + 2 + flap); g.stroke();
+    g.fillStyle = '#1a2440'; g.beginPath(); g.ellipse(head[0] - .2, head[1] - 4.1, 4.9, 1.6, -.12, 0, 7); g.fill();
+    g.fillStyle = '#f2f3f0'; g.beginPath(); g.ellipse(head[0] - .6, head[1] - 5.6, 6.2, 1.9, -.12, 0, 7); g.fill();
+    g.fillStyle = '#d7dbe0'; g.beginPath(); g.ellipse(head[0] - .6, head[1] - 5.2, 6.2, .9, -.12, 0, Math.PI); g.fill();
+    arm(ph + Math.PI, true);
+    return { head, mouth: [head[0] + 4.6, head[1] + 2] };
+  }
+
+  // ### The layout of the ship along the run: what stands where, decided once per game.
+  function runLayout(rand){
+    const L = { portholes: [], doors: [], lamps: [], rings: [], benches: [], vents: [], bollards: [], boats: [] };
+    for (let x = -180; x < RUN.PROMENADE_END - 40; x += 64) L.portholes.push(x);
+    for (let x = 260; x < RUN.PROMENADE_END - 120; x += 480 + rand() * 160) L.doors.push(x);
+    for (let x = -120; x < RUN.PROMENADE_END; x += 210) L.lamps.push(x);
+    const B = RUN.PROMENADE_END + 260;
+    for (let x = B + 40; x < RUN.LEN - 80; x += 300 + rand() * 120) L.rings.push(x);
+    for (let x = B + 190; x < RUN.LEN - 200; x += 420 + rand() * 160) L.benches.push(x);
+    for (let x = B + 120; x < RUN.LEN - 300; x += 560 + rand() * 200) L.vents.push(x);
+    for (let x = B + 300; x < RUN.LEN; x += 380 + rand() * 160) if (!L.benches.some(b => x > b - 30 && x < b + 70)) L.bollards.push(x);
+    for (let x = B + 40; x < B + 1100; x += 190) L.boats.push(x);
+    L.funnel = B + 520; L.mast = RUN.LEN - 760; L.crane = RUN.LEN - 380;
+    // nothing stands in front of the foot of the mast or the crane
+    for (const k of ['rings', 'benches', 'vents', 'bollards']) L[k] = L[k].filter(x => Math.abs(x - L.mast) > 90 && Math.abs(x - L.crane - 20) > 80);
+    return L;
+  }
+  // ### Paints the part of the ship from world x0 to x0 + w onto g (already scaled), in the cold light of the night.
+  function paintRunTile(g, x0, w, L){
+    const { GROUND, H, PROMENADE_END: PE, RAIL, BOW0, BOW } = RUN;
+    g.save(); g.translate(-x0, 0);
+    const vis = (a, b) => b > x0 - 2 && a < x0 + w + 2;
+    const snow = (x, y, wd, th) => { g.fillStyle = '#f4f9fc'; g.beginPath(); g.moveTo(x - 1, y + 1); g.quadraticCurveTo(x + wd / 2, y - th * 2, x + wd + 1, y + 1); g.closePath(); g.fill(); };
+    const icicles = (xa, xb, y, step) => { g.fillStyle = 'rgba(220,240,252,.95)'; for (let x = Math.ceil(xa / step) * step; x < xb; x += step){ const l = 3 + ((x * 7919) % 7); g.beginPath(); g.moveTo(x, y); g.lineTo(x + 2.4, y); g.lineTo(x + 1.2, y + l); g.fill(); } };
+    const glow = (x, y, r, a) => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(255,205,120,${a})`); gr.addColorStop(1, 'rgba(255,205,120,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); };
+    // ---- the covered promenade along the side of the ship ----
+    if (vis(-400, PE + 40)){
+      const xa = Math.max(x0 - 2, -400), xb = Math.min(x0 + w + 2, PE);
+      // the deck above: its railing against the sky, the slab, the steel side with seams and rivets
+      g.strokeStyle = '#d9dee2'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(xa, 8); g.lineTo(xb, 8); g.moveTo(xa, 18); g.lineTo(xb, 18); g.stroke();
+      for (let x = Math.ceil(xa / 22) * 22; x < xb; x += 22){ g.beginPath(); g.moveTo(x + .5, 8); g.lineTo(x + .5, 30); g.stroke(); }
+      g.fillStyle = '#f4f9fc'; g.fillRect(xa, 6, xb - xa, 2);
+      const wall = g.createLinearGradient(0, 30, 0, GROUND); wall.addColorStop(0, '#d9d4c6'); wall.addColorStop(.5, '#c9c6bb'); wall.addColorStop(1, '#a9aeb2');
+      g.fillStyle = wall; g.fillRect(xa, 30, xb - xa, GROUND - 30);
+      g.fillStyle = '#ece8dc'; g.fillRect(xa, 30, xb - xa, 10); g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(xa, 40, xb - xa, 6);   // the slab and its shadow
+      icicles(xa, xb, 40, 9);
+      g.strokeStyle = 'rgba(80,80,72,.35)'; g.lineWidth = 1;
+      for (const y of [92, 128, 196]){ g.beginPath(); g.moveTo(xa, y + .5); g.lineTo(xb, y + .5); g.stroke(); }
+      for (let x = Math.ceil(xa / 96) * 96; x < xb; x += 96){ g.beginPath(); g.moveTo(x + .5, 46); g.lineTo(x + .5, GROUND); g.stroke(); }
+      g.fillStyle = 'rgba(90,84,70,.45)';
+      for (const y of [89, 125, 193]) for (let x = Math.ceil(xa / 12) * 12; x < xb; x += 12){ g.beginPath(); g.arc(x, y, .9, 0, 7); g.fill(); }
+      // two rows of round portholes: brass rims, warm light inside, frost on the lower edge
+      for (const px of L.portholes) for (const [py, rr, off] of [[160, 13, 0], [70, 9, 32]]){
+        const x = px + off; if (!vis(x - 30, x + 30) || x > PE - 30) continue;
+        glow(x, py, rr * 2.6, .25);
+        const rim = g.createLinearGradient(x - rr, py - rr, x + rr, py + rr); rim.addColorStop(0, '#f0d58c'); rim.addColorStop(.5, '#b58b3a'); rim.addColorStop(1, '#6e5220');
+        g.fillStyle = rim; g.beginPath(); g.arc(x, py, rr + 3.5, 0, 7); g.fill();
+        g.fillStyle = '#4f3a16'; g.beginPath(); g.arc(x, py, rr + .8, 0, 7); g.fill();
+        const gl = g.createRadialGradient(x - rr * .3, py - rr * .3, 1, x, py, rr); gl.addColorStop(0, '#fff1c2'); gl.addColorStop(.6, '#f2b55a'); gl.addColorStop(1, '#a8621e');
+        g.fillStyle = gl; g.beginPath(); g.arc(x, py, rr, 0, 7); g.fill();
+        g.strokeStyle = 'rgba(255,255,255,.7)'; g.lineWidth = 1.2; g.beginPath(); g.arc(x, py, rr * .65, Math.PI * 1.1, Math.PI * 1.45); g.stroke();
+        g.fillStyle = '#4f3a16'; for (let k = 0; k < 8; k++){ const a = k * Math.PI / 4; g.beginPath(); g.arc(x + Math.cos(a) * (rr + 2), py + Math.sin(a) * (rr + 2), .8, 0, 7); g.fill(); }
+        g.strokeStyle = 'rgba(240,250,255,.9)'; g.lineWidth = 2; g.beginPath(); g.arc(x, py, rr + 2.5, Math.PI * .2, Math.PI * .8); g.stroke();
+      }
+      // watertight doors with a small round window, pipes beside them
+      for (const dx of L.doors){
+        if (!vis(dx - 30, dx + 60)) continue;
+        g.fillStyle = '#b7b6ad'; g.fillRect(dx - 3, GROUND - 78, 42, 78);
+        g.fillStyle = '#d2cfc4'; g.beginPath(); g.moveTo(dx, GROUND); g.lineTo(dx, GROUND - 68); g.quadraticCurveTo(dx, GROUND - 75, dx + 7, GROUND - 75); g.lineTo(dx + 29, GROUND - 75); g.quadraticCurveTo(dx + 36, GROUND - 75, dx + 36, GROUND - 68); g.lineTo(dx + 36, GROUND); g.fill();
+        g.strokeStyle = 'rgba(70,70,64,.6)'; g.lineWidth = 1; g.stroke();
+        g.fillStyle = '#4f3a16'; g.beginPath(); g.arc(dx + 18, GROUND - 56, 6, 0, 7); g.fill(); g.fillStyle = '#f2b55a'; g.beginPath(); g.arc(dx + 18, GROUND - 56, 4.5, 0, 7); g.fill();
+        g.fillStyle = '#6d6a60'; g.fillRect(dx + 28, GROUND - 40, 5, 3);
+        g.strokeStyle = '#8b8f92'; g.lineWidth = 4; g.beginPath(); g.moveTo(dx - 14, 46); g.lineTo(dx - 14, GROUND); g.stroke();
+        g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 1; g.beginPath(); g.moveTo(dx - 15.5, 46); g.lineTo(dx - 15.5, GROUND); g.stroke();
+        g.fillStyle = '#c0392b'; g.fillRect(dx + 46, GROUND - 70, 16, 22); g.fillStyle = '#efe6cf'; g.fillRect(dx + 48, GROUND - 66, 12, 3);   // fire hose box
+      }
+      // lamps under the deck above
+      for (const lx of L.lamps){ if (!vis(lx - 40, lx + 40)) continue; glow(lx, 52, 46, .45); g.fillStyle = '#6e5220'; g.fillRect(lx - 1, 46, 2, 4); g.fillStyle = '#fff3c4'; g.beginPath(); g.arc(lx, 53, 3.2, 0, 7); g.fill(); }
+      // snow blown in along the foot of the wall
+      g.fillStyle = 'rgba(240,248,252,.9)'; g.beginPath(); g.moveTo(xa, GROUND);
+      for (let x = xa; x <= xb; x += 16) g.lineTo(x, GROUND - 3 - Math.abs(Math.sin(x * .013)) * 6);
+      g.lineTo(xb, GROUND); g.fill();
+      // the end of the promenade: a steep stairway up to the deck above, and the corner of the deckhouse
+      if (vis(PE - 140, PE + 40)){
+        const s0 = [PE - 118, GROUND], s1 = [PE - 14, 44], n = 15, sx = (s1[0] - s0[0]) / n, sy = (s1[1] - s0[1]) / n;
+        g.fillStyle = 'rgba(0,0,0,.16)'; g.beginPath(); g.moveTo(s0[0] + 6, GROUND); g.lineTo(s1[0] + 6, s1[1]); g.lineTo(s1[0] + 14, s1[1]); g.lineTo(s1[0] + 14, GROUND); g.fill();
+        for (let k = 1; k < n; k++){ const x = s0[0] + sx * k, y = s0[1] + sy * k; g.fillStyle = '#7a5a3a'; g.fillRect(x - 2, y - 2.5, 13, 3); g.fillStyle = '#f4f9fc'; g.fillRect(x - 2, y - 3.5, 13, 1.2); }
+        g.strokeStyle = '#5f4429'; g.lineWidth = 3; g.beginPath(); g.moveTo(s0[0], s0[1]); g.lineTo(s1[0], s1[1]); g.stroke();
+        g.strokeStyle = '#d9dee2'; g.lineWidth = 1.6; g.beginPath(); g.moveTo(s0[0] + 2, s0[1] - 26); g.lineTo(s1[0] + 2, s1[1] - 26);
+        for (let k = 0; k <= n; k += 3){ const x = s0[0] + sx * k + 2, y = s0[1] + sy * k; g.moveTo(x, y - 2); g.lineTo(x, y - 26); }
+        g.stroke();
+        g.fillStyle = '#e6e1d4'; g.fillRect(PE - 8, 30, 8, GROUND - 30); g.fillStyle = 'rgba(0,0,0,.12)'; g.fillRect(PE - 8, 30, 2, GROUND - 30);
+      }
+    }
+    // ---- the open deck ----
+    if (vis(PE, RUN.LEN + 400)){
+      const xa = Math.max(x0 - 2, PE), xb = x0 + w + 2;
+      // a funnel and lifeboats in their davits behind the railing
+      if (vis(L.funnel - 10, L.funnel + 90)){
+        const fx = L.funnel;
+        const fg = g.createLinearGradient(fx, 0, fx + 84, 0); fg.addColorStop(0, '#7d6844'); fg.addColorStop(.35, '#b4935a'); fg.addColorStop(1, '#5f4d31');
+        g.fillStyle = fg; g.fillRect(fx, -4, 84, RAIL - 30);
+        g.fillStyle = '#0d0f12'; g.fillRect(fx, -4, 84, 26); g.fillStyle = 'rgba(240,248,252,.85)'; g.fillRect(fx, 22, 84, 2);
+        g.fillStyle = 'rgba(0,0,0,.22)'; for (const y of [60, 100, 140]) g.fillRect(fx, y, 84, 2);
+        g.fillStyle = '#d9d4c6'; g.fillRect(fx - 30, RAIL - 34, 144, 34);
+      }
+      for (const bx of L.boats){
+        if (!vis(bx - 10, bx + 90)) continue;
+        g.strokeStyle = '#d7dde2'; g.lineWidth = 3; g.beginPath(); g.moveTo(bx + 4, RAIL); g.quadraticCurveTo(bx + 4, RAIL - 46, bx + 18, RAIL - 46); g.moveTo(bx + 82, RAIL); g.quadraticCurveTo(bx + 82, RAIL - 46, bx + 68, RAIL - 46); g.stroke();
+        g.lineWidth = 1; g.beginPath(); g.moveTo(bx + 18, RAIL - 46); g.lineTo(bx + 20, RAIL - 36); g.moveTo(bx + 68, RAIL - 46); g.lineTo(bx + 66, RAIL - 36); g.stroke();
+        g.fillStyle = '#e9eef2'; g.beginPath(); g.moveTo(bx + 8, RAIL - 36); g.lineTo(bx + 78, RAIL - 36); g.quadraticCurveTo(bx + 72, RAIL - 16, bx + 43, RAIL - 16); g.quadraticCurveTo(bx + 14, RAIL - 16, bx + 8, RAIL - 36); g.fill();
+        g.fillStyle = '#8f2a20'; g.fillRect(bx + 10, RAIL - 35, 66, 2); snow(bx + 8, RAIL - 37, 70, 2.5);
+      }
+      // the foremast with its rigging and the crow's nest
+      if (vis(L.mast - 160, L.mast + 160)){
+        const mx = L.mast;
+        g.strokeStyle = 'rgba(40,46,52,.9)'; g.lineWidth = 1;
+        for (let k = -3; k <= 3; k++){ if (!k) continue; g.beginPath(); g.moveTo(mx + 4, 20); g.lineTo(mx + 4 + k * 46, RAIL); g.stroke(); }
+        g.strokeStyle = 'rgba(40,46,52,.5)'; for (let y = 40; y < RAIL; y += 9){ const s = (y - 20) / (RAIL - 20); g.beginPath(); g.moveTo(mx + 4 - 138 * s, y); g.lineTo(mx + 4 - 46 * s, y); g.stroke(); }
+        const mg = g.createLinearGradient(mx, 0, mx + 9, 0); mg.addColorStop(0, '#6b4a2a'); mg.addColorStop(.5, '#9a7046'); mg.addColorStop(1, '#4e341c');
+        g.fillStyle = mg; g.beginPath(); g.moveTo(mx, GROUND); g.lineTo(mx + 1.5, -4); g.lineTo(mx + 7.5, -4); g.lineTo(mx + 9, GROUND); g.fill();
+        g.fillStyle = '#5a4126'; g.fillRect(mx - 34, 26, 77, 4); snow(mx - 34, 25, 77, 1.5);
+        g.fillStyle = '#7a5428'; g.fillRect(mx - 10, 54, 29, 24); g.fillStyle = 'rgba(0,0,0,.25)'; for (let k = 0; k < 4; k++) g.fillRect(mx - 10, 58 + k * 5, 29, 1);
+        snow(mx - 11, 53, 31, 2.5); g.fillStyle = '#d8b25a'; g.beginPath(); g.arc(mx + 22, 66, 3.4, 0, 7); g.fill();
+        g.fillStyle = '#fff3c4'; g.beginPath(); g.arc(mx + 4.5, 96, 3, 0, 7); g.fill(); glow(mx + 4.5, 96, 26, .5);
+      }
+      // the railing: white steel posts, a wooden top rail with snow on it and icicles under it (as far as the bow)
+      const rb = Math.min(xb, BOW0);
+      g.strokeStyle = '#e3e9ee'; g.lineWidth = 1.6;
+      for (let x = Math.ceil(xa / 30) * 30; x < rb; x += 30){ g.beginPath(); g.moveTo(x + .5, RAIL + 4); g.lineTo(x + .5, GROUND); g.stroke(); }
+      if (rb > xa){
+        g.lineWidth = 1.2; for (const y of [RAIL + 20, RAIL + 36]){ g.beginPath(); g.moveTo(xa, y + .5); g.lineTo(rb, y + .5); g.stroke(); }
+        const rail = g.createLinearGradient(0, RAIL, 0, RAIL + 6); rail.addColorStop(0, '#a4764a'); rail.addColorStop(1, '#6b4a2a');
+        g.fillStyle = rail; g.fillRect(xa, RAIL, rb - xa, 6);
+        g.fillStyle = '#f4f9fc'; g.fillRect(xa, RAIL - 2, rb - xa, 2.5);
+        icicles(xa, rb, RAIL + 6, 13);
+      }
+      // life rings hanging on the railing
+      for (const rx of L.rings){
+        if (!vis(rx - 20, rx + 20)) continue;
+        const cy = RAIL + 22;
+        g.strokeStyle = '#d7c49a'; g.lineWidth = 1; g.beginPath(); g.moveTo(rx - 8, RAIL + 4); g.lineTo(rx - 10, cy - 6); g.moveTo(rx + 8, RAIL + 4); g.lineTo(rx + 10, cy - 6); g.stroke();
+        g.lineWidth = 6.5; for (let k = 0; k < 8; k++){ g.strokeStyle = k % 2 ? '#f1ece2' : '#d0472c'; g.beginPath(); g.arc(rx, cy, 12, k * Math.PI / 4, (k + 1) * Math.PI / 4); g.stroke(); }
+        g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 1; g.beginPath(); g.arc(rx, cy, 15.3, 0, 7); g.stroke();
+        g.fillStyle = '#2a2418'; g.font = '700 4px Arial, sans-serif'; g.textAlign = 'center'; g.fillText('TITANIC', rx, cy + 1.5); g.textAlign = 'start';
+        g.strokeStyle = '#f4f9fc'; g.lineWidth = 2; g.beginPath(); g.arc(rx, cy, 13, Math.PI * 1.15, Math.PI * 1.85); g.stroke();
+      }
+      // ventilator cowls, benches, bollards with rope, and a cargo crane near the bow
+      for (const vx of L.vents){
+        if (!vis(vx - 20, vx + 40)) continue;
+        g.fillStyle = '#e8e4da'; g.fillRect(vx, GROUND - 46, 12, 46);
+        g.beginPath(); g.arc(vx + 14, GROUND - 48, 14, Math.PI * .55, Math.PI * 1.9); g.lineTo(vx + 12, GROUND - 40); g.fill();
+        g.fillStyle = '#8f2a20'; g.beginPath(); g.ellipse(vx + 22, GROUND - 52, 6, 9, -.5, 0, 7); g.fill();
+        snow(vx + 2, GROUND - 61, 18, 2); g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(vx + 8, GROUND - 46, 4, 46);
+      }
+      for (const bx of L.benches){
+        if (!vis(bx - 10, bx + 70)) continue;
+        g.fillStyle = '#2e2e2e'; g.fillRect(bx + 4, GROUND - 16, 3, 16); g.fillRect(bx + 52, GROUND - 16, 3, 16); g.fillRect(bx + 2, GROUND - 32, 3, 18); g.fillRect(bx + 54, GROUND - 32, 3, 18);
+        g.fillStyle = '#8a5f36'; for (let k = 0; k < 3; k++) g.fillRect(bx, GROUND - 18 + k * 2.5, 60, 2);
+        for (let k = 0; k < 3; k++) g.fillRect(bx, GROUND - 32 + k * 4.5, 60, 3);
+        snow(bx, GROUND - 19, 60, 2); snow(bx, GROUND - 33, 60, 1.5);
+      }
+      for (const bx of L.bollards){
+        if (!vis(bx - 10, bx + 30)) continue;
+        g.fillStyle = '#2b2f33'; g.fillRect(bx, GROUND - 10, 18, 4); g.fillRect(bx + 2, GROUND - 16, 5, 10); g.fillRect(bx + 11, GROUND - 16, 5, 10);
+        g.fillStyle = '#c9b38a'; g.beginPath(); g.ellipse(bx + 9, GROUND - 3, 11, 3, 0, 0, 7); g.fill(); g.strokeStyle = '#9a855e'; g.lineWidth = .8; g.beginPath(); g.ellipse(bx + 9, GROUND - 3, 6, 1.6, 0, 0, 7); g.stroke();
+        snow(bx + 1, GROUND - 17, 16, 1.2);
+      }
+      if (vis(L.crane - 60, L.crane + 120)){
+        const cx = L.crane;
+        g.fillStyle = '#3a4046'; g.fillRect(cx, GROUND - 70, 10, 70);
+        g.strokeStyle = '#3a4046'; g.lineWidth = 4; g.beginPath(); g.moveTo(cx + 5, GROUND - 60); g.lineTo(cx + 96, GROUND - 112); g.stroke();
+        g.strokeStyle = '#22272b'; g.lineWidth = 1; g.beginPath(); g.moveTo(cx + 96, GROUND - 112); g.lineTo(cx + 96, GROUND - 52); g.moveTo(cx + 5, GROUND - 70); g.lineTo(cx + 96, GROUND - 112); g.stroke();
+        g.fillStyle = '#22272b'; g.fillRect(cx + 92, GROUND - 54, 8, 5);
+        g.fillStyle = '#4b5258'; g.fillRect(cx - 18, GROUND - 22, 46, 22); g.fillStyle = '#2b2f33'; g.beginPath(); g.arc(cx + 5, GROUND - 14, 7, 0, 7); g.fill();
+        snow(cx - 18, GROUND - 23, 46, 2); snow(cx, GROUND - 71, 10, 1.5);
+      }
+      // deck lamps on posts
+      for (let lx = PE + 360; lx < RUN.LEN; lx += 520){
+        if (!vis(lx - 40, lx + 40)) continue;
+        g.fillStyle = '#2b2f33'; g.fillRect(lx - 1.5, RAIL - 30, 3, GROUND - RAIL + 30); glow(lx, RAIL - 34, 34, .5);
+        g.fillStyle = '#fff3c4'; g.beginPath(); g.arc(lx, RAIL - 34, 3.5, 0, 7); g.fill(); snow(lx - 4, RAIL - 39, 8, 1.2);
+      }
+      // two capstans for the anchor chains just before the bow
+      for (const cx of [RUN.LEN - 150, RUN.LEN - 70]){
+        if (!vis(cx - 20, cx + 20)) continue;
+        g.fillStyle = '#1d2125'; g.fillRect(cx - 9, GROUND - 14, 18, 14); g.fillRect(cx - 12, GROUND - 17, 24, 4);
+        g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(cx - 7, GROUND - 13, 3, 12); snow(cx - 12, GROUND - 17, 24, 1.5);
+      }
+    }
+    // ---- the deck itself: frosted teak, its seams and butt joints, snow (more of it out in the open) ----
+    const dg = g.createLinearGradient(0, GROUND, 0, H); dg.addColorStop(0, '#a58a6b'); dg.addColorStop(1, '#7a6550');
+    g.fillStyle = dg; g.fillRect(x0 - 2, GROUND, w + 4, H - GROUND);
+    g.fillStyle = 'rgba(200,220,235,.32)'; g.fillRect(x0 - 2, GROUND, w + 4, H - GROUND);   // a film of frost over the wood
+    g.strokeStyle = 'rgba(55,42,30,.55)'; g.lineWidth = 1;
+    for (let y = GROUND + 6.5, row = 0; y < H; y += 7, row++){
+      g.beginPath(); g.moveTo(x0 - 2, y); g.lineTo(x0 + w + 2, y); g.stroke();
+      for (let x = Math.floor((x0 - 120) / 120) * 120 + (row % 3) * 40; x < x0 + w; x += 120){ g.beginPath(); g.moveTo(x + .5, y - 7); g.lineTo(x + .5, y); g.stroke(); }
+    }
+    // patches of snow, each in its own cell of the deck so that a patch is whole even where two tiles meet
+    for (let cell = Math.floor((x0 - 60) / 60); cell * 60 < x0 + w + 60; cell++){
+      const Rc = seq(cell * 131 + 7), sx = cell * 60 + Rc() * 60, sy = GROUND + 6 + Rc() * 40, open = sx > PE, rw = 14 + Rc() * 26, rh = 2.2 + Rc() * 2.5;
+      if (!open && Rc() < .6) continue;
+      g.fillStyle = `rgba(240,248,252,${open ? .8 : .55})`; g.beginPath(); g.ellipse(sx, sy, rw, rh, 0, 0, 7); g.fill();
+      if (Rc() < .5){ g.fillStyle = '#fff'; g.fillRect(sx + 6, sy - 1, 1.6, 1.6); }
+    }
+    g.fillStyle = 'rgba(240,248,252,.9)'; g.fillRect(x0 - 2, GROUND, w + 4, 1.5);
+    // ---- the bow: the deck narrows to the stem, the railing sweeps round with it, and beyond is the black sea ----
+    if (vis(BOW0, BOW + 600)){
+      const edge = x => GROUND + (H - GROUND) * (1 - Math.sqrt(Math.max(0, 1 - Math.min(1, (x - BOW0) / (BOW - BOW0)) ** 2)));
+      const xs = []; for (let x = BOW0; x < BOW; x += 3) xs.push(x); xs.push(BOW);
+      // the anchor chains, from the capstans along the deck to the hawse pipes at the stem
+      g.strokeStyle = '#2b2f33'; g.lineWidth = 2.2; g.setLineDash([3, 1.6]);
+      for (const [cx, y] of [[RUN.LEN - 150, GROUND + 9], [RUN.LEN - 70, GROUND + 16]]){ g.beginPath(); g.moveTo(cx, GROUND - 2); g.quadraticCurveTo(cx + 10, y, cx + 40, y); g.lineTo(BOW - 90, y + 6); g.lineTo(BOW - 30, H - 8); g.stroke(); }
+      g.setLineDash([]);
+      g.fillStyle = '#04080f'; g.beginPath(); g.moveTo(BOW0, GROUND - .5); for (const x of xs) g.lineTo(x, edge(x)); g.lineTo(BOW + 600, H); g.lineTo(BOW + 600, GROUND - .5); g.fill();
+      g.fillStyle = 'rgba(200,220,240,.16)'; for (let k = 0; k < 9; k++){ const x = BOW0 + 60 + k * 61, y = GROUND + 6 + (k * 17) % 40; if (y < edge(x) - 3) g.fillRect(x, y, 9 + (k % 3) * 5, 1); }
+      // the gunwale along the edge of the deck, then the railing on top of it
+      const along = d => { g.beginPath(); xs.forEach((x, k) => k ? g.lineTo(x, edge(x) - d) : g.moveTo(x, edge(x) - d)); g.stroke(); };
+      g.strokeStyle = 'rgba(240,248,252,.9)'; g.lineWidth = 1.5; along(-.75);
+      g.strokeStyle = '#e3e9ee'; g.lineWidth = 1.6; g.beginPath();
+      for (let x = Math.ceil(BOW0 / 30) * 30; x < BOW - 8; x += 30){ g.moveTo(x + .5, edge(x) - (GROUND - RAIL) + 4); g.lineTo(x + .5, edge(x)); }
+      g.stroke(); g.lineWidth = 1.2;
+      for (const d of [18, 34]) along(d - .5);
+      const top = GROUND - RAIL;
+      g.fillStyle = 'rgba(220,240,252,.95)';
+      for (let x = Math.ceil(BOW0 / 13) * 13; x < BOW - 20; x += 13){ const y = edge(x) - top + 6, l = 3 + ((x * 7919) % 7); g.beginPath(); g.moveTo(x, y); g.lineTo(x + 2.4, y); g.lineTo(x + 1.2, y + l); g.fill(); }
+      g.strokeStyle = '#8a6038'; g.lineWidth = 6; along(top - 3);
+      g.strokeStyle = '#f4f9fc'; g.lineWidth = 2.5; along(top + .75);
+      // the jack staff at the stem, flying the line's red swallow-tailed flag with its white star stiff in the cold wind
+      const jx = BOW - 6, jy = edge(BOW - 6), fy = jy - 104;
+      g.fillStyle = '#d9d4c6'; g.fillRect(jx - 1.5, fy, 3, 104); g.beginPath(); g.arc(jx, fy, 2.4, 0, 7); g.fill();
+      g.fillStyle = '#b8322a'; g.beginPath(); g.moveTo(jx + 1.5, fy + 1); g.lineTo(jx + 31, fy + 3); g.lineTo(jx + 22, fy + 9.5); g.lineTo(jx + 31, fy + 16); g.lineTo(jx + 1.5, fy + 18); g.fill();
+      g.fillStyle = '#f4f6f8'; g.beginPath();
+      for (let k = 0; k < 10; k++){ const a = -Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? 1.9 : 4.6; g.lineTo(jx + 11 + Math.cos(a) * r, fy + 9.5 + Math.sin(a) * r); }
+      g.fill();
+    }
+    g.restore();
+  }
+
   BUILD.deckrun = api => {
-    const W = 640, H = 300, GROUND = 250, LEN = 4400, SPEED = 230, RAIL = 222;
+    const { GROUND, H, LEN } = RUN, W = 640, SPEED = 230, TW = 512;
     const c = api.canvas(W, H), g = c.getContext('2d');
-    const night = paintNight(W, 205, 170, 1912);
+    const night = paintNight(W, 205, 170, 1912), layout = runLayout(api.rand);
+    const scale = Math.max(1, c.width / W), tiles = new Map();
     const p = { x: 90, y: GROUND, vy: 0, hurt: 0 };
     let dist = 0, lives = 3, t = 0, breath = 0;
     const kinds = Object.keys(RUN_KINDS), obs = [];
     for (let x = 520; x < LEN - 200; x += 230 + api.rand() * 170){ const k = kinds[Math.floor(api.rand() * kinds.length)]; obs.push({ x, k, ...RUN_KINDS[k] }); }
     const flakes = Array.from({ length: 40 }, () => ({ x: api.rand() * W, y: api.rand() * H, s: .4 + api.rand() * .9 }));
     const jump = () => { if (p.y >= GROUND - .5 && !api.over){ p.vy = -610; api.sound('jump'); } };
-    const R = Math.round;
-    const body = () => ({ x: p.x - 7, y: p.y - 47, w: 14, h: 47 });
-    const wrap = (v, span) => ((v % span) + span) % span;
+    const Rn = Math.round;
+    const body = () => ({ x: p.x - 7, y: p.y - 56, w: 14, h: 56 });
+    // ### One tile of the ship, painted the first time it comes near the screen and forgotten once it is behind.
+    function tile(i){
+      if (!tiles.has(i)){
+        const cv = document.createElement('canvas'); cv.width = Math.ceil(TW * scale); cv.height = Math.ceil(H * scale);
+        const tg = cv.getContext('2d'); tg.scale(cv.width / TW, cv.height / H);
+        paintRunTile(tg, i * TW, TW, layout); tiles.set(i, cv);
+      }
+      return tiles.get(i);
+    }
     function drawObstacle(o, sx){
-      const x = R(sx), y = GROUND - o.h, w = o.w, h = o.h;
+      const x = Rn(sx), y = GROUND - o.h, w = o.w, h = o.h;
       if (o.k === 'crate'){
         g.fillStyle = '#8a6136'; g.fillRect(x, y, w, h);
         g.fillStyle = '#6d4a26'; g.fillRect(x, y, w, 3); g.fillRect(x, y + h - 3, w, 3); g.fillRect(x, y, 3, h); g.fillRect(x + w - 3, y, 3, h);
         g.strokeStyle = '#5a3c1e'; g.lineWidth = 2; g.beginPath(); g.moveTo(x + 3, y + 3); g.lineTo(x + w - 3, y + h - 3); g.stroke();
-        g.fillStyle = '#eef6fb'; g.fillRect(x, y, w, 4); g.fillStyle = '#ffffff'; g.fillRect(x + 2, y, w - 6, 2);   // snow on the lid
+        g.fillStyle = '#eef6fb'; g.fillRect(x, y, w, 4); g.fillStyle = '#ffffff'; g.fillRect(x + 2, y, w - 6, 2);
       } else if (o.k === 'trunk'){
         g.fillStyle = '#3d4a5c'; g.fillRect(x, y, w, h);
         g.fillStyle = '#b08a3e'; g.fillRect(x, y + 4, w, 2); g.fillRect(x, y + h - 6, w, 2); g.fillRect(x + 6, y, 3, h); g.fillRect(x + w - 9, y, 3, h);
@@ -433,7 +752,6 @@
         g.fillStyle = '#2d3236'; g.fillRect(x, y + 5, w, 3); g.fillRect(x, y + h - 8, w, 3);
         g.fillStyle = '#eef6fb'; g.fillRect(x, y, w, 3);
       } else {
-        // a block of ice that broke off the iceberg and landed on the deck
         const gr = g.createLinearGradient(x, y, x + w, y + h); gr.addColorStop(0, '#e9f7ff'); gr.addColorStop(1, '#6fa9cc');
         g.fillStyle = gr; g.fillRect(x, y, w, h);
         g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(x + 3, y + 3, w * .4, 2);
@@ -466,68 +784,23 @@
       },
       draw(){
         g.drawImage(night, 0, 0, W, 205);
-        // the funnels and the deckhouse behind, lit coldly from the stars and warmly from the windows (parallax)
-        for (let i = 0; i < 6; i++){
-          const fx = R(wrap(i * 260 - dist * .55, 1560) - 160);
-          g.fillStyle = 'rgba(70,75,85,.55)'; for (let s = 0; s < 4; s++){ g.beginPath(); g.arc(fx + 20 - s * 14, 34 - s * 9, 10 + s * 5, 0, 7); g.fill(); }
-          const fg = g.createLinearGradient(fx, 0, fx + 46, 0); fg.addColorStop(0, '#7d6844'); fg.addColorStop(.4, '#a98b55'); fg.addColorStop(1, '#6a5638');
-          g.fillStyle = fg; g.fillRect(fx, 40, 46, 160); g.fillStyle = '#0d0f12'; g.fillRect(fx, 40, 46, 22);
-          g.fillStyle = 'rgba(230,242,250,.75)'; g.fillRect(fx, 62, 46, 2);
-        }
-        // the white deckhouse wall from the boat deck up, with its lit windows, frosted along the top
-        const wg = g.createLinearGradient(0, 196, 0, GROUND); wg.addColorStop(0, '#c3cfd8'); wg.addColorStop(1, '#9aa8b3');
-        g.fillStyle = wg; g.fillRect(0, 196, W, GROUND - 196);
-        for (let i = 0; i < 26; i++){
-          const wx = R(wrap(i * 30 - dist * .8, 780) - 30), lit = i % 3;
-          g.fillStyle = '#5d6871'; g.fillRect(wx - 1, 203, 14, 14);
-          g.fillStyle = lit ? '#f2c66d' : '#2c353d'; g.fillRect(wx, 204, 12, 12);
-          g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(wx, 204, 12, 2);
-        }
-        g.fillStyle = '#eef5f9'; g.fillRect(0, 196, W, 2);
-        // lifeboats in their davits, frosted
-        for (let i = 0; i < 8; i++){
-          const lx = R(wrap(i * 120 - dist * .8, 960) - 120);
-          g.strokeStyle = '#e8eff4'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(lx + 2, 196); g.quadraticCurveTo(lx + 2, 176, lx + 14, 176); g.moveTo(lx + 78, 196); g.quadraticCurveTo(lx + 78, 176, lx + 66, 176); g.stroke();
-          g.fillStyle = '#e9eef2'; g.beginPath(); g.moveTo(lx + 6, 180); g.lineTo(lx + 74, 180); g.quadraticCurveTo(lx + 68, 196, lx + 40, 196); g.quadraticCurveTo(lx + 12, 196, lx + 6, 180); g.fill();
-          g.fillStyle = '#ffffff'; g.fillRect(lx + 8, 178, 64, 3);
-        }
-        // the frosted deck: pale grey planks, rime between them, patches of snow and glints of ice
-        const dg = g.createLinearGradient(0, GROUND, 0, H); dg.addColorStop(0, '#a9b6c0'); dg.addColorStop(1, '#7f8d98');
-        g.fillStyle = dg; g.fillRect(0, GROUND, W, H - GROUND);
-        g.strokeStyle = 'rgba(60,72,82,.55)'; g.lineWidth = 1;
-        for (let y = GROUND + 8.5; y < H; y += 9){ g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
-        for (let i = 0; i < 20; i++){ const x = R(wrap(i * 48 - dist, 960) - 20) + .5; g.beginPath(); g.moveTo(x, GROUND); g.lineTo(x - 12, H); g.stroke(); }
-        for (let i = 0; i < 14; i++){
-          const sx = R(wrap(i * 137 - dist, 1918) - 100), sy = GROUND + 6 + (i * 13) % 40;
-          g.fillStyle = 'rgba(240,248,252,.75)'; g.beginPath(); g.ellipse(sx, sy, 26 + (i % 4) * 8, 3 + (i % 3), 0, 0, 7); g.fill();
-          if (i % 2){ g.fillStyle = '#ffffff'; g.fillRect(sx + 10, sy - 1, 2, 2); }
-        }
-        g.fillStyle = 'rgba(240,248,252,.9)'; g.fillRect(0, GROUND, W, 2);
-        // the railing, with icicles under the top rail
-        g.strokeStyle = '#e6eef3'; g.lineWidth = 2; g.beginPath(); g.moveTo(0, RAIL); g.lineTo(W, RAIL); g.moveTo(0, RAIL + 12); g.lineTo(W, RAIL + 12); g.stroke();
-        g.lineWidth = 1.5; for (let i = 0; i < 24; i++){ const x = R(wrap(i * 34 - dist, 816) - 10) + .5; g.beginPath(); g.moveTo(x, RAIL); g.lineTo(x, GROUND); g.stroke(); }
-        g.fillStyle = 'rgba(225,242,252,.9)';
-        for (let i = 0; i < 40; i++){ const x = R(wrap(i * 21 - dist, 840) - 20), l = 3 + (i * 7) % 6; g.beginPath(); g.moveTo(x, RAIL + 1); g.lineTo(x + 3, RAIL + 1); g.lineTo(x + 1.5, RAIL + 1 + l); g.fill(); }
-        // the bow, with its frosted mast and flag
-        const bx = R(LEN - dist + p.x + 40);
-        if (bx < W + 40){ g.fillStyle = '#16181a'; g.beginPath(); g.moveTo(bx, GROUND); g.lineTo(bx + 120, 200); g.lineTo(bx + 120, H); g.lineTo(bx, H); g.fill(); g.fillStyle = '#e8eff4'; g.fillRect(bx, GROUND - 2, 120, 3); g.fillStyle = '#c0392b'; g.fillRect(bx + 20, 150, 4, 100); g.fillRect(bx + 24, 150, 24, 14); }
+        // glints of starlight on the sea move slowly past
+        g.fillStyle = 'rgba(200,220,240,.18)';
+        for (let i = 0; i < 14; i++){ const x = ((i * 97 - dist * .15) % (W + 40) + W + 40) % (W + 40) - 20; g.fillRect(x, 176 + (i % 4) * 7, 10 + (i % 3) * 6, 1); }
+        g.fillStyle = '#04080f'; g.fillRect(0, 205, W, GROUND - 205);   // the dark sea seen low through the railing
+        // the ship, in tiles that scroll with the deck (world x = screen x - p.x + dist)
+        const wx0 = dist - p.x, first = Math.floor(wx0 / TW), last = Math.floor((wx0 + W) / TW);
+        for (let i = first; i <= last + 1; i++){ const cv = tile(i); if (i <= last) g.drawImage(cv, Rn(i * TW - wx0), 0, TW, H); }
+        for (const k of [...tiles.keys()]) if (k < first - 1) tiles.delete(k);
         for (const o of obs){ const sx = o.x - dist + p.x; if (sx > -60 && sx < W + 60) drawObstacle(o, sx); }
-        // the runner: an inmate in an orange jumpsuit, breathing out little clouds in the cold
+        // the sailor, breathing out little clouds in the cold
         if (!(p.hurt > 0 && Math.floor(p.hurt * 10) % 2)){
-          const x = R(p.x), y = R(p.y), run = p.y < GROUND ? 3 : Math.sin(t * 16) * 6;
-          g.lineCap = 'round'; g.strokeStyle = '#e8640f'; g.lineWidth = 5;
-          g.beginPath(); g.moveTo(x, y - 17); g.lineTo(x + run, y - 1); g.moveTo(x, y - 17); g.lineTo(x - run, y - 1); g.stroke();
-          g.strokeStyle = '#ff7a1a'; g.lineWidth = 7; g.beginPath(); g.moveTo(x, y - 18); g.lineTo(x + 1, y - 33); g.stroke();
-          g.lineWidth = 4; g.beginPath(); g.moveTo(x + 1, y - 31); g.lineTo(x + 8 - run * .6, y - 22); g.moveTo(x + 1, y - 31); g.lineTo(x - 6 + run * .6, y - 22); g.stroke();
-          g.fillStyle = '#1c1c1c'; g.fillRect(x - 4, y - 3, 8, 3);
-          g.fillStyle = '#e8c39e'; g.beginPath(); g.arc(x + 2, y - 40, 6, 0, 7); g.fill();
-          g.fillStyle = '#3a2a1a'; g.beginPath(); g.arc(x + 2, y - 42, 6, Math.PI, 0); g.fill();
-          if (breath < .5){ g.fillStyle = `rgba(235,245,255,${.5 - breath})`; g.beginPath(); g.arc(x + 12 + breath * 20, y - 41 - breath * 6, 3 + breath * 8, 0, 7); g.fill(); }
+          g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.ellipse(p.x + 2, GROUND + 1, 11 - (GROUND - p.y) * .05, 2.2, 0, 0, 7); g.fill();
+          const s = drawSailor(g, p.x, p.y, t, p.y < GROUND - .5, p.vy);
+          if (breath < .5){ g.fillStyle = `rgba(235,245,255,${.55 - breath})`; g.beginPath(); g.arc(s.mouth[0] + 4 + breath * 20, s.mouth[1] - breath * 6, 2.5 + breath * 8, 0, 7); g.fill(); }
         }
-        // snow drifting past
         g.fillStyle = 'rgba(255,255,255,.8)'; for (const f of flakes){ g.beginPath(); g.arc(f.x, f.y, f.s * 1.3, 0, 7); g.fill(); }
-        // progress to the bow
-        g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(20, 14, W - 40, 6); g.fillStyle = '#ff7a1a'; g.fillRect(20, 14, R((W - 40) * dist / LEN), 6);
+        g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(20, 14, W - 40, 6); g.fillStyle = '#ff7a1a'; g.fillRect(20, 14, Rn((W - 40) * dist / LEN), 6);
       }
     };
   };
@@ -984,5 +1257,5 @@
     return { stop(){ if (!stopped){ api.over = true; cleanup(); } }, get timeLeft(){ return left; } };
   }
 
-  return Object.freeze({ TIME, INFO, GAMES, DIFFS, pickGames, tttWinner, tttBot, placeFleet, fleetSunk, bsBot, around, waterAround, pickDiffs, hitDiff, overlap, icebergPoly, inPoly, cloudStack, hitsClouds, RUN_KINDS, CLIMB_LEVELS, open });
+  return Object.freeze({ TIME, INFO, GAMES, DIFFS, pickGames, tttWinner, tttBot, placeFleet, fleetSunk, bsBot, around, waterAround, pickDiffs, hitDiff, overlap, icebergPoly, inPoly, cloudStack, hitsClouds, RUN_KINDS, RUN, runLayout, CLIMB_LEVELS, open });
 });

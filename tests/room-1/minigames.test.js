@@ -116,6 +116,20 @@ test('deck run: every obstacle is a plain box, so what you see is exactly what k
   }
 });
 
+test('deck run: first the portholes along the side of the ship, then the open deck with its rings, and the bow after the finish', () => {
+  const { PROMENADE_END: PE, LEN, BOW0, BOW } = M.RUN;
+  for (const seed of [1, 2, 3]){
+    const L = M.runLayout(seeded(seed));
+    assert.ok(L.portholes.length > 20 && L.portholes.every(x => x < PE), 'portholes only along the covered side');
+    for (const k of ['rings', 'benches', 'vents', 'bollards', 'boats']){
+      assert.ok(L[k].length > 0 && L[k].every(x => x > PE && x < LEN), `${k} on the open deck`);
+    }
+    assert.ok(L.funnel > PE && L.mast > PE && L.mast < LEN, 'funnel and mast on the open deck');
+  }
+  // the deck only narrows to the stem beyond the finish, so the sailor never runs out over the sea
+  assert.ok(BOW0 > LEN && BOW > BOW0);
+});
+
 test('spot the difference: five differences each game, found only once and only near the right place', () => {
   const d = M.pickDiffs(seeded(5));
   assert.equal(d.length, 5);
