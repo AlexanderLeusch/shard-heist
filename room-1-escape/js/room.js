@@ -988,23 +988,52 @@ const tunnelLight = new THREE.PointLight(0xffb066, 0, 5, 2); tunnelLight.positio
   for (let i = 0; i < 3; i++) box(.012, .07, .15, M.dullSteel, 2.5 + i * .25, 2.94, -1.8);
 }
 
-// ### The prisoner's jacket, as in the photo: a long coat in broad black and sand stripes, hung by its collar on a hook
-// ### on the north wall under the red lamp, its hem slumped on the floor. Body and sleeves are tubes of cloth built
-// ### point by point: narrow where the collar is gathered on the hook, the shoulders sagging, soft vertical folds that
-// ### grow towards the hem. The stripes follow the cloth (texture v runs down the coat).
-{
-  const PERIOD = .13, L = 1.96;   // one black and one sand stripe; the coat is longer than the hook is high
-  const stripes = canvasTex(128, 256, (g, w, h) => {
-    for (let y = 0; y < h; y++){
-      const dark = y < h / 2, v = dark ? 26 + rnd() * 8 : 176 + rnd() * 18;
-      g.fillStyle = dark ? `rgb(${v + 4},${v},${v - 4})` : `rgb(${v + 14},${v},${v - 34})`; g.fillRect(0, y, w, 1);
+// ### Prison cloth: broad black and sand stripes of a coarse cotton twill. The stripes' edges wander a little where the dye
+// ### bled, the diagonal ribs of the twill and thicker and thinner threads run through it, and it is faded and grubby in
+// ### places. Returns the colour and a matching bump map for the ribs. The stripes run across v (one dark and one sand
+// ### stripe per repeat) and the texture tiles both ways; rib sets how strongly the twill shows. Used for the uniform on the wall and the sleeves of your arms.
+function prisonCloth(w, h, repeat, rib = 1){
+  const weave = (x, y) => (((x + y) & 3) < 2 ? 1 : -1) * (((x >> 1) + y) % 7 === 0 ? .4 : 1);   // the twill's diagonal ribs
+  const slub = []; for (let y = 0; y < h; y++) slub.push((rnd() - .5) * .1);
+  const ph = [rnd(), rnd(), rnd(), rnd()].map(p => p * Math.PI * 2), TAU = Math.PI * 2;
+  const shift = x => (Math.sin(TAU * x / w * 3 + ph[0]) * 1.2 + Math.sin(TAU * x / w * 8 + ph[1]) * .6) * h / 256;
+  const width = x => (Math.sin(TAU * x / w * 5 + ph[2]) * 1.1 + Math.sin(TAU * x / w * 11 + ph[3]) * .5) * h / 256;
+  const map = canvasTex(w, h, g => {
+    const img = g.createImageData(w, h), d = img.data;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){
+      const yy = (y + shift(x) + h) % h, edge = Math.abs(yy - h / 2 - width(x)), dark = yy < h / 2 + width(x);
+      const blur = Math.min(1, Math.min(edge, yy, h - yy) / 1.5), k = 1 + weave(x, y) * .035 * rib + slub[y] * .6 + (rnd() - .5) * .05;
+      const c = dark ? [34, 32, 31] : [196, 186, 152], o = dark ? [196, 186, 152] : [34, 32, 31], mix = .5 - .5 * blur;
+      const i = (y * w + x) * 4;
+      for (let j = 0; j < 3; j++) d[i + j] = clamp((c[j] * (1 - mix) + o[j] * mix) * k, 0, 255);
+      d[i + 3] = 255;
     }
-    for (let i = 0; i < 2600; i++){ const v = rnd() < .5 ? 255 : 0; g.fillStyle = `rgba(${v},${v},${v},${rnd() * .08})`; g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 3, 1); }   // the weave
-    grime(g, w, h, 8, 'rgba(60,44,24,.18)', 40, false);
-  }, [1, 1]);
-  const cloth = new THREE.MeshStandardMaterial({ map: stripes, roughness: .95 });
+    g.putImageData(img, 0, 0);
+    grime(g, w, h, 9, 'rgba(78,60,34,.16)', w * .35, false);              // old sweat and dirt
+    grime(g, w, h, 6, 'rgba(240,232,210,.07)', w * .3, false);            // faded where it was scrubbed
+  }, repeat);
+  const bump = canvasTex(w, h, g => {
+    const img = g.createImageData(w, h), d = img.data;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++){ const v = clamp(128 + weave(x, y) * 60 * rib + slub[y] * 400 + (rnd() - .5) * 30, 0, 255), i = (y * w + x) * 4; d[i] = d[i + 1] = d[i + 2] = v; d[i + 3] = 255; }
+    g.putImageData(img, 0, 0);
+  }, repeat);
+  bump.encoding = THREE.LinearEncoding;
+  return { map, bump };
+}
+// ### The prisoner's uniform, hung on a hook on the north wall under the red lamp: a striped jacket hung by its collar,
+// ### and the matching trousers hung behind it by the waistband, their legs showing under the jacket. The jacket is a
+// ### tube of cloth built point by point: gathered at the collar, the shoulders sagging down to either side, soft folds
+// ### that grow towards the hem, the lower back pushed off the wall by the trousers. On it sit a turned down collar, a
+// ### dark gap down the front with its buttons, a breast pocket whose stripes do not quite match, and a sewn on cloth
+// ### patch with the number 1356 stamped on it. The stripes follow the cloth (texture v runs down it).
+{
+  const PERIOD = .13, LJ = .76;   // one black and one sand stripe; the jacket's length from the collar
+  const tex = prisonCloth(256, 256, [1, 1]);
+  const cloth = new THREE.MeshStandardMaterial({ map: tex.map, bumpMap: tex.bump, bumpScale: .0007, roughness: .97 });
+  const clothD = cloth.clone(); clothD.side = THREE.DoubleSide;
+  const gap = new THREE.MeshStandardMaterial({ color: 0x070606, roughness: 1, side: THREE.DoubleSide });
   // a tube of cloth: fn(t, a) gives the point at t (0 top .. 1 bottom) and angle a, and how far the cloth there is pulled
-  // up against the hang (the stripes follow it); v0 + t * len is the length of cloth from the collar
+  // up against the hang (the stripes follow it); v0 + t * len is the length of cloth from the top
   const clothTube = (rows, cols, v0, len, fn) => {
     const pos = [], uv = [], idx = [];
     for (let i = 0; i <= rows; i++) for (let j = 0; j <= cols; j++){
@@ -1019,41 +1048,89 @@ const tunnelLight = new THREE.PointLight(0xffb066, 0, 5, 2); tunnelLight.positio
     return geo;
   };
   const ss = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
-  const folds = (x, t) => (Math.sin(x * 30 + 1.3) * .6 + Math.sin(x * 53 + .4) * .25 + Math.sin(x * 13 + t * 4) * .5) * (.003 + .022 * ss(.12, 1, t));
+  const folds = (x, t) => (Math.sin(x * 30 + 1.3) * .6 + Math.sin(x * 53 + .4) * .25 + Math.sin(x * 13 + t * 4) * .5) * (.002 + .016 * ss(.15, 1, t));
   const g = new THREE.Group(); g.position.set(1.15, 1.84, -D / 2); room.add(g);
-  // the body: gathered to a few centimetres at the hook, shoulders sagging down to either side, then hanging straight
-  // and widening a little to the hem; flat at the back against the wall, rounded and folded in front
-  const coat = (t, a) => {
-    const w = .03 + .135 * ss(.02, .14, t) + .03 * ss(.14, 1, t), d = .02 + .035 * ss(0, .2, t) + .015 * t;
-    const c = Math.cos(a), sn = Math.sin(a), x = w * Math.sign(c) * Math.pow(Math.abs(c), .6), f = folds(x, t);
-    let y = -t * L, z = .012 + (sn > 0 ? d * Math.pow(sn, .7) + f * sn : sn * .004);
-    z += .02 * Math.exp(-Math.pow((t - .07) / .04, 2)) * Math.max(sn, 0);   // cloth bunched under the collar
-    const floor = .006 - 1.84;   // below the floor the hem slumps forward instead
-    if (y < floor){ z += (floor - y) * (.55 + .3 * Math.sin(x * 23)); y = floor + (y - floor) * .05; }
-    // across the sagging shoulders a stripe runs downhill from the collar
-    const sag = .08 * Math.pow(Math.min(1, Math.abs(x) / .17), 1.5) * (1 - ss(.08, .4, t));
-    return [x + .012 * Math.sin(t * 5 + 1) * ss(.1, .5, t), y, z, sag + f * .2];
+  const put = (geo, mat) => { const m = new THREE.Mesh(geo, mat); m.castShadow = m.receiveShadow = true; g.add(m); return m; };
+  // the jacket: half its width, how far its back stands off the wall, and how far its front bulges, down its length
+  const jw = t => .025 + .17 * ss(.01, .26, t) + .02 * ss(.26, 1, t);
+  const back = t => .012 + .05 * ss(.4, .75, t);
+  const jd = t => .018 + .03 * ss(0, .18, t) + .012 * t;
+  // the point on the front of the jacket at x across and t down it
+  const front = (x, t) => {
+    const c = Math.pow(Math.min(1, Math.abs(x) / jw(t)), 1 / .6), s = Math.sqrt(Math.max(0, 1 - c * c));
+    const z = back(t) + jd(t) * Math.pow(s, .7) + folds(x, t) * s + .018 * Math.exp(-Math.pow((t - .07) / .04, 2)) * s;   // bunched under the collar
+    return [x + .008 * Math.sin(t * 5 + 1) * ss(.1, .6, t), -.03 - t * LJ, z];
   };
-  const m = new THREE.Mesh(clothTube(56, 32, 0, L, coat), cloth); m.castShadow = m.receiveShadow = true; g.add(m);
-  // the sleeves hang from the shoulders down both sides, in front of the body's edge and clearly apart from it
+  // across the sagging shoulders a stripe runs downhill from the collar
+  const sag = (x, t) => .07 * Math.pow(Math.min(1, Math.abs(x) / .19), 1.5) * (1 - ss(.15, .5, t)) + folds(x, t) * .2;
+  put(clothTube(56, 36, 0, LJ, (t, a) => {
+    const w = jw(t), c = Math.cos(a), sn = Math.sin(a), x = w * Math.sign(c) * Math.pow(Math.abs(c), .6);
+    if (sn > 0) return [...front(x, t), sag(x, t)];
+    return [x + .008 * Math.sin(t * 5 + 1) * ss(.1, .6, t), -.03 - t * LJ, back(t) + sn * .004, sag(x, t)];
+  }), cloth);
+  // a piece laid on the front of the jacket: corner(u, v) gives x and t, lift how far it stands off the cloth
+  const onFront = (corner, nu, nv, lift, uvOf, mat) => {
+    const pos = [], uv = [], idx = [];
+    for (let i = 0; i <= nv; i++) for (let j = 0; j <= nu; j++){
+      const u = j / nu, v = i / nv, [x, t] = corner(u, v), p = front(x, t);
+      pos.push(p[0], p[1], p[2] + lift(u, v)); uv.push(...uvOf(u, v, x, t));
+    }
+    for (let i = 0; i < nv; i++) for (let j = 0; j < nu; j++){ const a = i * (nu + 1) + j, b = a + nu + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx);
+    geo.computeVertexNormals();
+    return put(geo, mat);
+  };
+  const clothUv = shift => (u, v, x, t) => [x * 6, -(t * LJ - sag(x, t) + shift) / PERIOD];
+  // the turned down collar: a band round the hook and two points lying on the chest
+  put(clothTube(4, 16, .3, .04, (t, a) => [Math.cos(a) * .034, -.006 - t * .04, .03 + Math.sin(a) * .024, 0]), cloth);
   for (const sd of [-1, 1]){
-    const sl = clothTube(24, 12, .1, .9, (t, a) => {
-      // it grows out of the sloping shoulder, then hangs as a tube
-      const r = .022 + .03 * ss(0, .14, t) - .008 * t + .004 * Math.sin(t * 17 + a * 2), cx = sd * (.1 + .1 * ss(0, .3, t)), cy = -.15 - t * .87, cz = .035 + .025 * ss(0, .2, t) + .01 * t;
-      return [cx + Math.cos(a) * r * .85, cy, cz + Math.sin(a) * r, Math.abs(Math.cos(a)) * .02];
-    });
-    const sm = new THREE.Mesh(sl, cloth); sm.castShadow = sm.receiveShadow = true; g.add(sm);
-    const cuff = new THREE.Mesh(new THREE.CircleGeometry(.04, 12), M.dark); cuff.rotation.x = Math.PI / 2; cuff.scale.x = .85; cuff.position.set(sd * .2, -1.015, .07); g.add(cuff);
+    const lerp = (p, q, k) => p + (q - p) * k;
+    onFront((u, v) => [sd * lerp(lerp(.01, .045, u), lerp(.022, .04, u), v), lerp(lerp(.045, .08, u), lerp(.2, .19, u), v)], 6, 8,
+      (u, v) => .006 + .006 * (1 - v), clothUv(.031), clothD);
   }
-  // a row of dark buttons down the front
-  for (let i = 0; i < 6; i++){
-    const t = .16 + i * .075, p = coat(t, Math.PI / 2);
-    const b = new THREE.Mesh(new THREE.CylinderGeometry(.011, .011, .006, 10), M.black); b.rotation.x = Math.PI / 2; b.position.set(p[0], p[1], p[2] + .002); g.add(b);
+  // the dark gap where the two fronts meet, from the collar down to the hem, and five buttons beside it
+  onFront((u, v) => [-.002 + u * .004, .17 + v * .83], 1, 40, () => .0008, (u, v) => [u, v], gap);
+  for (let i = 0; i < 5; i++){
+    const t = .22 + i * .15, p = front(-.018, t);
+    const b = put(new THREE.CylinderGeometry(.0085, .0085, .005, 12), M.black); b.rotation.x = Math.PI / 2; b.position.set(p[0], p[1], p[2] + .004);
+  }
+  // the breast pocket on the left of the chest; its stripes are a little off the jacket's, its top edge is hemmed
+  onFront((u, v) => [.045 + u * .105, .37 + v * .15], 8, 8, (u, v) => .004 + .002 * Math.sin(u * Math.PI), clothUv(.022), clothD);
+  onFront((u, v) => [.045 + u * .105, .37 + v * .006], 8, 1, () => .0065, (u, v) => [u, v], gap);
+  // the number patch above it: off-white cloth, the number stamped in black ink, worn, and stitched round the edge
+  const numTex = canvasTex(256, 128, (c, w, h) => {
+    c.fillStyle = '#d6cfb8'; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 2600; i++){ const v = rnd() < .5 ? 255 : 60; c.fillStyle = `rgba(${v},${v},${v * .9},${rnd() * .09})`; c.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 3, 1); }
+    grime(c, w, h, 5, 'rgba(90,70,40,.16)', 60, false);
+    c.fillStyle = '#151413'; c.font = 'bold 86px "Arial Narrow", "Helvetica Neue", Arial, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.save(); c.translate(w / 2, h / 2 + 4); c.rotate(-.02); c.scale(1, 1.05); c.fillText('1356', 0, 0); c.restore();
+    for (let i = 0; i < 700; i++){ c.fillStyle = `rgba(214,207,184,${.3 + rnd() * .6})`; c.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 2, 1 + rnd() * 2); }   // worn ink
+    c.strokeStyle = 'rgba(40,36,30,.75)'; c.lineWidth = 2; c.setLineDash([6, 5]); c.strokeRect(8, 8, w - 16, h - 16);   // the stitches
+  });
+  const numMat = new THREE.MeshStandardMaterial({ map: numTex, roughness: .95, side: THREE.DoubleSide });
+  onFront((u, v) => [.032 + u * .118, .255 + v * .076], 10, 4, () => .0045, (u, v) => [u, 1 - v], numMat);
+  // the sleeves hang from the shoulders down both sides, in front of the body's edge, bunched a little at the elbow
+  for (const sd of [-1, 1]){
+    put(clothTube(26, 14, .16 + sd * .02, .54, (t, a) => {
+      const r = .022 + .025 * ss(0, .14, t) - .006 * t + .003 * Math.sin(t * 19 + a * 2) + .004 * Math.exp(-Math.pow((t - .52) / .06, 2)) + .003 * ss(.93, .97, t);
+      const cx = sd * (.15 + .065 * ss(0, .25, t)), cy = -.17 - t * .52, cz = .045 + .02 * ss(0, .2, t) + .045 * ss(.5, 1, t);
+      return [cx + Math.cos(a) * r * .85, cy, cz + Math.sin(a) * r, Math.abs(Math.cos(a)) * .015];
+    }), cloth);
+    const cuff = put(new THREE.CircleGeometry(.036, 12), M.dark); cuff.rotation.x = Math.PI / 2; cuff.scale.x = .85; cuff.position.set(sd * .215, -.689, .11);
+  }
+  // the trousers' legs, hung behind the jacket by the waistband and showing below its hem
+  for (const sd of [-1, 1]){
+    put(clothTube(20, 16, .37 + sd * .03, .6, (t, a) => {
+      const rx = .062 + .006 * t + .003 * Math.sin(t * 13 + a * 3 + sd), rz = .034 + .004 * t;
+      return [sd * (.056 + .008 * t) + Math.cos(a) * rx, -.52 - t * .6, .052 + Math.sin(a) * rz, Math.abs(Math.cos(a)) * .01];
+    }), cloth);
+    const hem = put(new THREE.CircleGeometry(1, 16), M.dark); hem.rotation.x = Math.PI / 2; hem.scale.set(.066, .036, 1); hem.position.set(sd * .064, -1.119, .052);
   }
   // the hook it hangs on, screwed to the tiles
   box(.035, .07, .012, M.dullSteel, 1.15, 1.88, -D / 2 + .006);
   const hk = new THREE.Mesh(new THREE.TorusGeometry(.02, .005, 6, 12, Math.PI * 1.2), M.steel); hk.position.set(1.15, 1.86, -D / 2 + .03); hk.rotation.set(0, Math.PI / 2, Math.PI * .9); add(hk);
-  flat(.7, .4, M.blob, 1.15, -D / 2 + .15);
+  flat(.5, .3, M.blob, 1.15, -D / 2 + .12);
 }
 // ### Toilet rolls dropped on the floor: lying on their sides at odd angles, one squashed, one with a long tail of paper
 // ### unrolled across the stall floor into the puddle by the toilet.
@@ -1330,13 +1407,7 @@ const HAND_MAT = {
     for (let i = 0; i < 260; i++){ const r = 2 + rnd() * 9; g.fillStyle = rnd() < .5 ? `rgba(176,104,84,${rnd() * .12})` : `rgba(214,170,140,${rnd() * .12})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, r, 0, Math.PI * 2); g.fill(); }
     for (let i = 0; i < 1600; i++){ g.fillStyle = `rgba(90,52,40,${rnd() * .07})`; g.fillRect(rnd() * w, rnd() * h, 1, 1); }   // pores
   }, [3, 3]) }),
-  sleeve: new THREE.MeshStandardMaterial({ color: 0xb4b4b4, roughness: .95, side: THREE.DoubleSide, map: canvasTex(64, 128, (g, w, h) => {
-    for (let y = 0; y < h; y++){
-      const dark = y < h / 2, v = dark ? 26 + rnd() * 8 : 176 + rnd() * 18;
-      g.fillStyle = dark ? `rgb(${v + 4},${v},${v - 4})` : `rgb(${v + 14},${v},${v - 34})`; g.fillRect(0, y, w, 1);
-    }
-    for (let i = 0; i < 900; i++){ const v = rnd() < .5 ? 255 : 0; g.fillStyle = `rgba(${v},${v},${v},${rnd() * .08})`; g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 3, 1); }   // the weave
-  }, [1, 3.2]) })
+  sleeve: (() => { const c = prisonCloth(256, 256, [1, 3.2], .25); return new THREE.MeshStandardMaterial({ color: 0xc8c8c8, roughness: .97, side: THREE.DoubleSide, map: c.map, bumpMap: c.bump, bumpScale: .0004 }); })()
 };
 // ### The cuff and the sleeve, running from the wrist (the origin) back out of the picture along +z.
 function addSleeve(arm){
