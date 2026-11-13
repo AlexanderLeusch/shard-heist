@@ -326,6 +326,8 @@ const M = {
   worn: steelMat(0xb4bcc0, 1.7),
   water: new THREE.MeshStandardMaterial({ color: 0x5d6b5e, metalness: .1, roughness: .04, transparent: true, opacity: .88 }),
   chrome: new THREE.MeshStandardMaterial({ color: 0xe8ecee, metalness: 1, roughness: .12 }),
+  // the floor drains: polished stainless that mirrors the lamps, with only fine scratches left in the polish
+  drain: steelMat(0xe4e9ec, .26, { envMapIntensity: 2, normalScale: new THREE.Vector2(.08, .08) }),
   cove: new THREE.MeshStandardMaterial({ color: 0x24382c, roughness: .35 }),
   grille: new THREE.MeshStandardMaterial({ map: grilleTex, metalness: .5, roughness: .6 }),
   speaker: new THREE.MeshStandardMaterial({ map: speakerTex, metalness: .6, roughness: .5 }),
@@ -569,9 +571,48 @@ wall(3.45, -2.275, D / 2, Math.PI, [], [false, true]); wall(3.45, 2.275, D / 2, 
 plane(1.1, H - 2.14, blockMat(1.1, H - 2.14), 0, 2.14 + (H - 2.14) / 2, D / 2, Math.PI);
 wall(D, -W / 2, 0, Math.PI / 2, [[1.5, 2.72], [4.5, 2.72]]);  // west (sinks), rust where the pipes turn down
 wall(D, W / 2, 0, -Math.PI / 2, [[3.45, 1.98, 'shower'], [4.55, 1.98, 'shower']]);  // east, under the shower heads
-// skirting drain channel and floor drain
-cyl(.12, .12, .01, M.dark, 0, .006, .3, 24);
-for (let i = -2; i <= 2; i++) box(.22, .012, .012, M.dullSteel, 0, .012, .3 + i * .045);
+// ### A floor drain of polished stainless steel. A bevelled frame sits on the floor round a dark, wet throat, and a grate
+// ### lies in it, a plate with slots cut through it whose rounded edges catch the light; the dark of the pipe shows
+// ### through the slots. round: a round drain with radial slots and a screw in the middle, else a square one with
+// ### parallel slots (the shower drain).
+function floorDrain(x, z, round){
+  const g = new THREE.Group(); g.position.set(x, 0, z); room.add(g);
+  const part = (geo, mat, y) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; m.receiveShadow = true; g.add(m); return m; };
+  const R = round ? .088 : .098;   // the grate's radius, or half its side
+  // a flat piece cut out of a shape and given a bevelled edge, laid flat on the floor
+  const plate = (shape, depth, bevel) => new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 3, curveSegments: 32 }).rotateX(-Math.PI / 2);
+  const outline = (r, sq) => { const s = new THREE.Shape(); if (sq) { s.moveTo(-r, -r); s.lineTo(r, -r); s.lineTo(r, r); s.lineTo(-r, r); s.closePath(); } else s.absarc(0, 0, r, 0, Math.PI * 2, false); return s; };
+  // a slot with round ends from (x1, y1) to (x2, y2), w wide
+  const slot = (x1, y1, x2, y2, w) => {
+    const a = Math.atan2(y2 - y1, x2 - x1), pts = [];
+    for (let i = 0; i <= 8; i++){ const t = a - Math.PI / 2 + Math.PI * i / 8; pts.push(new THREE.Vector2(x2 + Math.cos(t) * w / 2, y2 + Math.sin(t) * w / 2)); }
+    for (let i = 0; i <= 8; i++){ const t = a + Math.PI / 2 + Math.PI * i / 8; pts.push(new THREE.Vector2(x1 + Math.cos(t) * w / 2, y1 + Math.sin(t) * w / 2)); }
+    return new THREE.Path(pts);
+  };
+  // the throat: dark, a little lighter towards the rim where the pipe wall catches light, and wet
+  const throat = canvasTex(64, 64, (c, w, h) => {
+    const gr = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    gr.addColorStop(0, '#030303'); gr.addColorStop(.7, '#0b0c0b'); gr.addColorStop(1, '#2a2b27'); c.fillStyle = gr; c.fillRect(0, 0, w, h);
+  });
+  part(new THREE.PlaneGeometry(R * 2.08, R * 2.08).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ map: throat, roughness: .15, metalness: .3, alphaTest: .5,
+    alphaMap: round ? canvasTex(64, 64, (c, w, h) => { c.fillStyle = '#000'; c.fillRect(0, 0, w, h); c.fillStyle = '#fff'; c.beginPath(); c.arc(w / 2, h / 2, w / 2, 0, Math.PI * 2); c.fill(); }) : null }), .0015);
+  // the frame on the floor round it
+  const frame = outline(R + .03, !round); frame.holes.push(outline(R + .003, !round));
+  part(plate(frame, .003, .003), M.drain, .0015);
+  // the grate
+  const grate = outline(R, !round);
+  if (round){
+    for (let i = 0; i < 8; i++){ const a = i / 8 * Math.PI * 2; grate.holes.push(slot(Math.cos(a) * .022, Math.sin(a) * .022, Math.cos(a) * .042, Math.sin(a) * .042, .008)); }
+    for (let i = 0; i < 16; i++){ const a = (i + .5) / 16 * Math.PI * 2; grate.holes.push(slot(Math.cos(a) * .054, Math.sin(a) * .054, Math.cos(a) * .076, Math.sin(a) * .076, .008)); }
+  } else for (let i = -3; i <= 3; i++) grate.holes.push(slot(-.075, i * .024, .075, i * .024, .009));
+  part(plate(grate, .002, .0012), M.drain, .0025);
+  if (round){   // the screw that holds the grate, with its slot
+    part(new THREE.CylinderGeometry(.007, .0075, .002, 16), M.drain, .0068);
+    part(new THREE.BoxGeometry(.011, .001, .0016), M.dark, .0079);
+  }
+  return g;
+}
+floorDrain(0, .3, true);
 
 // Pipes along the ceiling and down to the sinks
 const pipe = (len, x, y, z, axis) => { const p = cyl(.045, .045, len, M.pipe, x, y, z, 12); if (axis === 'x') p.rotation.z = Math.PI / 2; if (axis === 'z') p.rotation.x = Math.PI / 2; return p; };
@@ -955,8 +996,7 @@ const tunnelLight = new THREE.PointLight(0xffb066, 0, 5, 2); tunnelLight.positio
       box(.06, .015, .18, M.worn, X - .03, 1.0, z);   // a soap ledge
       flat(.8, .8, M.blob, X - .35, z);
     }
-    box(.24, .01, .24, M.dullSteel, 3.55, .005, 1.0);
-    for (let i = -2; i <= 2; i++) box(.2, .012, .018, M.dark, 3.55, .006, 1.0 + i * .04);
+    floorDrain(3.55, 1.0, false);
     WATER.puddle(1.3, 2.2, 3.35, 1.0); flat(1.1, 1.6, M.stain, 3.5, 1.0);
   }
   { // the steel bench bolted to the wall west of the door
