@@ -42,7 +42,7 @@
 |---|---|---|
 | **Continue or New game** | Shown after a reload, if there is a saved game | Continue goes on where you were, with the time that was left. New game asks first, then deletes the save |
 | **Pause** | `P`, `Esc` or the pause button | Stops the clock. The pause card has Resume, Restart and the volume slider |
-| **Volume** | Slider on the pause card, 0–100 % | All sounds of the washroom: the light's hum, dripping water, the tap and the effects. A short tone plays when it is let go |
+| **Volume** | Slider on the pause card, 0–100 % | All sounds of the washroom: the light's hum, the air vent, dripping water, the tap and the effects. A short tone plays when it is let go |
 | **Sound** | `M` or the speaker button | All sound off or on |
 | **Walk** | Arrow keys or `W A S D` | Walks through the washroom in the first person |
 | **Look around** | Drag the mouse or a finger | Turns your head, all the way round |

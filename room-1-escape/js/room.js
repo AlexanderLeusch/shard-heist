@@ -1999,9 +1999,16 @@ addEventListener('pagehide', () => { if (ac) ac.suspend(); save(); });
 addEventListener('shardheist:fatal', () => { if (S.scene !== 'intro' && !S.ending && !paused) showPause(); if (ac) ac.suspend(); $('fatalReload').focus(); });
 
 // ---------- Sound ----------
-// ### Synthesised with Web Audio: the hum of the fluorescent tube, dripping water, running water while the tap is on,
-// ### and short effects for every kind of action. Starts on the first click, as browsers require.
+// ### Web Audio: two real recordings (CC0, in room-1-escape/sounds with their credits) for the hot tap and the air vent,
+// ### and synthesised sounds for the rest: the hum of the fluorescent tube, dripping water and short effects for every
+// ### kind of action. Starts on the first click, as browsers require. If a recording cannot be loaded (for example when
+// ### the page is opened as a file), the tap falls back to synthesised hiss and the vent stays silent.
 let ac = null, master = null, waterGain = null, noiseBuf = null, dripIn = 3;
+// ### Where the loops lie in the recordings (seconds): the tap's steady stream, then its end (water stops, handle shut);
+// ### the vent's seamless loop. Measured when the files were made; see sounds/CREDITS.md.
+const TAP = { file: 'sounds/tap-water.mp3', loopStart: 1.08, loopEnd: 8.28, vol: .45 };
+const VENT = { file: 'sounds/air-vent.mp3', loopStart: .25, loopEnd: 9.25, vol: .12 };
+let tapBuf = null, tapBus = null, tapSrc = null, tapOn = false;
 // ### Creates the audio on the first click, as browsers require.
 function initAudio(){
   if (ac){ if (ac.state === 'suspended' && !document.hidden) ac.resume(); return; }
@@ -2017,6 +2024,37 @@ function initAudio(){
   const wf = ac.createBiquadFilter(); wf.type = 'bandpass'; wf.frequency.value = 1400; wf.Q.value = .6;
   waterGain = ac.createGain(); waterGain.gain.value = 0;
   water.connect(wf); wf.connect(waterGain); waterGain.connect(master); water.start();
+  tapBus = ac.createGain(); tapBus.gain.value = 0; tapBus.connect(master);
+  loadSound(TAP.file, b => { tapBuf = b; });
+  loadSound(VENT.file, startVent);
+}
+// ### Fetches and decodes one recording, then hands it on; a failure leaves the synthesised sound in its place.
+function loadSound(file, then){
+  fetch(file).then(r => r.ok ? r.arrayBuffer() : Promise.reject(new Error(file)))
+    .then(data => new Promise((ok, fail) => ac.decodeAudioData(data, ok, fail)))
+    .then(then, () => {});
+}
+// ### The air vent: its recording loops for the rest of the game, faded in over two seconds.
+function startVent(buf){
+  const s = ac.createBufferSource(), g = ac.createGain(), t = ac.currentTime;
+  s.buffer = buf; s.loop = true; s.loopStart = VENT.loopStart; s.loopEnd = VENT.loopEnd;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(VENT.vol, t + 2);
+  s.connect(g); g.connect(master); s.start(t, VENT.loopStart);
+}
+// ### The hot tap follows the rules' steam: turned on, the recording plays the handle and the water starting, then loops
+// ### the steady stream; turned off, the stream fades into the recording's end. Pausing only fades the tap out.
+function updateTap(dt){
+  if (!tapBuf) return;
+  tapBus.gain.value += ((paused ? 0 : TAP.vol) - tapBus.gain.value) * Math.min(1, dt * 4);
+  if (S.steam === tapOn) return;
+  tapOn = S.steam;
+  const t = ac.currentTime, old = tapSrc;
+  if (old){ old.g.gain.setValueAtTime(1, t); old.g.gain.linearRampToValueAtTime(0, t + .12); old.s.stop(t + .15); }
+  const s = ac.createBufferSource(), g = ac.createGain();
+  s.buffer = tapBuf; s.connect(g); g.connect(tapBus);
+  if (tapOn){ s.loop = true; s.loopStart = TAP.loopStart; s.loopEnd = TAP.loopEnd; s.start(t); }
+  else { g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + .12); s.start(t, TAP.loopEnd); }
+  tapSrc = tapOn ? { s, g } : null;
 }
 // ### Plays one short tone.
 function tone(freq, dur, type, vol, slideTo, delay){
@@ -2132,7 +2170,8 @@ function frame(now){
   // steam on the mirror and rising from the hot sink
   const st = S.steam ? 1 : 0;
   M.steam.opacity += (st * .92 - M.steam.opacity) * Math.min(1, dt * .45);
-  if (waterGain) waterGain.gain.value += ((S.steam && !paused ? .05 : 0) - waterGain.gain.value) * Math.min(1, dt * 4);
+  if (waterGain) waterGain.gain.value += ((S.steam && !paused && !tapBuf ? .05 : 0) - waterGain.gain.value) * Math.min(1, dt * 4);
+  if (ac) updateTap(dt);
   steamPuffs.forEach(s => { s.userData.t = (s.userData.t + dt * .25) % 1; const t = s.userData.t; s.position.set(-3.73 + Math.sin(t * 9 + s.id) * .05, .9 + t * 1.1, -.65 + Math.cos(t * 7 + s.id) * .08); s.scale.setScalar(.15 + t * .5); s.material.opacity = S.steam ? Math.sin(t * Math.PI) * .35 : Math.max(0, s.material.opacity - dt); s.visible = s.material.opacity > .003; });
   // the guard's silhouette in the window
   guardShow = Math.max(0, guardShow - dt);

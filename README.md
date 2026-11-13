@@ -77,6 +77,7 @@ shard-heist/
 │   ├── js/boot.js           error screen (load failures, no WebGL, unexpected errors)
 │   ├── textures/            CC0 scans from Poly Haven: concrete, cinder blocks, scratched steel, the vault HDRI
 │   ├── models/              the two hand models (MIT, WebXR Input Profiles) with their licence
+│   ├── sounds/              two CC0 recordings, the hot tap and the air vent, with their credits
 │   └── fonts/               the two fonts with their licences
 │
 ├── room-2-chase/            ROOM 2 · Shard Heist (3D police chase)
@@ -119,7 +120,7 @@ shard-heist/
 |---|---|---|
 | Static website, no backend, no build step | Runs anywhere, free hosting on GitHub Pages, nothing to install or keep running, no server to attack | No online leaderboard |
 | three.js r128 from a CDN, pinned to one version, with SRI hashes | A proven 3D engine instead of raw WebGL; the hashes make the browser refuse any file that is not exactly the one we tested | r128 is from 2021; upgrading means re-testing the post-processing add-ons |
-| Everything procedural (buildings, textures, vehicles, sounds), except four CC0 scans from Poly Haven in the escape room | Almost no image or audio files to license or download; the scans (concrete, cinder blocks, scratched steel and one HDRI for the steel's reflections, 1.7 MB) make the washroom photo-real where it matters | Stylised elsewhere |
+| Everything procedural (buildings, textures, vehicles, sounds), except four CC0 scans from Poly Haven and two CC0 recordings (the hot tap and the air vent) in the escape room | Almost no image or audio files to license or download; the scans (concrete, cinder blocks, scratched steel and one HDRI for the steel's reflections, 1.7 MB) make the washroom photo-real where it matters, and the recordings (230 kB) make it sound like a real washroom | Stylised elsewhere |
 | Puddles in the escape room are real mirrors: the room is drawn a second time, smaller, from a camera under the floor | Reflections of what is really there (lamps, steel, the red glow) that move with you, instead of a fixed shine | A second, smaller drawing of the room while you move or look round; standing still it is not redrawn |
 | Rules split out into `core.js` | They can be tested in Node in milliseconds, and the rules are in one place | `game.js` still shares state between its sections |
 | Arcade physics (speed along the heading, collision circles) | Predictable, fun handling at 60 fps on modest hardware | No real tyre grip or weight transfer |
@@ -194,6 +195,8 @@ All radio music is composed and synthesised by the game at run time, so there ar
 
 
 Escape-room scans from [Poly Haven](https://polyhaven.com) (CC0, fetched through its public API and kept in `room-1-escape/textures/`): the textures *Hangar Concrete Floor*, *Concrete Wall 004* and *Blue Metal Plate*, and the HDRI *Bank Vault*. CC0 asks for no credit; we give it anyway.
+
+Escape-room recordings (CC0, kept in `room-1-escape/sounds/` with their sources in `CREDITS.md`): the hot tap is *tap-water-1* from Owlish Media's *Sound Effects Pack* on OpenGameArt, and the air vent is *Fan* by lllBabaBooeylll on Freesound (536942). Both are bundled with the game, so no sound service is called while playing.
 
 The escape room's hands are the *generic-hand* models of the [WebXR Input Profiles](https://github.com/immersive-web/webxr-input-profiles) (© 2019 Amazon, MIT licence; copied unchanged into `room-1-escape/models/` with the licence in `LICENSE-hands.txt`). They are files, not an npm package: nothing is installed.
 

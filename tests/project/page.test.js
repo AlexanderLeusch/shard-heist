@@ -171,6 +171,19 @@ test('escape room: every scanned texture the room loads ships with it and is cre
   assert.match(read('README.md'), /Poly Haven.*CC0/);
 });
 
+test('escape room: the tap and air vent recordings ship with it, are served as audio and are credited as CC0', () => {
+  const files = [...new Set([...escRoom.matchAll(/'sounds\/([a-z-]+\.mp3)'/g)].map(m => m[1]))].sort();
+  assert.deepEqual(files, ['air-vent.mp3', 'tap-water.mp3']);
+  const credits = read('room-1-escape/sounds/CREDITS.md');
+  for (const f of files){
+    assert.ok(fs.existsSync(path.join(ROOT, 'room-1-escape/sounds', f)), f + ' is missing');
+    assert.match(credits, new RegExp('`' + f.replace('.', '\\.') + '`.*CC0 1\\.0'), f + ' is credited with its licence');
+  }
+  assert.equal(resolvePath('/room-1-escape/sounds/tap-water.mp3'), path.join(ROOT, 'room-1-escape', 'sounds', 'tap-water.mp3'), 'the dev server serves MP3');
+  assert.match(escHtml, /media-src 'self'/);
+  assert.match(escHtml, /connect-src 'self'/, 'the recordings are fetched from this site only');
+});
+
 test('escape room: the two rooms stay separate (no file of one room loads the other)', () => {
   assert.ok(!/\.\.\//.test(escHtml), 'room 1 does not load files from room 2');
   assert.ok(!/room-1-escape/.test(html), 'room 2 does not load files from room 1');
