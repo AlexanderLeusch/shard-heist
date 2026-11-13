@@ -25,7 +25,7 @@ You were the detective on the Ashford necklace case; now you are inmate 4471, co
 | Clues (3) | Steam on the mirror, graffiti in the stall, scratches in the wall beside the door. Together they give the year the "unsinkable" ship sank. The code is always the same |
 | Endings (2) | **A:** the hatch opens in time and you climb down into the tunnel. **B:** time runs out and Hale takes you back to your cell. The earlier choice to jam the door buys one extra minute before Ending B |
 | Pressure | 10:00 clock, warnings at 5:00, 2:00, 1:00 and 0:30; every wrong code makes noise and costs 30 seconds |
-| Look | Modelled on a photo of a real prison washroom: green glazed tiles under yellowed cream cinder blocks streaked with rust, caged red emergency lamps, puddles that mirror the lamps and the steel, a striped prisoner's coat hanging to the floor, toilet rolls kicked about. You see your own hands in the striped sleeves of the prison uniform: relaxed at rest, swinging like in a real walk, reaching out when you use something; the head dips at every step and sways gently |
+| Look | Modelled on a photo of a real prison washroom: green glazed tiles under yellowed cream cinder blocks streaked with rust, caged red emergency lamps, puddles that mirror the lamps and the steel, a striped prisoner's coat hanging to the floor, toilet rolls kicked about. You see your own hands (real hand models with jointed fingers) in the striped sleeves of the prison uniform: relaxed and never quite still at rest, swinging a little differently with every step, reaching out when you use something; the head dips at every step and sways gently |
 | Controls | Arrow keys (or `W A S D`) to walk freely in the first person, drag to look around, click the pulsing markers or the objects, "Walk to" buttons only on touch screens (no arrow keys there), `P` / `Esc` pause, `M` sound, a volume slider on the pause card |
 
 Progress is saved in the browser after every accepted action, and a reload offers to continue.
@@ -76,6 +76,7 @@ shard-heist/
 │   ├── js/room.js           the 3D washroom, camera, markers, cards, sound
 │   ├── js/boot.js           error screen (load failures, no WebGL, unexpected errors)
 │   ├── textures/            CC0 scans from Poly Haven: concrete, cinder blocks, scratched steel, the vault HDRI
+│   ├── models/              the two hand models (MIT, WebXR Input Profiles) with their licence
 │   └── fonts/               the two fonts with their licences
 │
 ├── room-2-chase/            ROOM 2 · Shard Heist (3D police chase)
@@ -129,7 +130,7 @@ shard-heist/
 
 ## Testing
 
-`npm test` runs 139 tests in Node (19 of them for the escape room), and `npm run test:browser` runs 22 more in headless Chrome (4 of them in the escape room). CI runs all of them, plus the SRI check and the 36 pytest checks of `original-solo-project/`, on every push to `main` and on every pull request. They cover:
+`npm test` runs 140 tests in Node (19 of them for the escape room), and `npm run test:browser` runs 22 more in headless Chrome (4 of them in the escape room). CI runs all of them, plus the SRI check and the 36 pytest checks of `original-solo-project/`, on every push to `main` and on every pull request. They cover:
 
 - **Escape room:** both endings and the jammed-door grace minute; refused actions (walking where there is no exit, taking an item twice, the car key before the tile is off, the door without the mop, lock wheels that do not exist, anything before the briefing or after an ending) return the unchanged state; wrong codes cost 30 s but never take the clock below zero; warnings sound once; tampered saved games are rejected; in the browser: briefing, refused action, save and continue after a reload, a wrong code and then Ending A.
 - **Accepted actions:** each menu action in the states whose cards show it; valid map and vehicle picks; restoring a valid saved selection; finishing every story act; both story endings.
@@ -193,5 +194,7 @@ All radio music is composed and synthesised by the game at run time, so there ar
 
 
 Escape-room scans from [Poly Haven](https://polyhaven.com) (CC0, fetched through its public API and kept in `room-1-escape/textures/`): the textures *Hangar Concrete Floor*, *Concrete Wall 004* and *Blue Metal Plate*, and the HDRI *Bank Vault*. CC0 asks for no credit; we give it anyway.
+
+The escape room's hands are the *generic-hand* models of the [WebXR Input Profiles](https://github.com/immersive-web/webxr-input-profiles) (© 2019 Amazon, MIT licence; copied unchanged into `room-1-escape/models/` with the licence in `LICENSE-hands.txt`). They are files, not an npm package: nothing is installed.
 
 Built with three.js r128 (MIT licence). Fonts: Big Shoulders Display and JetBrains Mono (SIL Open Font License 1.1; the font files and their licences are in `room-1-escape/fonts/` and `room-2-chase/fonts/`). Code written with the help of Claude (Anthropic).
