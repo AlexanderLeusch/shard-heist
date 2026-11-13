@@ -15,7 +15,7 @@
     spotdiff: { title: 'Spot the <em>difference</em>', name: 'Spot the difference', how: 'Two photographs of the Titanic, five differences. Click them in either picture. A wrong click costs 2 seconds.' },
     tictactoe: { title: 'Anchors and <em>icebergs</em>', name: 'Tic-tac-toe', how: 'You play the anchors, the bot plays the icebergs. Get three in a row. A draw starts a new round.' },
     deckrun: { title: 'Run the <em>deck</em>', name: 'Deck run', how: 'Run to the bow as a sailor. Jump over crates, trunks, barrels and ice with Space, ↑ or a click. Three knocks and you are out.' },
-    deckclimb: { title: 'Climb the <em>decks</em>', name: 'Deck climb', how: 'Bounce up through the ship: from the engine room past the crew quarters, second class and first class to the boat deck. Steer with ← → or the mouse. Lifebuoys bounce you higher. Do not fall.' },
+    deckclimb: { title: 'Climb the <em>decks</em>', name: 'Deck climb', how: 'Bounce up through the ship as a sailor: from the engine room past the crew quarters, second class and first class to the boat deck. Steer with ← → or the mouse. Lifebuoys bounce you higher. Do not fall.' },
     seagull: { title: 'The <em>seagull</em>', name: 'Seagull', how: 'Fly between the icebergs and the storm clouds. Flap with Space, ↑ or a click. Pass ten gaps.' }
   };
   const GAMES = Object.keys(INFO);
@@ -420,25 +420,44 @@
   // ### black neckerchief, bell-bottom trousers, boots, and the round sailor's cap whose two ribbons fly behind him. Arms and
   // ### legs are two-part limbs that move through a real running stride; the limbs on the far side are drawn darker.
   function drawSailor(g, x, y, t, air, vy){
-    const ph = t * 11, lean = air ? .08 : .2;
-    const TH = 13.5, SH = 13.5, UA = 10, FA = 9.5, TORSO = 19;
-    const legPose = (q, near) => {
-      if (air) return near ? [.95 - Math.min(.5, Math.max(0, vy) / 900), 1.55] : [-.35, .7];
-      return [.62 * Math.sin(q), .15 + 1.3 * Math.max(0, Math.cos(q))];
+    const ph = t * 11;
+    const leg = (q, near) => air ? (near ? [.95 - Math.min(.5, Math.max(0, vy) / 900), 1.55] : [-.35, .7]) : [.62 * Math.sin(q), .15 + 1.3 * Math.max(0, Math.cos(q))];
+    const arm = (q, near) => { const ua = air ? (near ? -1.9 : 1.1) : -.8 * Math.sin(q); return [ua, ua + (air ? .6 : 1.45)]; };
+    return drawSailorPose(g, x, y, t, {
+      lean: air ? .08 : .2, hipUp: air ? 30 : 0,
+      legs: [leg(ph + Math.PI, false), leg(ph, true)], arms: [arm(ph, false), arm(ph + Math.PI, true)]
+    });
+  }
+  // ### The sailor bouncing up through the ship: arms stretched up as he takes off, then arms out and knees drawn up as he
+  // ### slows and falls, ready to land. vy is his speed upwards (negative) or downwards.
+  function climbPose(vy){
+    const k = Math.min(1, Math.max(0, (vy + 760) / 1160)), m = (a, b) => a + (b - a) * k;
+    const mix = (a, b) => a.map((v, i) => m(v, b[i]));
+    return {
+      lean: m(.02, .1), hipUp: 0,
+      legs: [mix([-.25, .35], [.2, .9]), mix([.15, .2], [.9, 1.4])],
+      arms: [mix([2.5, 2.7], [-1.3, -.9]), mix([2.8, 3], [1.5, 1.1])]
     };
+  }
+  // ### The same sailor in any pose: lean of the body; for the far and the near leg the thigh angle and the bend of the knee;
+  // ### for the far and the near arm the angles of upper arm and forearm (0 is straight down, positive is forward). His feet
+  // ### stand at x, y, unless hipUp holds his hip that high above y.
+  function drawSailorPose(g, x, y, t, pose){
+    const lean = pose.lean;
+    const TH = 13.5, SH = 13.5, UA = 10, FA = 9.5, TORSO = 19;
     // lay the legs out from a hip at 0, 0, then move the whole body so the lower foot stands on the deck
-    const legs = [[ph + Math.PI, false], [ph, true]].map(([q, near]) => {
-      const [th, bend] = legPose(q, near), hip = [0, 0], knee = at(hip, TH, th), sa = th - bend, ankle = at(knee, SH, sa);
+    const legs = pose.legs.map(([th, bend], i) => {
+      const hip = [0, 0], knee = at(hip, TH, th), sa = th - bend, ankle = at(knee, SH, sa);
       const toe = [ankle[0] + Math.cos(sa) * 6.5, ankle[1] - Math.sin(sa) * 6.5 + 1.5];
-      return { near, knee, ankle, toe };
+      return { near: i === 1, knee, ankle, toe };
     });
     const low = Math.max(...legs.map(l => Math.max(l.ankle[1] + 2.5, l.toe[1] + 1.5)));
-    const ox = x, oy = air ? y - 30 : y - low;
+    const ox = x, oy = pose.hipUp ? y - pose.hipUp : y - low;
     const P = p => [ox + p[0], oy + p[1]];
     const hip = [ox, oy], shoulder = [ox + Math.sin(lean) * TORSO, oy - Math.cos(lean) * TORSO];
     const NAVY = '#1f2c4f', NAVY_FAR = '#141c33', TROUSER = '#1a2440', TROUSER_FAR = '#10162a', SKIN = '#e0ad86', SKIN_FAR = '#b98663';
-    const arm = (q, near) => {
-      const ua = air ? (near ? -1.9 : 1.1) : -.8 * Math.sin(q), fa = ua + (air ? .6 : 1.45);
+    const arm = near => {
+      const [ua, fa] = pose.arms[near ? 1 : 0];
       const s = [shoulder[0] + (near ? 1 : -1), shoulder[1] + 2], e = at(s, UA, ua), h = at(e, FA, fa);
       limb2(g, s, e, 5.2, 4.4, near ? NAVY : NAVY_FAR); limb2(g, e, h, 4.4, 3.6, near ? NAVY : NAVY_FAR);
       g.fillStyle = near ? SKIN : SKIN_FAR; g.beginPath(); g.arc(h[0], h[1], 2.1, 0, 7); g.fill();
@@ -448,7 +467,7 @@
       limb2(g, hip, k, 7, 5.6, c); limb2(g, k, a, 5.6, 6.4, c);   // bell-bottoms widen at the ankle
       limb2(g, a, tt, 4.2, 3.4, l.near ? '#0b0b0d' : '#060607');
     };
-    arm(ph, false); leg(legs[0]);
+    arm(false); leg(legs[0]);
     // torso: the jumper, a little wider at the shoulders, with a belt line
     const n = [Math.cos(lean), Math.sin(lean)];
     g.fillStyle = NAVY; g.beginPath();
@@ -478,7 +497,7 @@
     g.fillStyle = '#1a2440'; g.beginPath(); g.ellipse(head[0] - .2, head[1] - 4.1, 4.9, 1.6, -.12, 0, 7); g.fill();
     g.fillStyle = '#f2f3f0'; g.beginPath(); g.ellipse(head[0] - .6, head[1] - 5.6, 6.2, 1.9, -.12, 0, 7); g.fill();
     g.fillStyle = '#d7dbe0'; g.beginPath(); g.ellipse(head[0] - .6, head[1] - 5.2, 6.2, .9, -.12, 0, Math.PI); g.fill();
-    arm(ph + Math.PI, true);
+    arm(true);
     return { head, mouth: [head[0] + 4.6, head[1] + 2] };
   }
 
@@ -1024,7 +1043,7 @@
       return { ...lv, top, h, cv };
     });
     const p = { x: W / 2, y: H - 60, vx: 0, vy: -760 };
-    let camY = 0, best = 0, steer = 0, aim = null, shown = '';
+    let camY = 0, best = 0, steer = 0, aim = null, shown = '', face = 1, t = 0;
     const plats = [{ x: 0, y: BOTTOM, w: W, move: 0, floor: true }];
     for (let y = H - 110; y > -GOAL - 40; y -= 62 + api.rand() * 34){
       const w = 70 + api.rand() * 30;
@@ -1044,6 +1063,8 @@
         const target = aim !== null ? clampN((aim - p.x) * 6, -330, 330) : steer * 330;
         p.vx += (target - p.vx) * Math.min(1, dt * 10);
         p.x += p.vx * dt; if (p.x < -10) p.x += W + 20; if (p.x > W + 10) p.x -= W + 20;
+        if (Math.abs(p.vx) > 30) face = Math.sign(p.vx);
+        t += dt;
         const prevY = p.y;
         p.vy += 1500 * dt; p.y += p.vy * dt;
         for (const pl of plats){
@@ -1075,13 +1096,13 @@
           paintPlatform(g, pl.level, pl.x, pl.y, pl.w);
           if (pl.spring) drawBuoy(g, pl.x + pl.w / 2, pl.y - 4, 7);
         }
-        // the climber in an orange jumpsuit
-        const legs = p.vy < 0 ? 2 : -1;
-        g.fillStyle = '#ff7a1a'; g.fillRect(p.x - 8, p.y - 26, 16, 20); g.fillRect(p.x - 7, p.y - 7 - legs, 5, 7); g.fillRect(p.x + 2, p.y - 7 + legs, 5, 7);
-        g.fillStyle = '#d9661a'; g.fillRect(p.x - 12, p.y - 25, 4, 12); g.fillRect(p.x + 8, p.y - 25, 4, 12);
-        g.fillStyle = '#1c1c1c'; g.fillRect(p.x - 4, p.y - 22, 8, 3);
-        g.fillStyle = '#e8c39e'; g.beginPath(); g.arc(p.x, p.y - 32, 7, 0, 7); g.fill();
-        g.fillStyle = '#3a2a1a'; g.beginPath(); g.arc(p.x, p.y - 34, 7, Math.PI, 0); g.fill();
+        // the climber: the same sailor as on the deck run, facing the way he moves, in a little warm light so that his
+        // navy uniform stands out against the dark engine room and the night sky
+        const lit = g.createRadialGradient(p.x, p.y - 24, 2, p.x, p.y - 24, 34); lit.addColorStop(0, 'rgba(255,226,170,.22)'); lit.addColorStop(1, 'rgba(255,226,170,0)');
+        g.fillStyle = lit; g.fillRect(p.x - 34, p.y - 58, 68, 68);
+        g.save(); g.translate(p.x, p.y); g.scale(face * .74, .74);
+        drawSailorPose(g, 0, 0, t, climbPose(p.vy));
+        g.restore();
         g.restore();
         // the level you are in, and how far there is still to climb
         g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(W - 16, 20, 8, H - 40);
