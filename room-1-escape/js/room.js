@@ -1298,6 +1298,123 @@ canvas.addEventListener('pointerup', e => { if (drag && drag.moved <= 6) clickAt
 canvas.addEventListener('pointercancel', () => { drag = null; canvas.classList.remove('dragging'); });
 if (COARSE) $('lookHint').textContent = 'Drag to look around · tap the markers';
 
+// ---------- Your own hands ----------
+// ### You see your own hands at the bottom of the picture, in the sleeves of the striped prison uniform (the same black
+// ### and sand stripes as the coat on the wall). They live in a small scene of their own that is drawn over the room after
+// ### a depth clear, so they never sink into a wall you stand close to and never show up in the puddles. They sway when
+// ### you turn your head, swing a little with every stride, breathe when you stand still, and the right hand reaches out
+// ### whenever you use something. They hide during the endings. With reduced motion they hold still.
+const handScene = new THREE.Scene(), handCam = new THREE.PerspectiveCamera();
+handScene.add(new THREE.HemisphereLight(0xb9c6bf, 0x1c1410, .42));
+{
+  const key = new THREE.DirectionalLight(0xe8ecdf, .62); key.position.set(.2, 1, -.4); handScene.add(key);
+  const red = new THREE.PointLight(0xff2a1a, .25, 3); red.position.set(-.8, .5, -.6); handScene.add(red);   // the emergency lamps
+}
+const HAND_MAT = {
+  skin: new THREE.MeshStandardMaterial({ color: 0xa06e55, roughness: .66 }),
+  nail: new THREE.MeshStandardMaterial({ color: 0xd9b3a0, roughness: .35 }),
+  sleeve: new THREE.MeshStandardMaterial({ color: 0xb4b4b4, roughness: .95, map: canvasTex(64, 128, (g, w, h) => {
+    for (let y = 0; y < h; y++){
+      const dark = y < h / 2, v = dark ? 26 + rnd() * 8 : 176 + rnd() * 18;
+      g.fillStyle = dark ? `rgb(${v + 4},${v},${v - 4})` : `rgb(${v + 14},${v},${v - 34})`; g.fillRect(0, y, w, 1);
+    }
+    for (let i = 0; i < 900; i++){ const v = rnd() < .5 ? 255 : 0; g.fillStyle = `rgba(${v},${v},${v},${rnd() * .08})`; g.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 3, 1); }   // the weave
+  }, [1, 3.2]) })
+};
+// ### One hand with its forearm in a sleeve. The wrist is at the origin and the fingers point along -z, as the camera
+// ### looks; side is 1 for the right hand and -1 for the left. Each finger is a chain of two joints, bent into a relaxed
+// ### hand; then every part with the same material is merged, so each arm is drawn in three draw calls.
+function buildHand(side){
+  const arm = new THREE.Group();
+  const mesh = (geo, mat, parent) => { const m = new THREE.Mesh(geo, mat); (parent || arm).add(m); return m; };
+  // the back of the hand and the palm: a soft, flattened oval, a little wider at the knuckles
+  mesh(new THREE.SphereGeometry(1, 18, 12).scale(.043, .017, .052).translate(0, 0, -.046), HAND_MAT.skin);
+  mesh(new THREE.SphereGeometry(1, 14, 10).scale(.035, .019, .03).translate(-side * .012, -.004, -.012), HAND_MAT.skin);   // the ball of the thumb
+  // four fingers from index (towards the middle of the picture) to the little finger
+  [[-.027, .047, .031, .0088], [-.009, .052, .034, .0086], [.009, .049, .032, .0082], [.026, .038, .025, .0072]].forEach(([x, l1, l2, r], i) => {
+    const base = new THREE.Group(); base.position.set(side * x, 0, -.09 + Math.abs(x) * .25); arm.add(base);
+    mesh(new THREE.SphereGeometry(r * 1.15, 10, 8), HAND_MAT.skin, base);   // knuckle
+    mesh(new THREE.CylinderGeometry(r * .95, r, l1, 9).rotateX(Math.PI / 2).translate(0, 0, -l1 / 2), HAND_MAT.skin, base);
+    const mid = new THREE.Group(); mid.position.z = -l1; base.add(mid);
+    mesh(new THREE.SphereGeometry(r * .95, 10, 8), HAND_MAT.skin, mid);
+    mesh(new THREE.CylinderGeometry(r * .8, r * .92, l2, 9).rotateX(Math.PI / 2).translate(0, 0, -l2 / 2), HAND_MAT.skin, mid);
+    mesh(new THREE.SphereGeometry(r * .8, 10, 8).translate(0, 0, -l2), HAND_MAT.skin, mid);
+    mesh(new THREE.SphereGeometry(1, 8, 6).scale(r * .62, r * .25, r * .9).translate(0, r * .62, -l2 + r * .55), HAND_MAT.nail, mid);
+    // a relaxed hand: the fingers hang a little lower towards the little finger
+    base.rotation.set(-.32 - i * .06, side * (i - 1.5) * -.035, 0); mid.rotation.x = -.55 - i * .05;
+  });
+  // the thumb, from the side of the palm forward and in, under the index finger
+  const thumb = new THREE.Group(); thumb.position.set(-side * .036, -.008, -.03); arm.add(thumb);
+  thumb.rotation.set(-.25, side * .55, -side * .5);
+  mesh(new THREE.SphereGeometry(.0105, 10, 8), HAND_MAT.skin, thumb);
+  mesh(new THREE.CylinderGeometry(.0095, .0108, .036, 9).rotateX(Math.PI / 2).translate(0, 0, -.018), HAND_MAT.skin, thumb);
+  const tip = new THREE.Group(); tip.position.z = -.036; tip.rotation.x = -.3; thumb.add(tip);
+  mesh(new THREE.SphereGeometry(.0096, 10, 8), HAND_MAT.skin, tip);
+  mesh(new THREE.CylinderGeometry(.0084, .0094, .029, 9).rotateX(Math.PI / 2).translate(0, 0, -.0145), HAND_MAT.skin, tip);
+  mesh(new THREE.SphereGeometry(.0084, 10, 8).translate(0, 0, -.029), HAND_MAT.skin, tip);
+  mesh(new THREE.SphereGeometry(1, 8, 6).scale(.0055, .002, .0075).translate(0, .0068, -.025), HAND_MAT.nail, tip);
+  // the wrist, then the cuff and the sleeve running back out of the picture
+  mesh(new THREE.CylinderGeometry(.027, .03, .05, 14).rotateX(Math.PI / 2).scale(1.25, .8, 1).translate(0, 0, .012), HAND_MAT.skin);
+  mesh(new THREE.CylinderGeometry(.043, .045, .035, 18, 1, true).rotateX(Math.PI / 2).translate(0, 0, .045), HAND_MAT.sleeve).material.side = THREE.DoubleSide;
+  mesh(new THREE.CylinderGeometry(.047, .058, .42, 18).rotateX(Math.PI / 2).translate(0, -.004, .27), HAND_MAT.sleeve);
+  bakeArm(arm);
+  handScene.add(arm);
+  return { arm };
+}
+// ### Merges every part of an arm that shares a material into one mesh, in the arm's own space.
+function bakeArm(arm){
+  arm.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(arm.matrixWorld).invert(), groups = new Map(), m4 = new THREE.Matrix4();
+  arm.traverse(o => { if (o.isMesh){ if (!groups.has(o.material)) groups.set(o.material, []); groups.get(o.material).push(o); } });
+  arm.clear();
+  for (const [mat, list] of groups){
+    const parts = list.map(o => { const g = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()).applyMatrix4(m4.multiplyMatrices(inv, o.matrixWorld)); o.geometry.dispose(); return g; });
+    const n = parts.reduce((a, g) => a + g.attributes.position.count, 0), pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2);
+    let o = 0;
+    for (const g of parts){ pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); uv.set(g.attributes.uv.array, o * 2); o += g.attributes.position.count; g.dispose(); }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    geo.computeBoundingSphere();
+    arm.add(new THREE.Mesh(geo, mat));
+  }
+}
+const HANDS = { r: buildHand(1), l: buildHand(-1), reach: 0, swayX: 0, swayY: 0, lastYaw: null, lastPitch: 0, down: 1 };
+// where each hand rests in the picture (x, y, z from the eye) and how it is turned (pitch, yaw, roll)
+const HAND_REST = { r: [.17, -.175, -.41, -.05, .2, -.38], l: [-.17, -.183, -.42, -.05, -.18, .4] };
+// ### The right hand reaches out when you use something (a marker, a click or a key).
+function reachHand(){ if (!REDUCED) HANDS.reach = 1; }
+// ### Moves the hands each frame: hidden in the endings, sway with the head, swing with the stride, reach when you act.
+function updateHands(dt){
+  const show = !S.ending && hatchAnim < 0 && camera.position.y > 0;
+  HANDS.down += ((show ? 0 : 1) - HANDS.down) * (1 - Math.exp(-dt * 5));
+  const k = 1 - Math.exp(-dt * 8);
+  if (HANDS.lastYaw === null) HANDS.lastYaw = cam.yaw;
+  const dyaw = wrapAngle(cam.yaw - HANDS.lastYaw), dpitch = cam.pitch - HANDS.lastPitch;
+  HANDS.lastYaw = cam.yaw; HANDS.lastPitch = cam.pitch;
+  const still = REDUCED ? 0 : 1;
+  HANDS.swayX += (clamp(-dyaw * 1.4, -.05, .05) * still - HANDS.swayX) * k;
+  HANDS.swayY += (clamp(-dpitch * 1.4, -.04, .04) * still - HANDS.swayY) * k;
+  HANDS.reach = Math.max(0, HANDS.reach - dt / .5);
+  const sp = Math.min(1, Math.hypot(cam.vel.x, cam.vel.z) / WALK_SPEED) * still, ph = cam.stride / .8 * Math.PI * 2;
+  const breathe = Math.sin(clock * 1.7) * .0025 * still, reach = Math.sin(HANDS.reach * Math.PI);
+  for (const key of ['r', 'l']){
+    const h = HANDS[key], [x, y, z, rx, ry, rz] = HAND_REST[key], side = key === 'r' ? 1 : -1;
+    const swing = Math.sin(ph + (side > 0 ? 0 : Math.PI)) * sp;
+    const out = key === 'r' ? reach : 0;
+    h.arm.position.set(x + HANDS.swayX + Math.cos(ph) * .006 * sp - out * .03,
+      y + HANDS.swayY + breathe + Math.abs(swing) * -.008 - HANDS.down * .35 + out * .05,
+      z + swing * .018 - out * .13);
+    h.arm.rotation.set(rx + swing * .05 + out * .2, ry - out * .2, rz, 'YXZ');
+    h.arm.visible = HANDS.down < .98;
+  }
+}
+// ### Draws the hands over the room with the same lens as the eye, after clearing the depth so nothing hides them.
+function drawHands(){
+  if (!HANDS.r.arm.visible) return;
+  handCam.projectionMatrix.copy(camera.projectionMatrix); handCam.projectionMatrixInverse.copy(camera.projectionMatrixInverse);
+  renderer.autoClear = false; renderer.clearDepth(); renderer.render(handScene, handCam); renderer.autoClear = true;
+}
+
 // ---------- Hotspots: markers and clicking objects ----------
 // ### visibleHotspots() from rules.js says what can be used right now. Objects get a pulsing marker (a real button, so it
 // ### works with a keyboard and on touch screens), and the hatch gets a marker of its own so you can kneel down at it.
@@ -1374,6 +1491,7 @@ function clickAt(e){
 // ### player sees why.
 function use(action, target){
   if (paused || S.ending) return;
+  reachHand();
   if (action === 'lock'){ if (S.scene === 'hatch') showLock(); return; }
   act(action, target);
 }
@@ -1784,6 +1902,7 @@ function frame(now){
     }
   }
   updateCamera(dt);
+  updateHands(dt);
   updateCine(dt);
   if (shake > 0 && !REDUCED){ shake = Math.max(0, shake - dt); camera.position.x += (Math.random() - .5) * shake * .05; camera.position.y += (Math.random() - .5) * shake * .05; }
   // steam on the mirror and rising from the hot sink
@@ -1825,6 +1944,7 @@ function frame(now){
     camera.updateMatrixWorld();
     WATER.update(clock, dt);
     renderer.render(scene, camera);
+    drawHands();
   }
   adaptResolution(elapsed);
 }
