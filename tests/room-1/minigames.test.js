@@ -1,4 +1,4 @@
-// ### Unit tests for the six Titanic mini games (room-1-escape/js/minigames.js): dealing, the bots, the fleets and the
+// ### Unit tests for the seven Titanic mini games (room-1-escape/js/minigames.js): dealing, the bots, the fleets and the
 // ### spot-the-difference circles. The drawing and the controls are played in the browser tests.
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -8,13 +8,13 @@ const R = require('../../room-1-escape/js/rules.js');
 // a small seeded random number generator, so every run of these tests sees the same numbers
 const seeded = a => () => { a = (a * 1664525 + 1013904223) % 4294967296; return a / 4294967296; };
 
-test('there are six games, the same six the rules know, each at most 30 seconds', () => {
+test('there are seven games, the same seven the rules know, each at most 30 seconds', () => {
   assert.deepEqual(M.GAMES, R.GAMES);
   assert.equal(M.TIME, 30);
   for (const g of M.GAMES) assert.ok(M.INFO[g].title && M.INFO[g].how && M.INFO[g].name, g);
 });
 
-test('every new game deals three different mini games, and over many games all six come up', () => {
+test('every new game deals three different mini games, and over many games all seven come up', () => {
   const seen = new Set(), rand = seeded(7);
   for (let i = 0; i < 200; i++){
     const g = M.pickGames(rand);
@@ -23,7 +23,7 @@ test('every new game deals three different mini games, and over many games all s
     g.forEach(x => seen.add(x));
     assert.ok(R.perform(R.newState(), 'start', g).ok, 'the rules accept every deal');
   }
-  assert.equal(seen.size, 6);
+  assert.equal(seen.size, 7);
 });
 
 test('tic-tac-toe: lines, draws, and a bot that always wins when it can and can be beaten', () => {
@@ -128,6 +128,69 @@ test('deck run: first the portholes along the side of the ship, then the open de
   }
   // the deck only narrows to the stem beyond the finish, so the sailor never runs out over the sea
   assert.ok(BOW0 > LEN && BOW > BOW0);
+});
+
+// a fair pinball player: flips a flipper when the ball is just above it and coming down
+function pinPlayer(s){
+  const b = s.ball, keys = { left: false, right: false };
+  s.hold = s.hold || [0, 0];
+  M.PIN_TABLE.flippers.forEach((f, i) => {
+    if (s.hold[i] > 0){ s.hold[i] -= 1 / 60; return; }
+    if (!b || b.ready) return;
+    const along = i ? f.x - b.x : b.x - f.x, surf = f.y + Math.tan(i ? Math.PI - s.flip[i].a : s.flip[i].a) * along;
+    if (along > 8 && along < f.len + 4 && b.y > surf - 26 && b.y < surf && b.vy > -50) s.hold[i] = .16;
+  });
+  keys.left = s.hold[0] > 0; keys.right = s.hold[1] > 0;
+  return keys;
+}
+// plays one pinball game for up to 30 s; returns the score and whether the goal was reached in time
+function pinGame(seed, player){
+  const s = M.pinNew(seeded(seed));
+  let lost = false;
+  for (let t = 0; t < 30 && !s.gone && s.score < M.PIN.GOAL; t += 1 / 60){
+    M.pinStep(s, 1 / 60, player ? player(s) : {});
+    if (s.ball && !s.ball.ready && (s.ball.x < 16 || s.ball.x > 352 || s.ball.y < 60)) lost = true;
+    s.events.length = 0;
+  }
+  return { score: s.score, won: s.score >= M.PIN.GOAL, lost };
+}
+
+test('pinball: the goal can be reached in 30 seconds by playing the flippers, but hardly ever without them', () => {
+  const games = 60, played = [], idle = [];
+  for (let seed = 1; seed <= games; seed++){ played.push(pinGame(seed, pinPlayer)); idle.push(pinGame(seed, null)); }
+  assert.ok(played.concat(idle).every(g => !g.lost), 'the ball never leaves the table except down the drain');
+  assert.ok(played.filter(g => g.won).length >= games * .9, 'a fair player makes it in nine games out of ten');
+  assert.ok(idle.filter(g => g.won).length <= games * .1, 'without touching the flippers you almost never make it');
+});
+
+test('pinball: the flippers swing between rest and up, and rolling through R, M and S gives the bonus', () => {
+  const s = M.pinNew(seeded(3));
+  M.pinStep(s, 1 / 60, {});
+  for (let i = 0; i < 10; i++) M.pinStep(s, 1 / 60, { left: true });
+  assert.equal(s.flip[0].a, M.PIN_TABLE.flippers[0].up);
+  assert.equal(s.flip[1].a, M.PIN_TABLE.flippers[1].rest);
+  for (let i = 0; i < 10; i++) M.pinStep(s, 1 / 60, {});
+  assert.equal(s.flip[0].a, M.PIN_TABLE.flippers[0].rest);
+  // roll the ball down through each of the three lanes in turn
+  const before = s.score;
+  for (const lane of M.PIN_TABLE.lanes){
+    s.ball = { x: lane.x, y: 100, vx: 0, vy: 30 }; s.out = true;
+    M.pinStep(s, 1 / 60, {});
+    s.ball = { x: lane.x, y: 200, vx: 0, vy: 0 }; M.pinStep(s, 1 / 60, {});
+  }
+  assert.ok(s.score - before >= 3 * M.PIN.SCORE.lane + M.PIN.SCORE.bonus, 'three lanes and the bonus');
+  assert.deepEqual(s.lit, [false, false, false], 'the lanes light up again from the start');
+});
+
+test('pinball: a lost ball comes back on the plunger until all three are gone', () => {
+  const s = M.pinNew(seeded(5));
+  for (let n = 3; n > 0; n--){
+    M.pinStep(s, 1 / 60, {});
+    assert.equal(s.balls, n);
+    s.ball = { x: 171, y: M.PIN.H + 30, vx: 0, vy: 100 }; s.out = true;
+    M.pinStep(s, 1 / 60, {});
+  }
+  assert.equal(s.balls, 0); assert.ok(s.gone);
 });
 
 test('spot the difference: five differences each game, found only once and only near the right place', () => {

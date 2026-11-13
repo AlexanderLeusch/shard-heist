@@ -66,9 +66,9 @@ There are exactly **three clues**, one behind each of three spots. Clicking a sp
 - A won clue is kept in your clue notes and can be read again at its spot; its mini game cannot be played again.
 - The **graffiti** on the stall wall ("She was unsinkable. She sailed only once. The year opens the floor.") is a hint, not one of the three clues.
 
-### The six mini games
+### The seven mini games
 
-At the start of every game, **three different games out of six** are dealt at random to the three spots (tile, mirror, scratches), so every round plays differently. The rules check that the three are different; the room deals them (`MiniGames.pickGames` in `room-1-escape/js/minigames.js`).
+At the start of every game, **three different games out of seven** are dealt at random to the three spots (tile, mirror, scratches), so every round plays differently. The rules check that the three are different; the room deals them (`MiniGames.pickGames` in `room-1-escape/js/minigames.js`).
 
 | Game | How to win in 30 seconds |
 |---|---|
@@ -78,6 +78,7 @@ At the start of every game, **three different games out of six** are dealt at ra
 | **Deck run** | As a sailor of the Titanic, run to the bow on the icy night of 14 April 1912: first along the side of the ship past its round portholes, then out on the open deck past the railing with its life rings, the lifeboats, a funnel and the foremast. Jump (Space, ↑ or a click) over crates, steamer trunks, barrels and blocks of ice. Each obstacle knocks you down exactly where it is drawn. Three knocks and you are out. |
 | **Deck climb** | As the same sailor, bounce up through the Titanic in five levels: the engine room (boilers, furnaces, pipes), the crew quarters (bunks and lockers), second class (oak-panelled corridors and the library), first class (the Grand Staircase with its clock and chandelier) and the boat deck with the funnels and lifeboats. Steer with ← → or the mouse. Lifebuoys bounce you higher. Falling back down loses. |
 | **Seagull** | Fly the seagull over the black, icy North Atlantic at night, the lit Titanic in the background; flap with Space, ↑ or a click through ten gaps between stacks of overlapping clouds and icebergs. Only the drawn outline of a cloud or an iceberg counts as a crash. |
+| **Pinball** | A vintage White Star Line table in walnut, cream, brass and burgundy. Score **1,500 points** with three balls. Flippers: ← and → (A and D), Space for both, or press the left or right half of the table; the ball shoots by itself (or with Space). Points: pop bumper 150, lifebuoy target 250, slingshot 10, each R-M-S lane 100 and all three lanes 1,000 more, and 250 for every flipper shot that reaches the crow's nest bell at the top. A fair player gets there in about 15 seconds; losing all three balls loses. |
 
 ## The lock
 

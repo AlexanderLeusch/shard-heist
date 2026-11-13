@@ -1919,6 +1919,9 @@ function miniSound(n){
     case 'bad': tone(140, .2, 'square', .05, 90); break;
     case 'jump': tone(420, .1, 'sine', .06, 760); break;
     case 'tick': cue('tick'); break;
+    case 'pop': tone(760, .07, 'square', .045, 480); break;
+    case 'flip': noise(.04, .09, 'lowpass', 900); break;
+    case 'bell': tone(1320, .45, 'sine', .07); tone(1980, .3, 'sine', .03); break;
     case 'win': [523, 659, 784, 1046].forEach((f, i) => tone(f, .18, 'triangle', .09, null, i * .09)); break;
     case 'lose': tone(300, .5, 'sawtooth', .05, 90); break;
   }

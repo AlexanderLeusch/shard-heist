@@ -22,7 +22,7 @@ test('the story has 5 scenes, 2 items, 3 clues and 2 endings', () => {
   assert.equal(Object.keys(R.SCENES).length, 5);
   assert.deepEqual(Object.keys(R.ITEMS), ['mop', 'carkey']);
   assert.deepEqual(Object.keys(R.CLUES), ['tile', 'mirror', 'scratches']);
-  assert.equal(R.GAMES.length, 6);
+  assert.equal(R.GAMES.length, 7);
   assert.deepEqual(Object.keys(R.ENDINGS), ['A', 'B']);
   assert.equal(R.TIME_LIMIT, 600);
   // every exit leads to a real scene, and every "go" hotspot is a real exit

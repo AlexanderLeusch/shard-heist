@@ -1,4 +1,4 @@
-// Room 1: the six Titanic mini games behind the three clue spots (the crooked tile, the mirror and the scratches).
+// Room 1: the seven Titanic mini games behind the three clue spots (the crooked tile, the mirror and the scratches).
 // ### Each game lasts at most 30 seconds and is drawn on its own (DOM buttons or a 2D canvas), with no image files.
 // ### The top of the file holds the pure helpers (dealing the games, the bots, the fleets, the differences), which the Node
 // ### tests load with require(). open() below them builds a game inside the card and reports the result through onEnd.
@@ -9,19 +9,20 @@
   'use strict';
 
   const TIME = 30;
-  // ### The six games, in the order rules.js lists them, with the words on the card above each game.
+  // ### The seven games, in the order rules.js lists them, with the words on the card above each game.
   const INFO = {
     battleship: { title: 'Sink the <em>fleet</em>', name: 'Battleship', how: 'Fire at the enemy waters on the right. A hit lets you fire again. Ships never touch, not even at a corner, so the water around a sunk ship is marked for you. Sink all three of the bot’s ships before it sinks yours.' },
     spotdiff: { title: 'Spot the <em>difference</em>', name: 'Spot the difference', how: 'Two photographs of the Titanic, five differences. Click them in either picture. A wrong click costs 2 seconds.' },
     tictactoe: { title: 'Anchors and <em>icebergs</em>', name: 'Tic-tac-toe', how: 'You play the anchors, the bot plays the icebergs. Get three in a row. A draw starts a new round.' },
     deckrun: { title: 'Run the <em>deck</em>', name: 'Deck run', how: 'Run to the bow as a sailor. Jump over crates, trunks, barrels and ice with Space, ↑ or a click. Three knocks and you are out.' },
     deckclimb: { title: 'Climb the <em>decks</em>', name: 'Deck climb', how: 'Bounce up through the ship as a sailor: from the engine room past the crew quarters, second class and first class to the boat deck. Steer with ← → or the mouse. Lifebuoys bounce you higher. Do not fall.' },
-    seagull: { title: 'The <em>seagull</em>', name: 'Seagull', how: 'Fly between the icebergs and the storm clouds. Flap with Space, ↑ or a click. Pass ten gaps.' }
+    seagull: { title: 'The <em>seagull</em>', name: 'Seagull', how: 'Fly between the icebergs and the storm clouds. Flap with Space, ↑ or a click. Pass ten gaps.' },
+    pinball: { title: 'Vintage <em>pinball</em>', name: 'Pinball', how: 'Score 1,500 points with three balls. Flippers: ← and → (A and D), Space for both, or press the left or right half of the table. The ball shoots by itself, or press Space.' }
   };
   const GAMES = Object.keys(INFO);
 
   // ---------- Pure helpers ----------
-  // ### Deals three different games out of the six. rand() returns a number from 0 (inclusive) to 1, like Math.random.
+  // ### Deals three different games out of the seven. rand() returns a number from 0 (inclusive) to 1, like Math.random.
   function pickGames(rand){
     const a = GAMES.slice();
     for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
@@ -1185,6 +1186,309 @@
     };
   };
 
+  // ### 7. Pinball: a vintage table of the White Star Line, in cream, walnut, brass and burgundy. Flip the ball into the
+  // ### three pop bumpers, the slingshots, the two lifebuoy targets and the R-M-S lanes at the top until you have the
+  // ### points. The table is a list of walls (line segments) and round bumpers; the ball is a circle that moves in small
+  // ### steps, so it can never pass through a wall. pinNew() and pinStep() hold all the rules and are tested in Node.
+  const PIN = { W: 360, H: 520, R: 7, G: 760, GOAL: 1500, BALLS: 3, MAX: 1050, TOP: 60,
+    SCORE: { bumper: 150, sling: 10, target: 250, lane: 100, bonus: 1000, nest: 250 } };
+  const PIN_TABLE = (() => {
+    const walls = [], seg = (ax, ay, bx, by, kind, id, w) => walls.push({ ax, ay, bx, by, kind: kind || 'wall', id: id || 0, w: w || 0 });
+    // the arch over the top of the table, from the left wall round to the right wall
+    const arch = []; for (let k = 0; k <= 20; k++){ const a = Math.PI + Math.PI * k / 20; arch.push([184 + 168 * Math.cos(a), 200 + 136 * Math.sin(a)]); }
+    for (let k = 0; k < 20; k++) seg(arch[k][0], arch[k][1], arch[k + 1][0], arch[k + 1][1]);
+    seg(16, 520, 16, 200); seg(352, 200, 352, 520);                 // the two side walls
+    seg(326, 530, 326, 214);                                         // the wall between the table and the shooter lane
+    seg(326, 500, 352, 500);                                         // the plunger's tip, where the ball waits
+    // both halves of the lower table are mirror images about x = 171
+    for (const side of [0, 1]){
+      const X = x => side ? 342 - x : x;
+      seg(X(16), 380, X(110), 447);                                    // the inlane guide, meeting the flipper just over its pivot
+      seg(X(50), 322, X(50), 374); seg(X(50), 374, X(90), 404);        // the back of the slingshot
+      seg(X(50), 322, X(90), 404, 'sling', side);                      // its rubber face, which kicks
+      seg(X(side ? 322 : 20), 246, X(side ? 322 : 20), 284, 'target', side);   // a lifebuoy target on the wall
+    }
+    for (const x of [111, 151, 191, 231]) seg(x, 96, x, 124, 'post', 0, 3);   // the posts between the R, M and S lanes
+    return {
+      walls,
+      gate: { ax: 326, ay: 214, bx: 352, by: 198, kind: 'wall', id: 0, w: 0 },   // closes the shooter lane once the ball is out
+      bumpers: [{ x: 134, y: 206, r: 18 }, { x: 208, y: 206, r: 18 }, { x: 171, y: 264, r: 18 }],
+      lanes: [{ x: 131, l: 'R' }, { x: 171, l: 'M' }, { x: 211, l: 'S' }],
+      flippers: [{ x: 106, y: 452, len: 54, rest: .5, up: -.42 }, { x: 236, y: 452, len: 54, rest: Math.PI - .5, up: Math.PI + .42 }],
+      arch
+    };
+  })();
+  // ### A new game: the ball waits on the plunger, three balls to play.
+  function pinNew(rand){
+    return { rand, score: 0, balls: PIN.BALLS, ball: null, wait: .6, out: false, gone: false, still: 0,
+      flip: PIN_TABLE.flippers.map(f => ({ a: f.rest, w: 0 })), lit: [false, false, false], inLane: -1,
+      shot: false, flash: { bumper: [0, 0, 0], sling: [0, 0], target: [0, 0], bonus: 0, nest: 0 }, events: [] };
+  }
+  function pinLaunch(s){
+    s.ball = { x: 339, y: 493, vx: 0, vy: -(930 + s.rand() * 90) }; s.out = false; s.events.push('launch');
+  }
+  // the deepest a wall reaches into the ball, or null; the wall may have a thickness (w at a, w2 at b)
+  function pinHit(b, ax, ay, bx, by, w, w2){
+    const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+    const t = clampN(((b.x - ax) * dx + (b.y - ay) * dy) / l2, 0, 1), cx = ax + dx * t, cy = ay + dy * t;
+    const nx = b.x - cx, ny = b.y - cy, d = Math.hypot(nx, ny), min = PIN.R + w + (w2 - w) * t;
+    if (d >= min || d < 1e-6) return null;
+    return { nx: nx / d, ny: ny / d, pen: min - d, cx, cy };
+  }
+  // bounces the ball off a surface that moves with velocity (sx, sy); returns how hard the ball hit it
+  function pinBounce(b, h, e, sx, sy){
+    b.x += h.nx * h.pen; b.y += h.ny * h.pen;
+    const vn = (b.vx - (sx || 0)) * h.nx + (b.vy - (sy || 0)) * h.ny;
+    if (vn < 0){ b.vx -= (1 + e) * vn * h.nx; b.vy -= (1 + e) * vn * h.ny; }
+    return -vn;
+  }
+  // ### One step of the game: keys is { left, right, launch }. Points, lost balls and sounds are left in s.events.
+  function pinStep(s, dt, keys){
+    const T = PIN_TABLE, SC = PIN.SCORE;
+    for (const k of Object.keys(s.flash)) s.flash[k] = Array.isArray(s.flash[k]) ? s.flash[k].map(v => Math.max(0, v - dt)) : Math.max(0, s.flash[k] - dt);
+    if (s.gone) return s;
+    if (!s.ball){ s.ball = { x: 339, y: 493, vx: 0, vy: 0, ready: true }; s.wait = .6; }
+    if (s.ball.ready){
+      s.wait -= dt;
+      if (keys.launch || s.wait <= 0) pinLaunch(s);
+    }
+    // the flippers swing up fast while their key is held, and fall back a little slower
+    const old = s.flip.map(f => f.a);
+    T.flippers.forEach((f, i) => {
+      const held = i ? keys.right : keys.left, goal = held ? f.up : f.rest, sp = (held ? 24 : 15) * dt, d = goal - s.flip[i].a;
+      s.flip[i].a += clampN(d, -sp, sp);
+      if (held && !s.flip[i].held) s.events.push('flip');
+      s.flip[i].held = held;
+    });
+    const b = s.ball;
+    if (b.ready) return s;
+    const N = 4, h = dt / N;
+    for (let n = 0; n < N; n++){
+      b.vy += PIN.G * h;
+      const sp = Math.hypot(b.vx, b.vy); if (sp > PIN.MAX){ b.vx *= PIN.MAX / sp; b.vy *= PIN.MAX / sp; }
+      b.x += b.vx * h; b.y += b.vy * h;
+      if (!s.out && b.x < 318) s.out = true;
+      for (const wl of s.out ? T.walls.concat(T.gate) : T.walls){
+        const hit = pinHit(b, wl.ax, wl.ay, wl.bx, wl.by, wl.w, wl.w); if (!hit) continue;
+        const hard = pinBounce(b, hit, wl.kind === 'sling' ? .2 : .45);
+        if (wl.kind === 'sling' && hard > 40){
+          const vn = b.vx * hit.nx + b.vy * hit.ny, kick = 290 + s.rand() * 150 - vn;   // never quite the same kick twice
+          b.vx += hit.nx * kick; b.vy += hit.ny * kick; s.score += SC.sling; s.flash.sling[wl.id] = .15; s.events.push('sling');
+        } else if (wl.kind === 'target' && hard > 70 && s.flash.target[wl.id] <= 0){
+          s.score += SC.target; s.flash.target[wl.id] = .35; s.events.push('target');
+        }
+      }
+      T.bumpers.forEach((bp, i) => {
+        const dx = b.x - bp.x, dy = b.y - bp.y, d = Math.hypot(dx, dy), min = bp.r + PIN.R;
+        if (d >= min || d < 1e-6) return;
+        const hit = { nx: dx / d, ny: dy / d, pen: min - d };
+        pinBounce(b, hit, .3);
+        const vn = b.vx * hit.nx + b.vy * hit.ny; if (vn < 430){ b.vx += hit.nx * (430 - vn); b.vy += hit.ny * (430 - vn); }
+        s.score += SC.bumper; s.flash.bumper[i] = .18; s.events.push('bumper');
+      });
+      T.flippers.forEach((f, i) => {
+        const a0 = old[i] + (s.flip[i].a - old[i]) * n / N, a1 = old[i] + (s.flip[i].a - old[i]) * (n + 1) / N, w = (a1 - a0) / h;
+        const tx = f.x + Math.cos(a1) * f.len, ty = f.y + Math.sin(a1) * f.len;
+        const hit = pinHit(b, f.x, f.y, tx, ty, 6.5, 4); if (!hit) return;
+        pinBounce(b, hit, .3, -w * (hit.cy - f.y), w * (hit.cx - f.x));
+        if (Math.abs(w) > 3) s.shot = true;   // a real flipper shot, not a ball rolling over a resting flipper
+      });
+    }
+    // a flipper shot that reaches the top of the table rings the crow's nest bell
+    if (s.shot && b.y < 130){ s.shot = false; s.score += SC.nest; s.flash.nest = .6; s.events.push('nest'); }
+    // the R, M and S lanes at the top: roll through all three for a bonus
+    const lane = b.y > 98 && b.y < 124 ? T.lanes.findIndex(l => Math.abs(b.x - l.x) < 13) : -1;
+    if (lane >= 0 && lane !== s.inLane){
+      if (!s.lit[lane]){ s.lit[lane] = true; s.score += SC.lane; s.events.push('lane'); }
+      if (s.lit.every(Boolean)){ s.score += SC.bonus; s.lit = [false, false, false]; s.flash.bonus = 1.2; s.events.push('bonus'); }
+    }
+    s.inLane = lane;
+    // a ball that lies dead still somewhere gets a little nudge, as if the table were shaken
+    s.still = Math.hypot(b.vx, b.vy) < 12 ? s.still + dt : 0;
+    if (s.still > (keys.left || keys.right ? 2.5 : 1.2)){ b.vx = (s.rand() - .5) * 200; b.vy = -180; s.still = 0; }
+    if (b.y > PIN.H + 20){
+      s.balls--; s.ball = null; s.inLane = -1; s.shot = false; s.events.push('drain');
+      if (s.balls <= 0) s.gone = true;
+    }
+    return s;
+  }
+
+  BUILD.pinball = api => {
+    const { W, H, R, GOAL } = PIN, T = PIN_TABLE;
+    const c = api.canvas(W, H), g = c.getContext('2d');
+    const s = pinNew(api.rand), keys = { left: false, right: false, launch: false };
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const field = document.createElement('canvas'); field.width = W * dpr; field.height = H * dpr;
+    const fg = field.getContext('2d'); fg.scale(dpr, dpr); paintPinField(fg);
+    let shown = 0;
+    const fmt = n => n.toLocaleString('en-GB');
+    const status = () => api.status(`Score ${fmt(s.score)} of ${fmt(GOAL)} · Ball ${Math.min(PIN.BALLS, PIN.BALLS - s.balls + 1)} of ${PIN.BALLS}`);
+    // a round of score reels like on an old machine: each digit rolls up to the next
+    function reels(x, y, value){
+      const str = String(Math.floor(value)).padStart(5, '0');
+      for (let i = 0; i < 5; i++){
+        const cx = x + i * 19;
+        const rg = g.createLinearGradient(0, y, 0, y + 24); rg.addColorStop(0, '#8d7d5e'); rg.addColorStop(.25, '#f3e9cf'); rg.addColorStop(.75, '#f3e9cf'); rg.addColorStop(1, '#8d7d5e');
+        g.fillStyle = '#1a0f08'; g.fillRect(cx - 1, y - 1, 18, 26); g.fillStyle = rg; g.fillRect(cx, y, 16, 24);
+        g.fillStyle = '#20140c'; g.font = '700 17px Georgia, "Times New Roman", serif'; g.textAlign = 'center'; g.fillText(str[i], cx + 8, y + 18);
+      }
+      g.textAlign = 'start';
+    }
+    return {
+      key(code, down){
+        if (code === 'ArrowLeft' || code === 'KeyA') keys.left = down;
+        if (code === 'ArrowRight' || code === 'KeyD') keys.right = down;
+        // Space, ↑ or ↓ shoots the ball; while it is on the table Space works both flippers
+        if ((code === 'Space' || code === 'ArrowUp' || code === 'ArrowDown') && down && s.ball && s.ball.ready) keys.launch = true;
+        else if (code === 'Space'){ keys.left = keys.right = down; }
+      },
+      point(x, y, type){
+        if (type === 'down'){ if (s.ball && s.ball.ready && x > 300) keys.launch = true; else if (x < W / 2) keys.left = true; else keys.right = true; }
+        if (type === 'up'){ keys.left = keys.right = false; }
+      },
+      start(){ status(); },
+      update(dt){
+        pinStep(s, dt, keys); keys.launch = false;
+        for (const e of s.events) api.sound({ bumper: 'pop', sling: 'tick', target: 'good', lane: 'good', bonus: 'good', nest: 'bell', drain: 'bad', launch: 'jump', flip: 'flip' }[e]);
+        s.events.length = 0;
+        status();
+        if (s.score >= GOAL) return api.win(`${fmt(s.score)} points. The table is beaten.`);
+        if (s.gone) return api.lose('All three balls are gone.');
+      },
+      draw(){
+        shown += (s.score - shown) * .25; if (s.score - shown < 1) shown = s.score;
+        g.drawImage(field, 0, 0, W, H);
+        // the lit lanes, targets, slingshots and bumpers
+        T.lanes.forEach((l, i) => {
+          const on = s.lit[i] || s.flash.bonus > 0 && Math.floor(s.flash.bonus * 8) % 2 === 0;
+          g.fillStyle = on ? '#ffd76a' : '#6e1c1c'; g.beginPath(); g.arc(l.x, 140, 9, 0, 7); g.fill();
+          if (on){ g.fillStyle = 'rgba(255,215,106,.35)'; g.beginPath(); g.arc(l.x, 140, 15, 0, 7); g.fill(); }
+          g.fillStyle = on ? '#3a1a0a' : '#e8d9b0'; g.font = '700 11px Georgia, serif'; g.textAlign = 'center'; g.fillText(l.l, l.x, 144); g.textAlign = 'start';
+        });
+        [[20, 0], [322, 1]].forEach(([x, i]) => {
+          const lit = s.flash.target[i] > 0;
+          if (lit){ g.fillStyle = 'rgba(255,215,106,.45)'; g.beginPath(); g.arc(x + (i ? -6 : 6), 265, 22, 0, 7); g.fill(); }
+          g.save(); g.translate(x + (i ? -5 : 5), 265); drawBuoy(g, 0, 0, 11); g.restore();
+        });
+        T.walls.filter(w => w.kind === 'sling').forEach(w => {
+          if (s.flash.sling[w.id] <= 0) return;
+          g.strokeStyle = '#fff6d0'; g.lineWidth = 5; g.beginPath(); g.moveTo(w.ax, w.ay); g.lineTo(w.bx, w.by); g.stroke();
+        });
+        // the crow's nest bell between the lanes and the bumpers: it rings for every flipper shot that reaches the top
+        const ring = s.flash.nest > 0, sw = ring ? Math.sin(s.flash.nest * 40) * .35 : 0;
+        if (ring){ g.fillStyle = 'rgba(255,215,106,.4)'; g.beginPath(); g.arc(171, 164, 16, 0, 7); g.fill(); }
+        g.save(); g.translate(171, 156); g.rotate(sw);
+        g.fillStyle = ring ? '#ffd76a' : '#c9a04a'; g.beginPath(); g.moveTo(-7, 12); g.quadraticCurveTo(-7, 0, 0, 0); g.quadraticCurveTo(7, 0, 7, 12); g.lineTo(9, 14); g.lineTo(-9, 14); g.closePath(); g.fill();
+        g.fillStyle = '#7a5a20'; g.beginPath(); g.arc(0, 15.5, 2, 0, 7); g.fill(); g.fillRect(-1, -3, 2, 3);
+        g.restore();
+        if (ring){ g.fillStyle = `rgba(122,31,31,${Math.min(1, s.flash.nest * 2)})`; g.font = 'italic 700 12px Georgia, serif'; g.textAlign = 'center'; g.fillText('+250', 171, 190 - (.6 - s.flash.nest) * 20); g.textAlign = 'start'; }
+        T.bumpers.forEach((bp, i) => drawPinBumper(g, bp, s.flash.bumper[i] > 0));
+        // the flippers: cream bats with a red rubber edge on brass pivots
+        T.flippers.forEach((f, i) => {
+          const a = s.flip[i].a;
+          g.save(); g.translate(f.x, f.y); g.rotate(a);
+          g.fillStyle = '#8e1e1e'; g.beginPath(); g.arc(0, 0, 8, Math.PI / 2, Math.PI * 1.5); g.lineTo(f.len, -5.5); g.arc(f.len, 0, 5.5, -Math.PI / 2, Math.PI / 2); g.closePath(); g.fill();
+          g.fillStyle = '#f2e8cc'; g.beginPath(); g.arc(0, 0, 6, Math.PI / 2, Math.PI * 1.5); g.lineTo(f.len, -3.6); g.arc(f.len, 0, 3.6, -Math.PI / 2, Math.PI / 2); g.closePath(); g.fill();
+          g.fillStyle = '#c9a04a'; g.beginPath(); g.arc(0, 0, 3.4, 0, 7); g.fill(); g.fillStyle = '#7a5a20'; g.beginPath(); g.arc(0, 0, 1.4, 0, 7); g.fill();
+          g.restore();
+        });
+        // the plunger in the shooter lane, pulled back while the ball waits
+        const pull = s.ball && s.ball.ready ? 4 + 10 * (1 - Math.max(0, s.wait) / .6) : 0;
+        g.fillStyle = '#c9a04a'; g.fillRect(335, 500 + pull, 8, 20); g.fillStyle = '#5b3a1c'; g.fillRect(330, 500 + pull, 18, 4);
+        // the ball: polished steel
+        if (s.ball){
+          const b = s.ball, bg = g.createRadialGradient(b.x - 2.5, b.y - 2.5, .5, b.x, b.y, R);
+          bg.addColorStop(0, '#ffffff'); bg.addColorStop(.35, '#c9cdd2'); bg.addColorStop(1, '#4b4f55');
+          g.fillStyle = 'rgba(40,20,0,.25)'; g.beginPath(); g.ellipse(b.x + 2, b.y + 3, R, R * .8, 0, 0, 7); g.fill();
+          g.fillStyle = bg; g.beginPath(); g.arc(b.x, b.y, R, 0, 7); g.fill();
+        }
+        // the backglass at the top: score reels, the goal and the balls left
+        const hg = g.createLinearGradient(0, 0, 0, 56); hg.addColorStop(0, '#3b0f12'); hg.addColorStop(1, '#1d0709');
+        g.fillStyle = hg; g.fillRect(0, 0, W, 56);
+        g.strokeStyle = '#c9a04a'; g.lineWidth = 1.5; g.strokeRect(4.5, 4.5, W - 9, 47); g.lineWidth = .7; g.strokeRect(7.5, 7.5, W - 15, 41);
+        g.fillStyle = '#e6c46a'; g.font = '700 10px Georgia, serif'; g.fillText('SCORE', 16, 22);
+        reels(16, 26, shown);
+        g.fillStyle = '#e6c46a'; g.textAlign = 'center'; g.font = 'italic 700 15px Georgia, serif'; g.fillText('R.M.S. Titanic', W / 2 + 8, 25);
+        g.font = '9px Georgia, serif'; g.fillStyle = '#d8c18a'; g.fillText('WHITE STAR LINE', W / 2 + 8, 40); g.textAlign = 'start';
+        g.textAlign = 'right'; g.fillStyle = '#e6c46a'; g.font = '700 10px Georgia, serif'; g.fillText('GOAL ' + fmt(GOAL), W - 16, 22);
+        for (let i = 0; i < PIN.BALLS; i++){
+          const on = i < s.balls - (s.ball && !s.ball.ready ? 1 : 0) || (i === s.balls - 1 && s.ball && s.ball.ready);
+          g.fillStyle = on ? '#d9dde2' : 'rgba(217,221,226,.18)'; g.beginPath(); g.arc(W - 22 - i * 16, 38, 5, 0, 7); g.fill();
+        }
+        g.textAlign = 'start';
+        if (s.flash.bonus > 0){ g.fillStyle = `rgba(255,215,106,${Math.min(1, s.flash.bonus)})`; g.font = 'italic 700 20px Georgia, serif'; g.textAlign = 'center'; g.fillText('R·M·S  BONUS  +1,000', W / 2 - 4, 310); g.textAlign = 'start'; }
+      }
+    };
+  };
+  // ### A pop bumper: a burgundy cap with a gold rim and the white star, glowing when it is hit.
+  function drawPinBumper(g, bp, lit){
+    if (lit){ g.fillStyle = 'rgba(255,220,120,.45)'; g.beginPath(); g.arc(bp.x, bp.y, bp.r + 9, 0, 7); g.fill(); }
+    g.fillStyle = 'rgba(40,20,0,.3)'; g.beginPath(); g.arc(bp.x + 2, bp.y + 3, bp.r, 0, 7); g.fill();
+    g.fillStyle = '#c9a04a'; g.beginPath(); g.arc(bp.x, bp.y, bp.r, 0, 7); g.fill();
+    const cg = g.createRadialGradient(bp.x - 4, bp.y - 4, 2, bp.x, bp.y, bp.r - 3);
+    cg.addColorStop(0, lit ? '#ffd27a' : '#c2413a'); cg.addColorStop(1, lit ? '#d0732a' : '#6e1414');
+    g.fillStyle = cg; g.beginPath(); g.arc(bp.x, bp.y, bp.r - 3, 0, 7); g.fill();
+    pinStar(g, bp.x, bp.y, 7.5, '#fbf3dc');
+  }
+  function pinStar(g, x, y, r, color){
+    g.fillStyle = color; g.beginPath();
+    for (let k = 0; k < 10; k++){ const a = -Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? r * .42 : r; g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+    g.closePath(); g.fill();
+  }
+  // ### The playfield and the cabinet around it, painted once: walnut, a cream field with gold lines and a sunburst, a sepia
+  // ### picture of the ship, the slingshots and inlane guides, the posts, the shooter lane and the apron with the star.
+  function paintPinField(g){
+    const { W, H } = PIN, T = PIN_TABLE;
+    // the walnut cabinet
+    const wood = g.createLinearGradient(0, 0, W, 0); wood.addColorStop(0, '#3a2312'); wood.addColorStop(.5, '#5a3820'); wood.addColorStop(1, '#3a2312');
+    g.fillStyle = wood; g.fillRect(0, 0, W, H);
+    g.strokeStyle = 'rgba(0,0,0,.18)'; g.lineWidth = 1; for (let x = 3; x < W; x += 7){ g.beginPath(); g.moveTo(x, 0); g.bezierCurveTo(x + 4, H * .3, x - 4, H * .6, x + 2, H); g.stroke(); }
+    // the cream field inside the arch and the walls
+    g.save(); g.beginPath(); g.moveTo(16, H); g.lineTo(16, 200); T.arch.forEach(([x, y]) => g.lineTo(x, y)); g.lineTo(352, H); g.closePath(); g.clip();
+    const cream = g.createRadialGradient(171, 300, 40, 171, 300, 330); cream.addColorStop(0, '#f6ecd0'); cream.addColorStop(.7, '#e9d9ae'); cream.addColorStop(1, '#c9b07a');
+    g.fillStyle = cream; g.fillRect(0, 0, W, H);
+    // a gold sunburst rising from the flippers
+    g.fillStyle = 'rgba(201,160,74,.16)';
+    for (let k = 0; k < 18; k++){ const a0 = Math.PI + k * Math.PI / 18, a1 = a0 + Math.PI / 36; g.beginPath(); g.moveTo(171, 470); g.lineTo(171 + Math.cos(a0) * 420, 470 + Math.sin(a0) * 420); g.lineTo(171 + Math.cos(a1) * 420, 470 + Math.sin(a1) * 420); g.closePath(); g.fill(); }
+    // the ship in sepia, sailing across the middle of the table
+    drawTitanic(g, 62, 362, .74, { silhouette: 'rgba(110,70,30,.22)' });
+    g.strokeStyle = 'rgba(110,70,30,.25)'; g.lineWidth = 1; for (let k = 0; k < 4; k++){ g.beginPath(); g.moveTo(40 + k * 9, 366 + k * 5); g.quadraticCurveTo(171, 360 + k * 5, 300 - k * 9, 366 + k * 5); g.stroke(); }
+    // a ship's wheel in fine gold lines around the bumpers
+    g.strokeStyle = 'rgba(150,110,40,.45)'; g.lineWidth = 1.2; g.beginPath(); g.arc(171, 220, 72, 0, 7); g.stroke(); g.beginPath(); g.arc(171, 220, 66, 0, 7); g.stroke();
+    for (let k = 0; k < 8; k++){ const a = k * Math.PI / 4; g.beginPath(); g.moveTo(171 + Math.cos(a) * 20, 220 + Math.sin(a) * 20); g.lineTo(171 + Math.cos(a) * 84, 220 + Math.sin(a) * 84); g.stroke(); g.beginPath(); g.arc(171 + Math.cos(a) * 88, 220 + Math.sin(a) * 88, 3.5, 0, 7); g.stroke(); }
+    // the shooter lane is plain varnished wood
+    g.fillStyle = '#b48a55'; g.fillRect(326, 190, 26, H);
+    g.restore();
+    // gold pinstripes just inside the arch and the walls
+    g.strokeStyle = '#c9a04a'; g.lineWidth = 1;
+    g.save(); g.beginPath(); g.rect(0, 0, 322, H); g.clip();
+    g.beginPath(); T.arch.forEach(([x, y], k) => { const px = 171 + (x - 184) * .955 + 6, py = 200 + (y - 200) * .94 + 3; k ? g.lineTo(px, py) : g.moveTo(px, py); }); g.stroke();
+    g.restore();
+    // the lane posts, the inlane guides and the slingshots with their white rubber rings
+    g.lineCap = 'round';
+    for (const w of T.walls){
+      if (w.kind === 'post'){ g.strokeStyle = '#c9a04a'; g.lineWidth = 6; g.beginPath(); g.moveTo(w.ax, w.ay); g.lineTo(w.bx, w.by); g.stroke(); g.strokeStyle = '#f7e9b8'; g.lineWidth = 2; g.stroke(); }
+    }
+    for (const side of [0, 1]){
+      const X = x => side ? 342 - x : x;
+      g.strokeStyle = '#c9a04a'; g.lineWidth = 4; g.beginPath(); g.moveTo(X(16), 380); g.lineTo(X(110), 447); g.stroke();
+      g.fillStyle = '#7a1f1f'; g.beginPath(); g.moveTo(X(50), 322); g.lineTo(X(50), 374); g.lineTo(X(90), 404); g.closePath(); g.fill();
+      g.strokeStyle = '#c9a04a'; g.lineWidth = 1.5; g.stroke();
+      g.strokeStyle = '#f6f1e4'; g.lineWidth = 3.5; g.beginPath(); g.moveTo(X(50), 322); g.lineTo(X(90), 404); g.stroke();
+      pinStar(g, X(61), 365, 6, '#e6c46a');
+    }
+    g.lineCap = 'butt';
+    // brass rails along the walls and the arch
+    g.strokeStyle = '#a07b34'; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(16, H); g.lineTo(16, 200); T.arch.forEach(([x, y]) => g.lineTo(x, y)); g.lineTo(352, H); g.stroke();
+    g.beginPath(); g.moveTo(326, H); g.lineTo(326, 214); g.stroke();
+    // the apron under the flippers: walnut with the line's star and name
+    g.fillStyle = '#3a2312'; g.beginPath(); g.moveTo(16, 488); g.lineTo(130, 500); g.lineTo(130, H); g.lineTo(16, H); g.fill();
+    g.beginPath(); g.moveTo(326, 488); g.lineTo(212, 500); g.lineTo(212, H); g.lineTo(326, H); g.fill();
+    g.fillStyle = '#e6c46a'; g.font = '700 8px Georgia, serif'; g.textAlign = 'center'; g.fillText('WHITE STAR', 66, 510); g.fillText('LINE', 276, 510); g.textAlign = 'start';
+    pinStar(g, 110, 506, 5, '#e6c46a'); pinStar(g, 232, 506, 5, '#e6c46a');
+  }
+
   const clampN = (v, a, b) => Math.max(a, Math.min(b, v));
   function mix(a, b, t){
     const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
@@ -1243,13 +1547,14 @@
     const toLogical = e => { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * logical.w, (e.clientY - r.top) / r.height * logical.h]; };
     const onDown = e => { if (!api.over && game.point){ e.preventDefault(); const [x, y] = toLogical(e); game.point(x, y, 'down'); } };
     const onMove = e => { if (!api.over && game.point){ const [x, y] = toLogical(e); game.point(x, y, 'move'); } };
+    const onUp = e => { if (!api.over && game.point){ const [x, y] = toLogical(e); game.point(x, y, 'up'); } };
     const GAME_KEYS = ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyA', 'KeyD', 'KeyW'];
     const onKey = e => {
       if (!GAME_KEYS.includes(e.code)) return;
       e.preventDefault();
       if (game.key && !api.over && !(e.repeat && e.type === 'keydown' && (e.code === 'Space' || e.code === 'ArrowUp'))) game.key(e.code, e.type === 'keydown');
     };
-    if (canvas){ canvas.addEventListener('pointerdown', onDown); canvas.addEventListener('pointermove', onMove); }
+    if (canvas){ canvas.addEventListener('pointerdown', onDown); canvas.addEventListener('pointermove', onMove); for (const t of ['pointerup', 'pointercancel', 'pointerleave']) canvas.addEventListener(t, onUp); }
     addEventListener('keydown', onKey, true); addEventListener('keyup', onKey, true);
     function loop(now){
       if (stopped) return;
@@ -1278,5 +1583,5 @@
     return { stop(){ if (!stopped){ api.over = true; cleanup(); } }, get timeLeft(){ return left; } };
   }
 
-  return Object.freeze({ TIME, INFO, GAMES, DIFFS, pickGames, tttWinner, tttBot, placeFleet, fleetSunk, bsBot, around, waterAround, pickDiffs, hitDiff, overlap, icebergPoly, inPoly, cloudStack, hitsClouds, RUN_KINDS, RUN, runLayout, CLIMB_LEVELS, open });
+  return Object.freeze({ TIME, INFO, GAMES, DIFFS, pickGames, tttWinner, tttBot, placeFleet, fleetSunk, bsBot, around, waterAround, pickDiffs, hitDiff, overlap, icebergPoly, inPoly, cloudStack, hitsClouds, RUN_KINDS, RUN, runLayout, CLIMB_LEVELS, PIN, PIN_TABLE, pinNew, pinStep, open });
 });

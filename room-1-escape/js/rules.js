@@ -20,9 +20,9 @@
     mirror: { title: 'Writing in the steam', text: 'The steam clears around figures someone traced on the mirror: “UNSINKABLE? 19 _ _”. The first two digits of the code: 1 and 9.' },
     scratches: { title: 'Scratched into the wall by the door', text: '“The ‘unsinkable’ went down on her first voyage.” Below it, gouged deep into a tile: “_ _ 1 2”. The last two digits of the code: 1 and 2.' }
   };
-  // ### The six Titanic mini games (drawn and played by minigames.js). Each new game deals three different ones to the
+  // ### The seven Titanic mini games (drawn and played by minigames.js). Each new game deals three different ones to the
   // ### three spots; which three is chosen by room.js, because the rules have no randomness of their own.
-  const GAMES = ['battleship', 'spotdiff', 'tictactoe', 'deckrun', 'deckclimb', 'seagull'];
+  const GAMES = ['battleship', 'spotdiff', 'tictactoe', 'deckrun', 'deckclimb', 'seagull', 'pinball'];
   const SPOTS = { tile: 'stall', mirror: 'sinks', scratches: 'door' };
   const GRAFFITI = '“She was unsinkable. She sailed only once. — The year opens the floor.”';
   const WARNINGS = [[300, 'Officer Hale, outside: “Five minutes!”'], [120, 'Officer Hale: “Two minutes. Hurry it up in there.”'], [60, 'Keys jingle outside the door. One minute left.'], [30, 'Hale: “Thirty seconds, 4471!”']];
