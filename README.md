@@ -77,7 +77,7 @@ shard-heist/
 │   ├── js/boot.js           error screen (load failures, no WebGL, unexpected errors)
 │   ├── textures/            CC0 scans from Poly Haven: concrete, cinder blocks, scratched steel, the vault HDRI, the tunnel's brick, stone and wood
 │   ├── models/              the two hand models (MIT, WebXR Input Profiles) with their licence
-│   ├── sounds/              two CC0 recordings, the hot tap and the air vent, with their credits
+│   ├── sounds/              CC0 recordings: the hot tap, the air vent and footsteps (steps/), with their credits
 │   └── fonts/               the two fonts with their licences
 │
 ├── room-2-chase/            ROOM 2 · Shard Heist (3D police chase)
@@ -197,7 +197,7 @@ All radio music is composed and synthesised by the game at run time, so there ar
 
 Escape-room scans from [Poly Haven](https://polyhaven.com) (CC0, fetched through its public API and kept in `room-1-escape/textures/`): the textures *Hangar Concrete Floor*, *Concrete Wall 004* and *Blue Metal Plate*, and the HDRI *Bank Vault*; for the tunnel under the hatch *Castle Brick 07* (Rob Tuytel), *Stone Brick Wall 001* (Dimitrios Savva, Rico Cilliers), *Worn Brick Floor* (Amal Kumar) and, for the ladder, *Rough Wood* (Rob Tuytel). The cobwebs and the dust are painted and animated in code. CC0 asks for no credit; we give it anyway.
 
-Escape-room recordings (CC0, kept in `room-1-escape/sounds/` with their sources in `CREDITS.md`): the hot tap is *tap-water-1* from Owlish Media's *Sound Effects Pack* on OpenGameArt, and the air vent is *Fan* by lllBabaBooeylll on Freesound (536942). Both are bundled with the game. When it can, the air vent instead plays a CC0 ventilation recording from Freesound that the game finds through the [Openverse](https://openverse.org) API (no key); the pause card names it and its creator.
+Escape-room recordings (CC0, kept in `room-1-escape/sounds/` with their sources in `CREDITS.md`): the hot tap is *tap-water-1* from Owlish Media's *Sound Effects Pack* on OpenGameArt, and the air vent is *Fan* by lllBabaBooeylll on Freesound (536942). The footsteps (`room-1-escape/sounds/steps/`) are Owlish Media's shoe steps, rubberduck's wet steps for the puddles and Kenney's *Impact Sounds* wood steps for the ladder, all CC0. They are bundled with the game. When it can, the air vent instead plays a CC0 ventilation recording from Freesound that the game finds through the [Openverse](https://openverse.org) API (no key); the pause card names it and its creator.
 
 The escape room's hands are the *generic-hand* models of the [WebXR Input Profiles](https://github.com/immersive-web/webxr-input-profiles) (© 2019 Amazon, MIT licence; copied unchanged into `room-1-escape/models/` with the licence in `LICENSE-hands.txt`). They are files, not an npm package: nothing is installed.
 

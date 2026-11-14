@@ -174,6 +174,14 @@ test('escape room: every scanned texture the room loads ships with it and is cre
 test('escape room: the tap and air vent recordings ship with it, are served as audio and are credited as CC0; the API vent is allowed only from its two hosts', () => {
   const files = [...new Set([...escRoom.matchAll(/'sounds\/([a-z-]+\.mp3)'/g)].map(m => m[1]))].sort();
   assert.deepEqual(files, ['air-vent.mp3', 'tap-water.mp3']);
+  // the footsteps: every recording room.js asks for ships with it, and each kind is credited
+  const steps = JSON.parse(escRoom.match(/const STEP_FILES = (\{[^}]+\})/)[1].replace(/(\w+):/g, '"$1":'));
+  assert.deepEqual(Object.keys(steps).sort(), ['floor', 'rung', 'wet']);
+  for (const [k, n] of Object.entries(steps)){
+    for (let i = 1; i <= n; i++) assert.ok(fs.existsSync(path.join(ROOT, 'room-1-escape/sounds/steps', `${k}-${i}.mp3`)), `${k}-${i}.mp3 is missing`);
+    assert.ok(!fs.existsSync(path.join(ROOT, 'room-1-escape/sounds/steps', `${k}-${n + 1}.mp3`)), `${k}: a file room.js never plays`);
+    assert.match(read('room-1-escape/sounds/CREDITS.md'), new RegExp('`steps/' + k + '-1\\.mp3`.*CC0 1\\.0'), k + ' steps are credited');
+  }
   const credits = read('room-1-escape/sounds/CREDITS.md');
   for (const f of files){
     assert.ok(fs.existsSync(path.join(ROOT, 'room-1-escape/sounds', f)), f + ' is missing');

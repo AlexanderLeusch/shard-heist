@@ -460,6 +460,8 @@ const WATER = (() => {
     mat, rt,
     // ### A puddle of w x d metres (the water fills about four fifths of it).
     puddle(w, d, x, z){ const m = flat(w, d, mat, x, z, .005); m.renderOrder = 1; boxes.push(new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(x, .005, z), new THREE.Vector3(w, .02, d))); return m; },
+    // ### Whether a foot at x, z lands in the water of a puddle (the middle four fifths of it; buckets do not count).
+    wetAt(x, z){ return boxes.some(b => b.max.y < .05 && Math.abs(x - (b.min.x + b.max.x) / 2) < .4 * (b.max.x - b.min.x) && Math.abs(z - (b.min.z + b.max.z) / 2) < .4 * (b.max.z - b.min.z)); },
     // ### The water in a bucket: a disc of radius r at height y, with a picture of the scum and bubbles on it.
     bucket(r, x, y, z, scum){
       bucketMat.uniforms.lift.value = 2 * (y - P0.y); bucketMat.uniforms.tScum.value = scum;
@@ -1768,8 +1770,8 @@ function walkInto(zone){
   if (S.scene === 'hatch' && zone !== 'stall') act('go', 'stall', true);
   if (S.scene !== zone) act('go', zone, true);
 }
-// ### One step of walking: speed builds up and fades out smoothly, you slide along walls, and the floor answers with soft
-// ### footsteps. The head moves as in a real walk (not with reduced motion): it dips a little at every footfall and rises
+// ### One step of walking: speed builds up and fades out smoothly, you slide along walls, and the floor answers with real
+// ### footsteps (see "Footsteps"). The head moves as in a real walk (not with reduced motion): it dips a little at every footfall and rises
 // ### over the standing leg, and the body shifts its weight from one foot to the other, so the view sways gently from side
 // ### to side once every two steps and tilts with it.
 function walk(dt){
@@ -1792,7 +1794,7 @@ function walk(dt){
     if (Math.floor(cam.stride / .8) !== before){
       // no two steps are quite the same: each one dips the head a little more or less
       cam.stepAmp = .82 + Math.random() * .36;
-      if (speed > .5) noise(.09, .06, 'lowpass', 240);
+      if (speed > .5) step(speed);
     }
     if (len) $('lookHint').classList.add('gone');
     const z = zoneAt(cam.pos.x, cam.pos.z, S.scene === 'hatch' ? 'stall' : S.scene);
@@ -1815,8 +1817,14 @@ function updateCamera(dt){
   }
   if (cam.t < 1){
     cam.t = Math.min(1, cam.t + dt / cam.dur);
-    const e = cam.t < .5 ? 2 * cam.t * cam.t : 1 - Math.pow(-2 * cam.t + 2, 2) / 2;
+    const e = cam.t < .5 ? 2 * cam.t * cam.t : 1 - Math.pow(-2 * cam.t + 2, 2) / 2, px = cam.pos.x, pz = cam.pos.z;
     cam.pos.lerpVectors(cam.from.pos, camTarget.pos, e);
+    // walking there with the buttons or a marker: the same footsteps, one every stride
+    const moved = Math.hypot(cam.pos.x - px, cam.pos.z - pz);
+    if (dt > 0 && moved / dt > .3 && S.scene !== 'intro' && !S.ending){
+      const before = Math.floor(cam.stride / .8); cam.stride += moved;
+      if (Math.floor(cam.stride / .8) !== before) step(Math.min(WALK_SPEED, moved / dt));
+    }
     cam.lookYaw = cam.yaw = cam.from.yaw + (camTarget.yaw - cam.from.yaw) * e;
     cam.lookPitch = cam.pitch = cam.from.pitch + (camTarget.pitch - cam.from.pitch) * e;
     cam.bob *= .9; cam.sway *= .9;
@@ -2506,6 +2514,10 @@ function initAudio(){
   loadSound(TAP.file, b => { tapBuf = b; });
   loadSound(VENT.file, startVent);
   findApiVent();
+  stepBus = ac.createGain(); stepBus.connect(master);
+  const echo = ac.createConvolver(), echoGain = ac.createGain(); echo.buffer = washroomEcho(); echoGain.gain.value = STEP_VOL.echo;
+  stepBus.connect(echo); echo.connect(echoGain); echoGain.connect(master);
+  for (const k in STEP_FILES) for (let i = 1; i <= STEP_FILES[k]; i++) loadSound('sounds/steps/' + k + '-' + i + '.mp3', b => stepBufs[k].push(b));
 }
 // ### Fetches and decodes one recording, then hands it on; a failure leaves the synthesised sound in its place.
 function loadSound(file, then){
@@ -2585,6 +2597,49 @@ function updateTap(dt){
   else { g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(1, t + .12); s.start(t, TAP.loopEnd); }
   tapSrc = tapOn ? { s, g } : null;
 }
+// ---------- Footsteps ----------
+// ### Real recordings (CC0, in sounds/steps with their credits): four steps of a soft-soled shoe on a hard floor, three wet
+// ### steps for the puddles and five boots on wood for the ladder. Each footfall takes another recording than the last,
+// ### a little higher or lower and louder or softer, the left foot a touch to the left and the right foot to the right, and
+// ### the tiled washroom answers with a short echo: a reverb made here from noise that dies away in about 0.6 s, with a few
+// ### early reflections off the walls. Until the recordings have loaded, the old synthesised thud stands in.
+const STEP_FILES = { floor: 4, wet: 3, rung: 5 }, STEP_VOL = { floor: .35, wet: .35, rung: .35, echo: .3 };
+const stepBufs = { floor: [], wet: [], rung: [] }, stepLast = {};
+let stepBus = null, stepFoot = 1;
+// ### Plays one footstep of a kind; false when its recordings are not there (yet). rate lowers or raises it on purpose.
+function footstep(kind, vol, rate = 1){
+  const list = stepBufs[kind];
+  if (!ac || !stepBus || !list.length) return false;
+  let i = Math.floor(Math.random() * list.length);
+  if (list.length > 1 && i === stepLast[kind]) i = (i + 1) % list.length;
+  stepLast[kind] = i; stepFoot = -stepFoot;
+  const s = ac.createBufferSource(), g = ac.createGain();
+  s.buffer = list[i]; s.playbackRate.value = rate * (.93 + Math.random() * .14); g.gain.value = vol * (.8 + Math.random() * .3);
+  s.connect(g);
+  if (ac.createStereoPanner){ const p = ac.createStereoPanner(); p.pan.value = .14 * stepFoot; g.connect(p); p.connect(stepBus); } else g.connect(stepBus);
+  s.start();
+  return true;
+}
+// ### One footfall where you stand: a wet one in a puddle, otherwise the hard floor; a slow step is softer than a brisk one.
+function step(speed){
+  const brisk = .55 + .45 * Math.min(1, speed / WALK_SPEED), wet = WATER.wetAt(cam.pos.x, cam.pos.z);
+  if (!footstep(wet ? 'wet' : 'floor', STEP_VOL[wet ? 'wet' : 'floor'] * brisk)) noise(.09, .06, 'lowpass', 240);
+}
+// ### The washroom's echo for the footsteps: stereo noise that dies away 60 dB in 0.6 s and gets darker as it fades,
+// ### after early reflections off the tiles (7 to 31 ms).
+function washroomEcho(){
+  const len = Math.floor(ac.sampleRate * .9), buf = ac.createBuffer(2, len, ac.sampleRate);
+  for (let c = 0; c < 2; c++){
+    const d = buf.getChannelData(c); let lp = 0;
+    for (let i = 0; i < len; i++){
+      const t = i / ac.sampleRate, k = .25 + .7 * Math.min(1, t / .6);   // the tail loses its highs
+      lp += (1 - k) * ((Math.random() * 2 - 1) - lp);
+      d[i] = lp * Math.exp(-6.9 * t / .6) * Math.min(1, t / .012);
+    }
+    for (const [ms, a] of [[7, .5], [11, .35], [17, .3], [23, .22], [31, .18]]) d[Math.floor((ms + c * 1.5) / 1000 * ac.sampleRate)] += a * (c ? -1 : 1);
+  }
+  return buf;
+}
 // ### Plays one short tone.
 function tone(freq, dur, type, vol, slideTo, delay){
   if (!ac) return;
@@ -2615,7 +2670,7 @@ function cue(name){
     case 'warn': tone(880, .12, 'square', .05); tone(880, .12, 'square', .05, null, .2); break;
     case 'rattle': for (let i = 0; i < 6; i++) noise(.07, .45, 'bandpass', 900, i * .13); break;
     case 'nope': tone(120, .18, 'square', .05); break;
-    case 'step': noise(.12, .12, 'lowpass', 180); break;
+    case 'step': if (!stepBufs.floor.length) noise(.12, .12, 'lowpass', 180); break;   // with the recordings, the walk itself steps
     case 'door': noise(.3, .5, 'lowpass', 220); break;
     case 'wedge': noise(.2, .3, 'lowpass', 400); tone(200, .2, 'triangle', .1); break;
     case 'water': break;
@@ -2734,7 +2789,7 @@ function updateClimb(dt){
     if (uh >= 1 && c.grabbed !== k){ c.grabbed = k; dustFall(10, mover.pos.x, mover.pos.y, mover.pos.z, .1); if (ac) noise(.05, .05, 'bandpass', 1500); }
     if (ed >= 1 && c.landed !== k){
       c.landed = k;
-      if (ac){ noise(.1, .1, 'lowpass', 320); tone(130 + Math.random() * 70, .28, 'sawtooth', .01, 85); }   // a boot on the rung, the old wood creaks
+      if (ac){ if (!footstep('rung', STEP_VOL.rung)) noise(.1, .1, 'lowpass', 320); tone(130 + Math.random() * 70, .28, 'sawtooth', .01, 85); }   // a boot on the rung, the old wood creaks
       dustFall(8, x, Math.round((pose.pos.y - 1.5) / .3) * .3, TUN.ladderZ, .3);
     }
   } else {
@@ -2743,7 +2798,8 @@ function updateClimb(dt){
     pose.pos.copy(last).lerp(bottom, easeIO(clamp(v * 1.6, 0, 1)));
     pose.yaw = Math.PI * easeIO(clamp((v - .2) / .8, 0, 1)); pose.pitch = -.5 + .4 * e;
     if (v > .2) c.hands = false;
-    if (!c.off){ c.off = true; if (ac) noise(.16, .16, 'lowpass', 220); dustFall(14, x, TUN.floor + .3, C.eyeZ - .1, .4); }
+    if (!c.off){ c.off = true; if (ac && !footstep('floor', STEP_VOL.floor * 1.2, .85)) noise(.16, .16, 'lowpass', 220); dustFall(14, x, TUN.floor + .3, C.eyeZ - .1, .4); }
+    if (v > .55 && !c.back){ c.back = true; if (ac) footstep('floor', STEP_VOL.floor * .8, .9); }   // the step back onto the tunnel floor
   }
   if (REDUCED){ const v = VIEWS.tunnel, a = anglesTo(v.pos, v.look); pose.pos.fromArray(v.pos); pose.yaw = a.yaw; pose.pitch = a.pitch; pose.roll = 0; }
   return pose;
