@@ -83,8 +83,11 @@ test('battleship: the water around a sunk ship is marked, and only around sunk s
   assert.deepEqual([...M.waterAround(6, ships, new Set([0, 1, 2]))].sort((a, b) => a - b), [3, 6, 7, 8, 9]);
 });
 
-test('deck climb: five levels from the engine room up to the boat deck', () => {
+test('deck climb: four levels to climb from the engine room, first class the longest, and the boat deck is the goal', () => {
   assert.deepEqual(M.CLIMB_LEVELS.map(l => l.name), ['Engine room', 'Crew quarters', 'Second class', 'First class', 'Boat deck']);
+  const [engine, crew, second, first, deck] = M.CLIMB_LEVELS.map(l => l.h);
+  assert.ok(first > Math.max(engine, crew, second), 'first class is the longest level');
+  assert.equal(deck, 0, 'nothing to climb above the boat deck: landing on it wins');
 });
 
 test('seagull: the clouds above a gap leave no way through, end exactly at the gap, and the icebergs are hit by their outline', () => {

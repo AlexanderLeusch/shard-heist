@@ -15,7 +15,7 @@
     spotdiff: { title: 'Spot the <em>difference</em>', name: 'Spot the difference', how: 'Two photographs of the Titanic, five differences. Click them in either picture. A wrong click costs 2 seconds.' },
     tictactoe: { title: 'Anchors and <em>icebergs</em>', name: 'Tic-tac-toe', how: 'You play the anchors, the bot plays the icebergs. Get three in a row. A draw starts a new round.' },
     deckrun: { title: 'Run the <em>deck</em>', name: 'Deck run', how: 'Run to the bow as a sailor. Jump over crates, trunks, barrels and ice with Space, ↑ or a click. Three knocks and you are out.' },
-    deckclimb: { title: 'Climb the <em>decks</em>', name: 'Deck climb', how: 'Bounce up through the ship as a sailor: from the engine room past the crew quarters, second class and first class to the boat deck. Steer with ← → or the mouse. Lifebuoys bounce you higher. Do not fall.' },
+    deckclimb: { title: 'Climb the <em>decks</em>', name: 'Deck climb', how: 'Bounce up through the ship as a sailor: from the engine room past the crew quarters, second class and the long first class. Land on the boat deck to win. Steer with ← → or the mouse. Lifebuoys bounce you higher. Do not fall.' },
     seagull: { title: 'The <em>seagull</em>', name: 'Seagull', how: 'Fly between the icebergs and the storm clouds. Flap with Space, ↑ or a click. Pass ten gaps.' },
     pinball: { title: 'Vintage <em>pinball</em>', name: 'Pinball', how: 'Score 1,500 points with three balls. Flippers: ← and → (A and D), Space for both, or press the left or right half of the table. The ball shoots by itself, or press Space.' }
   };
@@ -825,12 +825,13 @@
     };
   };
 
-  // ### 5. Deck climb: bounce up through the ship, from the boiler rooms at the bottom, past the crew quarters, second class
-  // ### and first class, to the boat deck with its funnels at the top. Each level is painted once, in detail, on its own
-  // ### canvas when the game starts, so drawing a frame costs only five pictures and the platforms.
+  // ### 5. Deck climb: bounce up through the ship, from the boiler rooms at the bottom, past the crew quarters and second
+  // ### class, through the long first class with the Grand Staircase, until you land on the boat deck: there the game is
+  // ### won. Each level is painted once, in detail, on its own canvas when the game starts, so drawing a frame costs only
+  // ### five pictures and the platforms. h is how tall a level is; the boat deck has no height to climb, it is the goal.
   const CLIMB_LEVELS = [
-    { id: 'engine', name: 'Engine room' }, { id: 'crew', name: 'Crew quarters' }, { id: 'second', name: 'Second class' },
-    { id: 'first', name: 'First class' }, { id: 'deck', name: 'Boat deck' }
+    { id: 'engine', name: 'Engine room', h: 500 }, { id: 'crew', name: 'Crew quarters', h: 500 }, { id: 'second', name: 'Second class', h: 500 },
+    { id: 'first', name: 'First class', h: 1000 }, { id: 'deck', name: 'Boat deck', h: 0 }
   ];
   // ### Paints one level of the ship on g (w x h, the level's own coordinates). r is a fixed random sequence.
   function paintLevel(id, g, w, h, r){
@@ -946,29 +947,67 @@
         g.strokeStyle = '#c9a052'; g.lineWidth = 2; g.strokeRect(x, y, 56, 84); g.strokeStyle = 'rgba(160,120,50,.4)'; g.lineWidth = 1; g.strokeRect(x + 5, y + 5, 46, 74);
         g.strokeStyle = 'rgba(160,120,50,.5)'; g.beginPath(); g.moveTo(x + 28, y + 24); g.bezierCurveTo(x + 14, y + 34, x + 42, y + 50, x + 28, y + 60); g.stroke();
       }
+      if (h > 700){
+        // the upper half of the long first class: the glass dome over the Grand Staircase, its great chandelier, and the
+        // staircase itself sweeping up with red carpet, a gilded balustrade and the bronze cherub holding a lamp
+        const dg = g.createRadialGradient(w / 2, 10, 10, w / 2, 10, 190); dg.addColorStop(0, '#fbf6e2'); dg.addColorStop(.5, '#d8e2e6'); dg.addColorStop(1, '#9fb4c0');
+        g.fillStyle = '#c9a052'; g.beginPath(); g.ellipse(w / 2, 0, w / 2 - 6, 150, 0, 0, Math.PI); g.fill();
+        g.fillStyle = dg; g.beginPath(); g.ellipse(w / 2, 0, w / 2 - 14, 142, 0, 0, Math.PI); g.fill();
+        g.strokeStyle = '#a07b34'; g.lineWidth = 2;
+        for (let k = 1; k < 12; k++){ const a = k * Math.PI / 12; g.beginPath(); g.moveTo(w / 2, 0); g.lineTo(w / 2 + Math.cos(a) * (w / 2 - 14), Math.sin(a) * 142); g.stroke(); }
+        g.lineWidth = 1.2; for (const f of [.4, .7]){ g.beginPath(); g.ellipse(w / 2, 0, (w / 2 - 14) * f, 142 * f, 0, 0, Math.PI); g.stroke(); }
+        g.strokeStyle = '#8a6a2a'; g.lineWidth = 3; g.beginPath(); g.ellipse(w / 2, 0, w / 2 - 10, 146, 0, 0, Math.PI); g.stroke();
+        const bx = w / 2, by = 196;
+        g.strokeStyle = '#b08a3e'; g.lineWidth = 2; g.beginPath(); g.moveTo(bx, 142); g.lineTo(bx, by); g.stroke();
+        g.fillStyle = '#c9a052'; g.beginPath(); g.ellipse(bx, by, 34, 7, 0, 0, 7); g.fill();
+        for (let k = -4; k <= 4; k++){ lamp(bx + k * 9, by + 10 + Math.abs(k) * -1.5, 'rgba(255,230,160,.5)', 16); }
+        for (let k = 0; k < 18; k++){ g.fillStyle = 'rgba(255,255,255,.85)'; g.beginPath(); g.arc(bx - 40 + k * 4.7, by + 24 + Math.sin(k * .9) * 4, 1.5, 0, 7); g.fill(); }
+        // the staircase: steps rising from lower left to the landing on the right
+        const s0 = [24, 470], s1 = [w - 40, 290], n = 16;
+        for (let k = 0; k < n; k++){
+          const x = s0[0] + (s1[0] - s0[0]) * k / n, y = s0[1] + (s1[1] - s0[1]) * k / n, sw = (s1[0] - s0[0]) / n + 1;
+          g.fillStyle = '#e7dcc0'; g.fillRect(x, y - 2, sw, 14); g.fillStyle = '#9c1f22'; g.fillRect(x, y - 2, sw, 6); g.fillStyle = '#d6b45a'; g.fillRect(x, y - 2, sw, 1);
+        }
+        g.fillStyle = '#e7dcc0'; g.fillRect(s1[0] - 4, s1[1] - 2, w - s1[0] + 4, 14); g.fillStyle = '#9c1f22'; g.fillRect(s1[0] - 4, s1[1] - 2, w - s1[0] + 4, 6);
+        g.strokeStyle = '#7a5428'; g.lineWidth = 4; g.beginPath(); g.moveTo(s0[0], s0[1] - 46); g.lineTo(s1[0], s1[1] - 46); g.stroke();
+        g.strokeStyle = '#c9a052'; g.lineWidth = 1.6;
+        for (let k = 0; k <= n; k++){ const x = s0[0] + (s1[0] - s0[0]) * k / n, y = s0[1] + (s1[1] - s0[1]) * k / n; g.beginPath(); g.moveTo(x, y - 2); g.bezierCurveTo(x - 4, y - 14, x + 4, y - 30, x, y - 44); g.stroke(); }
+        // the newel post with the bronze cherub and his lamp
+        g.fillStyle = '#7a5428'; g.fillRect(s0[0] - 8, s0[1] - 54, 16, 64);
+        g.fillStyle = '#5a4020'; g.beginPath(); g.arc(s0[0], s0[1] - 62, 6, 0, 7); g.fill(); g.fillRect(s0[0] - 4, s0[1] - 58, 8, 6);
+        g.strokeStyle = '#5a4020'; g.lineWidth = 2; g.beginPath(); g.moveTo(s0[0] + 3, s0[1] - 60); g.lineTo(s0[0] + 10, s0[1] - 74); g.stroke();
+        lamp(s0[0] + 11, s0[1] - 78, 'rgba(255,220,140,.6)', 22);
+        // two more arched windows and paintings between the dome and the staircase
+        for (let k = 0; k < 2; k++){
+          const fx = k ? w - 78 : 18, fy = 250;
+          g.fillStyle = '#b08a3e'; g.fillRect(fx, fy - 70, 60, 48); g.fillStyle = k ? '#5a4a6a' : '#6a5a3a'; g.fillRect(fx + 5, fy - 65, 50, 38);
+          g.fillStyle = 'rgba(255,240,200,.5)'; g.beginPath(); g.arc(fx + 30, fy - 46, 8, 0, 7); g.fill();
+        }
+      }
+      const o = Math.max(0, h - 480);   // the lower part keeps its old place above the balustrade
       // arched windows with the glow of the sea at night
       for (let k = 0; k < 2; k++){
-        const ax = 40 + k * 220, ay = 60;
+        const ax = 40 + k * 220, ay = o + 60;
         g.fillStyle = '#c9a052'; g.beginPath(); g.moveTo(ax - 4, ay + 120); g.lineTo(ax - 4, ay + 30); g.arc(ax + 36, ay + 30, 40, Math.PI, 0); g.lineTo(ax + 76, ay + 120); g.fill();
         const gl = g.createLinearGradient(0, ay, 0, ay + 120); gl.addColorStop(0, '#1b2f52'); gl.addColorStop(1, '#4f6f9a');
         g.fillStyle = gl; g.beginPath(); g.moveTo(ax, ay + 116); g.lineTo(ax, ay + 30); g.arc(ax + 36, ay + 30, 36, Math.PI, 0); g.lineTo(ax + 72, ay + 116); g.fill();
         g.strokeStyle = '#c9a052'; g.lineWidth = 1.5; g.beginPath(); g.moveTo(ax + 36, ay - 6); g.lineTo(ax + 36, ay + 116); g.moveTo(ax, ay + 60); g.lineTo(ax + 72, ay + 60); g.stroke();
       }
       // the carved clock
-      const cx = w / 2, cy = 260;
+      const cx = w / 2, cy = o + 260;
       g.fillStyle = '#7a5428'; g.fillRect(cx - 60, cy - 46, 120, 92);
       g.fillStyle = '#9a6f38'; g.beginPath(); g.ellipse(cx - 40, cy, 14, 36, 0, 0, 7); g.ellipse(cx + 40, cy, 14, 36, 0, 0, 7); g.fill();
       g.fillStyle = '#f7f1df'; g.beginPath(); g.arc(cx, cy, 22, 0, 7); g.fill(); g.strokeStyle = '#3a2a10'; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, 22, 0, 7); g.moveTo(cx, cy); g.lineTo(cx, cy - 15); g.moveTo(cx, cy); g.lineTo(cx + 10, cy + 4); g.stroke();
       g.fillStyle = '#3a2a10'; g.font = 'italic 9px Georgia, serif'; g.textAlign = 'center'; g.fillText('Honour and Glory', cx, cy + 40); g.textAlign = 'start';
       // a chandelier
-      const chx = w / 2, chy = 60;
-      g.strokeStyle = '#b08a3e'; g.lineWidth = 2; g.beginPath(); g.moveTo(chx, 0); g.lineTo(chx, chy); g.stroke();
+      const chx = w / 2, chy = o + 60;
+      g.strokeStyle = '#b08a3e'; g.lineWidth = 2; g.beginPath(); g.moveTo(chx, o); g.lineTo(chx, chy); g.stroke();
       for (let k = -3; k <= 3; k++){ g.beginPath(); g.moveTo(chx, chy); g.quadraticCurveTo(chx + k * 10, chy + 18, chx + k * 14, chy + 8); g.stroke(); lamp(chx + k * 14, chy + 6, 'rgba(255,230,160,.55)', 18); }
       for (let k = 0; k < 14; k++){ g.fillStyle = 'rgba(255,255,255,.8)'; g.beginPath(); g.arc(chx - 36 + k * 5.5, chy + 22 + Math.sin(k) * 3, 1.6, 0, 7); g.fill(); }
       // oil paintings and the gilded balustrade at the bottom
-      g.fillStyle = '#b08a3e'; g.fillRect(30, 360, 70, 56); g.fillRect(w - 100, 360, 70, 56);
-      g.fillStyle = '#4f6a5a'; g.fillRect(36, 366, 58, 44); g.fillStyle = '#7a4a3a'; g.fillRect(w - 94, 366, 58, 44);
-      g.fillStyle = '#e0c48a'; g.beginPath(); g.arc(65, 392, 6, 0, 7); g.fill(); g.fillStyle = '#32503e'; g.fillRect(w - 94, 396, 58, 14);
+      g.fillStyle = '#b08a3e'; g.fillRect(30, o + 360, 70, 56); g.fillRect(w - 100, o + 360, 70, 56);
+      g.fillStyle = '#4f6a5a'; g.fillRect(36, o + 366, 58, 44); g.fillStyle = '#7a4a3a'; g.fillRect(w - 94, o + 366, 58, 44);
+      g.fillStyle = '#e0c48a'; g.beginPath(); g.arc(65, o + 392, 6, 0, 7); g.fill(); g.fillStyle = '#32503e'; g.fillRect(w - 94, o + 396, 58, 14);
       g.fillStyle = '#8c1d1d'; g.fillRect(0, h - 26, w, 26); g.fillStyle = '#c9a052'; g.fillRect(0, h - 28, w, 3);
       for (let x = 6; x < w; x += 16){ g.fillStyle = '#c9a052'; g.fillRect(x, h - 60, 3, 32); g.beginPath(); g.arc(x + 1.5, h - 60, 3, 0, 7); g.fill(); }
       g.fillStyle = '#7a5428'; g.fillRect(0, h - 64, w, 5);
@@ -1030,27 +1069,30 @@
     }
   }
   BUILD.deckclimb = api => {
-    const W = 360, H = 480, GOAL = 2000, BOTTOM = H - 30, TOP = -GOAL - 80;
+    const W = 360, H = 480, BOTTOM = H - 30, SKY = 520;
     const c = api.canvas(W, H), g = c.getContext('2d');
-    // the five levels share the height from the boiler floor to the boat deck; the deck level also holds the sky above it
-    const bandH = Math.ceil((BOTTOM - TOP) / 5);
-    const levelAt = y => CLIMB_LEVELS[clampN(Math.floor((BOTTOM - y) / bandH), 0, 4)].id;
+    // where each level starts (its floor) going up from the boiler floor; the last one is the boat deck, whose planks
+    // (the top 50 units of the deck picture's floor) are the goal
+    const floors = []; CLIMB_LEVELS.reduce((y, lv) => { floors.push(y); return y - lv.h; }, BOTTOM);
+    const DECK = floors[4] - 50, GOAL = H - 60 - DECK;
+    const levelAt = y => { let i = 0; while (i < 4 && y <= floors[i + 1]) i++; return CLIMB_LEVELS[i].id; };
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     const bands = CLIMB_LEVELS.map((lv, i) => {
-      const top = BOTTOM - (i + 1) * bandH - (i === 4 ? 400 : 0), h = BOTTOM - i * bandH - top;
+      const h = lv.h || SKY, top = floors[i] - h;
       const cv = document.createElement('canvas'); cv.width = W * dpr; cv.height = h * dpr;
       const bg = cv.getContext('2d'); bg.scale(dpr, dpr);
       paintLevel(lv.id, bg, W, h, seq(1912 + i * 7));
       return { ...lv, top, h, cv };
     });
     const p = { x: W / 2, y: H - 60, vx: 0, vy: -760 };
-    let camY = 0, best = 0, steer = 0, aim = null, shown = '', face = 1, t = 0;
+    let camY = 0, best = 0, steer = 0, aim = null, shown = '', face = 1, t = 0, landed = false;
     const plats = [{ x: 0, y: BOTTOM, w: W, move: 0, floor: true }];
-    for (let y = H - 110; y > -GOAL - 40; y -= 62 + api.rand() * 34){
+    // platforms up to just below the boat deck; from the last one a jump always carries you above the deck's planks
+    for (let y = H - 110; y > DECK + 60; y -= 62 + api.rand() * 34){
       const w = 70 + api.rand() * 30;
       plats.push({ x: api.rand() * (W - w), y, w, move: api.rand() < .2 ? (api.rand() < .5 ? -60 : 60) : 0, spring: api.rand() < .08 });
     }
-    plats.push({ x: 0, y: TOP, w: W, move: 0, top: true });
+    plats.push({ x: 0, y: DECK, w: W, move: 0, top: true });
     plats.forEach(pl => { pl.level = pl.top ? 'deck' : levelAt(pl.y); });
     return {
       key(code, down){
@@ -1071,7 +1113,7 @@
         for (const pl of plats){
           if (pl.move){ pl.x += pl.move * dt; if (pl.x < 0 || pl.x + pl.w > W) pl.move = -pl.move; }
           if (p.vy > 0 && prevY <= pl.y && p.y >= pl.y && p.x > pl.x - 8 && p.x < pl.x + pl.w + 8){
-            if (pl.top){ p.y = pl.y; p.vy = 0; return api.win('You made it out onto the boat deck.'); }
+            if (pl.top){ p.y = pl.y; p.vy = 0; landed = true; return api.win('You made it out onto the boat deck.'); }
             p.y = pl.y; p.vy = pl.spring ? -1150 : -760; api.sound(pl.spring ? 'good' : 'jump');
           }
         }
@@ -1084,16 +1126,18 @@
         if (p.y - camY > H + 40) api.lose('You fell back down into the boiler room.');
       },
       draw(){
+        // once you are on the boat deck, the view rises a little to show the funnels and lifeboats around you
+        if (landed) camY += (DECK - H * .82 - camY) * .12;
         g.fillStyle = '#05080c'; g.fillRect(0, 0, W, H);
         for (const b of bands) if (b.top - camY < H && b.top + b.h - camY > 0) g.drawImage(b.cv, 0, b.top - camY, W, b.h);
         // the steel deck between two levels
         g.fillStyle = '#1d1f21';
-        for (let i = 1; i < 5; i++){ const y = BOTTOM - i * bandH - camY; if (y > -10 && y < H + 10){ g.fillRect(0, y - 5, W, 10); g.fillStyle = '#5a5e62'; g.fillRect(0, y - 5, W, 2); g.fillStyle = '#1d1f21'; } }
+        for (let i = 1; i < 5; i++){ const y = floors[i] - camY; if (y > -10 && y < H + 10){ g.fillRect(0, y - 5, W, 10); g.fillStyle = '#5a5e62'; g.fillRect(0, y - 5, W, 2); g.fillStyle = '#1d1f21'; } }
         g.save(); g.translate(0, -camY);
         for (const pl of plats){
           if (pl.y - camY < -30 || pl.y - camY > H + 30) continue;
           if (pl.floor){ g.fillStyle = '#2a2420'; g.fillRect(0, pl.y, W, 40); g.fillStyle = '#e0b030'; g.fillRect(0, pl.y, W, 2); continue; }
-          if (pl.top){ g.fillStyle = '#c4935e'; g.fillRect(0, pl.y, W, 14); continue; }
+          if (pl.top) continue;   // the boat deck's planks are part of its picture
           paintPlatform(g, pl.level, pl.x, pl.y, pl.w);
           if (pl.spring) drawBuoy(g, pl.x + pl.w / 2, pl.y - 4, 7);
         }
@@ -1107,7 +1151,7 @@
         g.restore();
         // the level you are in, and how far there is still to climb
         g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(W - 16, 20, 8, H - 40);
-        CLIMB_LEVELS.forEach((lv, i) => { const y = 20 + (H - 40) * (1 - (i + 1) / 5); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(W - 19, y, 14, 1); });
+        for (let i = 1; i < 5; i++){ const y = 20 + (H - 40) * (1 - clampN((H - 60 - floors[i]) / GOAL, 0, 1)); g.fillStyle = 'rgba(255,255,255,.35)'; g.fillRect(W - 19, y, 14, 1); }
         g.fillStyle = '#ff7a1a'; const f = clampN(best / GOAL, 0, 1); g.fillRect(W - 16, 20 + (H - 40) * (1 - f), 8, (H - 40) * f);
         g.fillStyle = 'rgba(10,13,15,.75)'; g.fillRect(8, 8, 128, 22);
         g.fillStyle = '#ff7a1a'; g.font = '700 12px "JetBrains Mono", monospace'; g.fillText(shown.toUpperCase() || 'ENGINE ROOM', 14, 23);
