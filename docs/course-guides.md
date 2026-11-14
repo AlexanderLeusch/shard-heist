@@ -10,10 +10,10 @@
 | Repository is public, `main` holds the deployed code | ✅ | Pages is deployed only from `main`, by CI |
 | No keys or passwords in the repository | ✅ | The game has no secrets; a test scans every file; GitHub secret scanning and push protection are on |
 | `README.md` has the deployed URL | ✅ | Top of the README |
-| `README.md` has the **names and student numbers of all members** | ❌ | Still missing: the team adds them |
+| `README.md` has the **names and student numbers of all members** | ✅ | README, section "Team": five members with student numbers and their main room |
 | `README.md` has the commands to run the app and its tests | ✅ | "Run it locally" |
 | Every member contributes code to the repository | ⚠️ | Commits by Alexander, Marco, Jasper and Louisa. Sarah's changes arrive through her pull requests, but their commits carry the author name "Claude": set `git config user.name` / `user.email` so they count under her name |
-| Team of 3 to 4 students | ⚠️ | Five people have write access; if all five are members, clear it with the teaching staff |
+| Team of 3 to 4 students | ⚠️ | The team has five members: clear the size with the teaching staff |
 | Live demo at the deployed URL | ✅ | Nothing to wake up: static hosting does not sleep |
 | Walkthrough: data, tests, unavailable API | ✅ | README: "Security", "Testing", "When something is unavailable"; `docs/rules/settings.md` lists all stored data |
 
@@ -108,9 +108,8 @@
 
 ## Open points for the team
 
-1. Add the **names and student numbers** of all members to `README.md`.
-2. Confirm the **teaching staff's approval** of the JavaScript stack.
-3. **Review every pull request** by a second member before merging (`AGENTS.md`).
-4. Sarah: set your own **git name and email**, so your commits count under your name.
-5. If all five people with write access are members, clear the **team size** (3 to 4) with the teaching staff.
-6. Optional: track the remaining work as **GitHub issues**.
+1. Confirm the **teaching staff's approval** of the JavaScript stack.
+2. **Review every pull request** by a second member before merging (`AGENTS.md`).
+3. Sarah: set your own **git name and email**, so your commits count under your name.
+4. The team has five members: clear the **team size** (3 to 4) with the teaching staff.
+5. Optional: track the remaining work as **GitHub issues**.

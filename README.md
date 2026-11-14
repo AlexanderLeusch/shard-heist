@@ -14,6 +14,16 @@ Both are published automatically from `main` once all tests pass. The rules of b
 
 The folder `original-solo-project/` holds the original solo project *Plot Twist: The Missing Necklace* (Python and Streamlit), which room 1 rebuilds in 3D. It is kept for reference, and CI tests it, but it is not part of the deployed game. Run it with `cd original-solo-project && uv run streamlit run app.py`.
 
+## Team
+
+| Name | Student number | Main focus |
+|---|---|---|
+| Jasper Beyer | 70114 | Room 1 · Escape room |
+| Louisa Roderer | 81845 | Room 2 · Police chase |
+| Marco Pichler | 78786 | Room 1 · Escape room |
+| Sarah Lock | 77952 | Room 1 · Escape room |
+| Alexander Leusch | 80897 | Room 2 · Police chase |
+
 ## Room 1 · Plot Twist: Cell Block D
 
 You were the detective on the Ashford necklace case; now you are inmate 4471, convicted of the theft. Officer Hale locks you in washroom 2 for ten minutes. A hatch in the floor is held shut by a four-digit combination lock, and the code is hidden in the room.
