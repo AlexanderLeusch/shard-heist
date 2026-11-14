@@ -2682,12 +2682,12 @@ function updateTap(dt){
   tapSrc = tapOn ? { s, g } : null;
 }
 // ---------- Footsteps ----------
-// ### Real recordings (CC0, in sounds/steps with their credits): four steps of a soft-soled shoe on a hard floor, three wet
-// ### steps for the puddles and five boots on wood for the ladder. Each footfall takes another recording than the last,
+// ### Real recordings (CC0, in sounds/steps with their credits): four steps of hard shoes on concrete (the heel strikes,
+// ### the sole slaps down after it), three wet steps for the puddles and five boots on wood for the ladder. Each footfall takes another recording than the last,
 // ### a little higher or lower and louder or softer, the left foot a touch to the left and the right foot to the right, and
-// ### the tiled washroom answers with a short echo: a reverb made here from noise that dies away in about 0.6 s, with a few
-// ### early reflections off the walls. Until the recordings have loaded, the old synthesised thud stands in.
-const STEP_FILES = { floor: 4, wet: 3, rung: 5 }, STEP_VOL = { floor: .35, wet: .35, rung: .35, echo: .3 };
+// ### the bare concrete and tiles answer with an echo: a reverb made here from noise that dies away in about 0.8 s and
+// ### stays bright (concrete swallows little of the highs), after a few early reflections off the walls. Until the recordings have loaded, the old synthesised thud stands in.
+const STEP_FILES = { floor: 4, wet: 3, rung: 5 }, STEP_VOL = { floor: .4, wet: .35, rung: .35, echo: .38 };
 const stepBufs = { floor: [], wet: [], rung: [] }, stepLast = {};
 let stepBus = null, stepFoot = 1;
 // ### Plays one footstep of a kind; false when its recordings are not there (yet). rate lowers or raises it on purpose.
@@ -2704,21 +2704,21 @@ function footstep(kind, vol, rate = 1){
   s.start();
   return true;
 }
-// ### One footfall where you stand: a wet one in a puddle, otherwise the hard floor; a slow step is softer than a brisk one.
+// ### One footfall where you stand: a wet one in a puddle, otherwise the concrete floor; a slow step is softer than a brisk one.
 function step(speed){
   const brisk = .55 + .45 * Math.min(1, speed / WALK_SPEED), wet = WATER.wetAt(cam.pos.x, cam.pos.z);
   if (!footstep(wet ? 'wet' : 'floor', STEP_VOL[wet ? 'wet' : 'floor'] * brisk)) noise(.09, .06, 'lowpass', 240);
 }
-// ### The washroom's echo for the footsteps: stereo noise that dies away 60 dB in 0.6 s and gets darker as it fades,
-// ### after early reflections off the tiles (7 to 31 ms).
+// ### The washroom's echo for the footsteps: stereo noise that dies away 60 dB in 0.8 s and only slowly gets darker,
+// ### after early reflections off the concrete and tiles (7 to 31 ms).
 function washroomEcho(){
-  const len = Math.floor(ac.sampleRate * .9), buf = ac.createBuffer(2, len, ac.sampleRate);
+  const len = Math.floor(ac.sampleRate * 1.1), buf = ac.createBuffer(2, len, ac.sampleRate);
   for (let c = 0; c < 2; c++){
     const d = buf.getChannelData(c); let lp = 0;
     for (let i = 0; i < len; i++){
-      const t = i / ac.sampleRate, k = .25 + .7 * Math.min(1, t / .6);   // the tail loses its highs
+      const t = i / ac.sampleRate, k = .08 + .5 * Math.min(1, t / .8);   // the tail slowly loses its highs
       lp += (1 - k) * ((Math.random() * 2 - 1) - lp);
-      d[i] = lp * Math.exp(-6.9 * t / .6) * Math.min(1, t / .012);
+      d[i] = lp * Math.exp(-6.9 * t / .8) * Math.min(1, t / .012);
     }
     for (const [ms, a] of [[7, .5], [11, .35], [17, .3], [23, .22], [31, .18]]) d[Math.floor((ms + c * 1.5) / 1000 * ac.sampleRate)] += a * (c ? -1 : 1);
   }
