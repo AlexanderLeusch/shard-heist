@@ -2102,6 +2102,7 @@ function spring(x, v, target, k, damping, dt){
 // ### hands breathe and now and then make a small gesture. Using something sends the right hand forward, fingers open.
 function updateHands(dt){
   if (climb && climb.hands){ climbHands(dt); return; }
+  leaveLadder();
   const show = !S.ending && hatchAnim < 0 && camera.position.y > 0;
   HANDS.down += ((show ? 0 : 1) - HANDS.down) * (1 - Math.exp(-dt * 5));
   const still = REDUCED ? 0 : 1, t = clock;
@@ -2555,6 +2556,27 @@ let ac = null, master = null, waterGain = null, noiseBuf = null, dripIn = 3;
 // ### the vent's seamless loop. Measured when the files were made; see sounds/CREDITS.md.
 const TAP = { file: 'sounds/tap-water.mp3', loopStart: 1.08, loopEnd: 8.28, vol: .45 };
 const VENT = { file: 'sounds/air-vent.mp3', loopStart: .25, loopEnd: 9.25, vol: .12 };
+// ### The climb down the ladder: one file of short CC0 recordings (see sounds/CREDITS.md), each [start, length] in seconds:
+// ### two creaks of old wood, two knocks of a boot on a rung, a hand gripping, clothes rustling, a boot on stone.
+const LADDER = { file: 'sounds/ladder.mp3', creak1: [.35, .478], creak2: [1.178, .386], rung1: [1.914, .248], rung2: [2.512, .281],
+  grab: [3.143, .3], cloth: [3.793, .95], floor: [5.093, .58] };
+let ladderBuf = null, ladderBus = null;
+// ### Plays one of the ladder's recordings, with the echo of the brick shaft; false while the file has not arrived.
+function ladderSound(name, vol, rate, delay){
+  if (!ac || !ladderBuf) return false;
+  if (!ladderBus){
+    // the shaft and the vault: a second and a half of reverberation, made from noise that dies away
+    const n = Math.floor(ac.sampleRate * 1.5), ir = ac.createBuffer(2, n, ac.sampleRate);
+    for (let ch = 0; ch < 2; ch++){ const d = ir.getChannelData(ch); for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 3.2) * .5; }
+    const verb = ac.createConvolver(), wet = ac.createGain();
+    verb.buffer = ir; wet.gain.value = .45;
+    ladderBus = ac.createGain(); ladderBus.connect(master); ladderBus.connect(verb); verb.connect(wet); wet.connect(master);
+  }
+  const [at, len] = LADDER[name], src = ac.createBufferSource(), g = ac.createGain(), t = ac.currentTime + (delay || 0);
+  src.buffer = ladderBuf; src.playbackRate.value = rate || 1; g.gain.value = vol;
+  src.connect(g); g.connect(ladderBus); src.start(t, Math.max(0, at - .02), len + .06);
+  return true;
+}
 let tapBuf = null, tapBus = null, tapSrc = null, tapOn = false;
 // ### Creates the audio on the first click, as browsers require.
 function initAudio(){
@@ -2574,6 +2596,7 @@ function initAudio(){
   tapBus = ac.createGain(); tapBus.gain.value = 0; tapBus.connect(master);
   loadSound(TAP.file, b => { tapBuf = b; });
   loadSound(VENT.file, startVent);
+  loadSound(LADDER.file, b => { ladderBuf = b; });
   findApiVent();
   stepBus = ac.createGain(); stepBus.connect(master);
   const echo = ac.createConvolver(), echoGain = ac.createGain(); echo.buffer = washroomEcho(); echoGain.gain.value = STEP_VOL.echo;
@@ -2786,10 +2809,13 @@ function updateCine(dt){
 // ---------- Endings ----------
 // ### Ending A: the lid swings up and dust trickles from the rim, the old bulbs below come on, and you climb down the
 // ### wooden ladder in the first person. You let yourself down into the hatch facing the ladder and hold on to the frame,
-// ### then go down rung by rung: one hand lets go and grabs a lower rung while the other holds on, then your body drops
-// ### one rung, then the other hand. Your hands stay on the rungs while you move, the view sways with each step, every
-// ### grab shakes dust off the wood, and halfway you glance down at the floor and pass Hale's note. At the bottom you let
-// ### go, step back and turn round to face the tunnel, then the ending card. With reduced motion you are simply down there.
+// ### then go down rung by rung: one hand lets go and grabs a lower rung while the other holds on, one boot steps down
+// ### to a lower rung, then your body sinks one rung, then the other hand and the other boot. Your whole body is there:
+// ### the hands close round the rungs, the forearms run to bent elbows and up to your shoulders, and when you glance
+// ### down you see your chest, your legs and your boots on the rungs. The wood creaks under your weight, hands and boots
+// ### knock on the rungs, your clothes rustle, all with the echo of the shaft (recorded sounds, sounds/ladder.mp3). Every
+// ### grab shakes dust off the wood, and on the way you pass Hale's note. At the bottom you let go, step onto the stone
+// ### floor and turn round to face the tunnel, then the ending card. With reduced motion you are simply down there.
 // ### Ending B: the door is flung open, white corridor light floods in, then the card.
 let hatchAnim = -1, doorFlash = 0, endingShown = false, climb = null, endStep = 0;
 const CLIMB = { mount: 1.4, step: .74, steps: 8, off: 2.2, rest: .5, eye: .55 };
@@ -2800,6 +2826,8 @@ const easeIO = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 const bump = (t, a, b) => Math.sin(Math.PI * clamp((t - a) / (b - a), 0, 1));
 // ### Where a hand holds on: the edge of the hatch frame at the top, a rung (at height y) below it.
 const gripAt = (side, y) => y > -.1 ? new THREE.Vector3(TUN.x + side * .2, .035, TUN.zN + .015) : new THREE.Vector3(TUN.x + side * .14, y, TUN.ladderZ);
+// ### Where a boot stands: the ankle just above the rung at height y, a little out from the ladder.
+const footAt = (side, y) => new THREE.Vector3(TUN.x + side * .1, y + .075, TUN.ladderZ + .07);
 function endingA(){
   hatchAnim = 0; endingShown = false; climb = null; $('lookHint').classList.add('gone');
   tunnelLight.visible = tunnelLight2.visible = dust.pts.visible = true;
@@ -2807,19 +2835,23 @@ function endingA(){
 }
 function endingB(){ doorFlash = 1; goView('cell', .6); setTimeout(() => { if (S.ending === 'B'){ showEnding(); } }, 1400); }
 // ### Plans the climb: at each step one hand (right, left, right ...) moves from the rung it holds to a lower one, a
-// ### little below where the eye will be after that step.
+// ### little below where the eye will be after that step, and the boot on the other side steps down to a rung about
+// ### a leg's length below the eye.
 function startClimb(){
-  const moves = [], held = { r: .035, l: .035 };
+  const moves = [], held = { r: .035, l: .035 }, stood = { r: -.6, l: -.9 };
   for (let k = 0; k < CLIMB.steps; k++){
-    const key = k % 2 ? 'l' : 'r', eyeEnd = CLIMB.eye - .3 * (k + 1);
+    const key = k % 2 ? 'l' : 'r', foot = k % 2 ? 'r' : 'l', eyeEnd = CLIMB.eye - .3 * (k + 1);
     const y = Math.max(-3.3, Math.min(Math.round((eyeEnd - .28) / .3) * .3, held[key] > 0 ? -.3 : held[key] - .3));
-    moves.push({ key, from: held[key], to: y }); held[key] = y;
+    const fy = Math.max(-3.3, Math.min(Math.round((eyeEnd - 1.6) / .3) * .3, stood[foot] - .3));
+    moves.push({ key, from: held[key], to: y, foot, footFrom: stood[foot], footTo: fy }); held[key] = y; stood[foot] = fy;
   }
   const hand = side => ({ pos: gripAt(side, .035), moving: true, curl: .2 });
   climb = { t: REDUCED ? CLIMB.end : 0, moves, from: { pos: cam.pos.clone(), yaw: wrapAngle(cam.yaw), pitch: cam.pitch }, hands: !REDUCED,
-    grabbed: -1, landed: -1, off: false, hand: { r: hand(1), l: hand(-1) } };
+    grabbed: -1, landed: -1, stepped: -1, let: -1, off: 0, bodyYaw: 0,
+    hand: { r: hand(1), l: hand(-1) }, foot: { r: footAt(1, -.6), l: footAt(-1, -.9) } };
+  ladderSound('cloth', .35); ladderSound('creak2', .3, .85, .5);
 }
-// ### One frame of the climb: where the eye is and where it looks, where each hand holds, sounds and dust.
+// ### One frame of the climb: where the eye is and where it looks, where each hand and boot is, sounds and dust.
 function updateClimb(dt){
   const c = climb, C = CLIMB, x = TUN.x, pose = { pos: new THREE.Vector3(), yaw: 0, pitch: -.5, roll: 0 };
   c.t += endStep;
@@ -2829,70 +2861,158 @@ function updateClimb(dt){
     const e = easeIO(c.t / C.mount);
     pose.pos.lerpVectors(c.from.pos, new THREE.Vector3(x, C.eye, C.eyeZ), e);
     pose.yaw = c.from.yaw * (1 - e); pose.pitch = c.from.pitch + (-.7 - c.from.pitch) * e;
-    for (const key of ['r', 'l']){ const h = c.hand[key]; h.moving = e < .7; h.curl = h.moving ? .2 : 1.2; }
+    for (const key of ['r', 'l']){ const h = c.hand[key]; h.moving = e < .7; h.curl = h.moving ? .2 : 1.25; }
+    c.bodyYaw = pose.yaw;
   } else if (c.t < C.mount + C.steps * C.step){
     const tt = (c.t - C.mount) / C.step, k = Math.floor(tt), u = tt - k, m = c.moves[k], s = m.key === 'r' ? 1 : -1;
     const mover = c.hand[m.key], other = c.hand[m.key === 'r' ? 'l' : 'r'];
     // the moving hand lets go, swings down a little away from the ladder and grabs the lower rung
     const uh = clamp(u / .5, 0, 1);
     mover.pos.lerpVectors(gripAt(s, m.from), gripAt(s, m.to), easeIO(uh));
-    mover.pos.z += Math.sin(Math.PI * uh) * .045; mover.pos.y += Math.sin(Math.PI * uh) * .03;
-    mover.moving = uh > .04 && uh < .96; mover.curl = mover.moving ? .15 : 1.2;
-    other.moving = false; other.curl = 1.2;
-    // then the body sinks one rung, leaning a little over the foot that steps down
+    mover.pos.z += Math.sin(Math.PI * uh) * .06; mover.pos.y += Math.sin(Math.PI * uh) * .03;
+    mover.moving = uh > .04 && uh < .96; mover.curl = mover.moving ? .15 : 1.25;
+    other.moving = false; other.curl = 1.25;
+    // the boot on the other side steps down to its next rung, lifted a little off the ladder on the way
+    const uf = clamp((u - .2) / .45, 0, 1), fs = m.foot === 'r' ? 1 : -1;
+    c.foot[m.foot].lerpVectors(footAt(fs, m.footFrom), footAt(fs, m.footTo), easeIO(uf));
+    c.foot[m.foot].z += Math.sin(Math.PI * uf) * .09; c.foot[m.foot].y += Math.sin(Math.PI * uf) * .04;
+    // then the body sinks one rung, leaning a little over the boot that stepped down
     const ed = easeIO(clamp((u - .35) / .6, 0, 1)), sw = Math.sin(Math.PI * ed), look = tt;
     pose.pos.set(x + s * .03 * sw, C.eye - .3 * (k + ed) + sw * .012, C.eyeZ);
     pose.roll = s * .035 * sw;
-    // a glance down past your feet early on, a look at the note on the left rail as you pass it
+    // at first you look further down at your hands, then a glance down past your boots, then the note on the left rail
     const down = bump(look, 1.9, 3.5), note = bump(look, 4.3, 6.1);
-    pose.pitch = -.5 - .22 * clamp(1 - tt / 2, 0, 1) + .05 * sw - .6 * down + .32 * note;   // at first you look further down, at your hands
+    pose.pitch = -.5 - .22 * clamp(1 - tt / 2, 0, 1) + .05 * sw - .6 * down + .32 * note;
     pose.yaw = -s * .03 * sw - .42 * note;
-    if (uh >= 1 && c.grabbed !== k){ c.grabbed = k; dustFall(10, mover.pos.x, mover.pos.y, mover.pos.z, .1); if (ac) noise(.05, .05, 'bandpass', 1500); }
-    if (ed >= 1 && c.landed !== k){
+    c.bodyYaw = -s * .03 * sw;
+    if (uh > .05 && c.let !== k){ c.let = k; ladderSound('cloth', .16, 1.1 + Math.random() * .2); }
+    if (uh >= 1 && c.grabbed !== k){
+      c.grabbed = k; dustFall(10, mover.pos.x, mover.pos.y, mover.pos.z, .1);
+      if (!ladderSound('grab', .5, .9 + Math.random() * .2)) noise(.05, .05, 'bandpass', 1500);
+      ladderSound(k % 2 ? 'rung1' : 'rung2', .1, 1.5 + Math.random() * .2, .02);   // the palm slaps the wood
+    }
+    if (uf >= 1 && c.stepped !== k){
+      c.stepped = k; dustFall(8, x + fs * .1, m.footTo, TUN.ladderZ, .15);
+      // the boot lands on the rung: a boot on wood from the footsteps, else a knock from the ladder's own recordings
+      if (!footstep('rung', STEP_VOL.rung * 1.3, .9) && !ladderSound(k % 2 ? 'rung1' : 'rung2', .55, .8 + Math.random() * .15)) noise(.1, .1, 'lowpass', 320);
+    }
+    if (ed >= .6 && c.landed !== k){
       c.landed = k;
-      if (ac){ if (!footstep('rung', STEP_VOL.rung)) noise(.1, .1, 'lowpass', 320); tone(130 + Math.random() * 70, .28, 'sawtooth', .01, 85); }   // a boot on the rung, the old wood creaks
-      dustFall(8, x, Math.round((pose.pos.y - 1.5) / .3) * .3, TUN.ladderZ, .3);
+      if (!ladderSound(k % 2 ? 'creak2' : 'creak1', .3 + Math.random() * .15, .75 + Math.random() * .3)) tone(130 + Math.random() * 70, .28, 'sawtooth', .01, 85);   // the old wood creaks under your weight
     }
   } else {
-    // at the bottom: step off the last rung, let go, step back and turn round to face the tunnel
+    // at the bottom: step off the last rung onto the stone floor, let go, step back and turn round to face the tunnel
     const v = clamp((c.t - C.mount - C.steps * C.step) / C.off, 0, 1), e = easeIO(v), last = new THREE.Vector3(x, C.eye - .3 * C.steps, C.eyeZ);
     pose.pos.copy(last).lerp(bottom, easeIO(clamp(v * 1.6, 0, 1)));
     pose.yaw = Math.PI * easeIO(clamp((v - .2) / .8, 0, 1)); pose.pitch = -.5 + .4 * e;
+    c.bodyYaw = pose.yaw;
     if (v > .2) c.hands = false;
-    if (!c.off){ c.off = true; if (ac && !footstep('floor', STEP_VOL.floor * 1.2, .85)) noise(.16, .16, 'lowpass', 220); dustFall(14, x, TUN.floor + .3, C.eyeZ - .1, .4); }
-    if (v > .55 && !c.back){ c.back = true; if (ac) footstep('floor', STEP_VOL.floor * .8, .9); }   // the step back onto the tunnel floor
+    if (c.off === 0){ c.off = 1; ladderSound('creak1', .3, .7); if (!ladderSound('floor', .6, .9)) noise(.16, .16, 'lowpass', 220); dustFall(14, x, TUN.floor + .3, C.eyeZ - .1, .4); }
+    if (c.off === 1 && v > .3){ c.off = 2; ladderSound('floor', .45, 1.05); ladderSound('cloth', .14, 1.2); }
+    if (c.off === 2 && v > .62){ c.off = 3; ladderSound('floor', .35, .95); }
   }
-  if (REDUCED){ const v = VIEWS.tunnel, a = anglesTo(v.pos, v.look); pose.pos.fromArray(v.pos); pose.yaw = a.yaw; pose.pitch = a.pitch; pose.roll = 0; }
+  if (REDUCED){ const v = VIEWS.tunnel, a = anglesTo(v.pos, v.look); pose.pos.fromArray(v.pos); pose.yaw = a.yaw; pose.pitch = a.pitch; pose.roll = 0; c.hands = false; }
   return pose;
 }
-// ### The hands on the ladder: each wrist sits just behind and below the rung it holds (or travels to the next one), so
-// ### the fingers close over the wood; the hands are fixed to the rungs in the world, so they stay put while you sink.
-const _inv = new THREE.Matrix4(), _m4 = new THREE.Matrix4(), _qw = new THREE.Quaternion(), _qr = new THREE.Quaternion(), _hv = new THREE.Vector3(), _sh = new THREE.Vector3(), _up = new THREE.Vector3(), _z = new THREE.Vector3(0, 0, 1);
+// ### Your body on the ladder, drawn with the hands (so a wall never hides it): the chest in the striped uniform, the
+// ### shoulders, the upper arms and elbows, the legs with knees and boots. Built the first time you climb.
+let ME = null;
+function buildBody(){
+  const cloth = prisonCloth(256, 256, [2, 4.2], .25);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, roughness: .97, map: cloth.map, bumpMap: cloth.bump, bumpScale: .0004 });
+  const leather = new THREE.MeshStandardMaterial({ color: 0x17120e, roughness: .55, envMapIntensity: .25 });
+  const g = new THREE.Group(); handScene.add(g);
+  const mesh = (geo, m) => { const o = new THREE.Mesh(geo, m || mat); o.frustumCulled = false; g.add(o); return o; };
+  // a limb runs from y = 0 (radius r0) to y = 1 (radius r1); it is stretched to its length
+  const limb = (r0, r1) => mesh(new THREE.CylinderGeometry(r1, r0, 1, 14, 1, true).translate(0, .5, 0));
+  const ball = r => mesh(new THREE.SphereGeometry(r, 14, 10));
+  const two = f => [f(), f()];
+  return { g, torso: mesh(new THREE.CylinderGeometry(1, .84, 1, 22).translate(0, -.5, 0)),
+    shoulder: two(() => ball(.062)), upper: two(() => limb(.058, .048)), elbow: two(() => ball(.047)),
+    hip: two(() => ball(.08)), thigh: two(() => limb(.078, .062)), knee: two(() => ball(.062)), shin: two(() => limb(.058, .045)),
+    boot: two(() => mesh(new THREE.BoxGeometry(.105, .085, .27).translate(0, -.01, -.05), leather)) };
+}
+// ### Where the middle joint goes for a limb from root to end with two bones of lengths a and b, bending towards pole.
+function twoBone(root, end, a, b, pole){
+  const d = end.clone().sub(root), dist = clamp(d.length(), Math.abs(a - b) + .01, a + b - .002); d.normalize();
+  const along = (a * a - b * b + dist * dist) / (2 * dist), h = Math.sqrt(Math.max(0, a * a - along * along));
+  const p = pole.clone().sub(d.clone().multiplyScalar(pole.dot(d))).normalize();
+  return root.clone().add(d.multiplyScalar(along)).add(p.multiplyScalar(h));
+}
+const _inv = new THREE.Matrix4(), _m4 = new THREE.Matrix4(), _qw = new THREE.Quaternion(), _qc = new THREE.Quaternion(), _qy = new THREE.Quaternion();
+const _hv = new THREE.Vector3(), _up = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _ax = new THREE.Vector3();
+const AXIS_X = new THREE.Vector3(1, 0, 0), AXIS_Y = new THREE.Vector3(0, 1, 0), AXIS_Z = new THREE.Vector3(0, 0, 1);
+const toCam = v => v.clone().applyMatrix4(_inv);
+// ### Stretches a limb from world point A to world point B.
+function placeLimb(m, A, B){
+  _a.copy(A).applyMatrix4(_inv); _b.copy(B).applyMatrix4(_inv).sub(_a);
+  const len = _b.length(); m.position.copy(_a); m.quaternion.setFromUnitVectors(AXIS_Y, _b.divideScalar(len || 1)); m.scale.set(1, len, 1);
+}
+const FOREARM = .29, UPPER_ARM = .31, THIGH = .46, SHIN = .46;
+// ### The hands on the ladder and the body they belong to. Each hand closes round its rung: the wrist sits so that the
+// ### rung lies across the palm at the base of the fingers, and the hands are fixed to the rungs in the world, so they
+// ### stay put while you sink. Each forearm runs from the wrist to an elbow found from the shoulder (two bones), so the
+// ### arms always reach your shoulders; the legs are solved the same way from the hips to the boots on the rungs.
 function climbHands(dt){
+  if (!ME) ME = buildBody();
   HANDS.down += (0 - HANDS.down) * (1 - Math.exp(-dt * 6));
   camera.updateMatrixWorld();
   _inv.copy(camera.matrixWorld).invert();
+  camera.getWorldQuaternion(_qc).invert();
+  // the body turns with the climb, not with the head: forward, right and the base of the neck
+  const by = climb.bodyYaw, fwd = new THREE.Vector3(Math.sin(by), 0, -Math.cos(by)), right = new THREE.Vector3(Math.cos(by), 0, Math.sin(by));
+  const neck = camera.position.clone().add(new THREE.Vector3(0, -.2, 0)).addScaledVector(fwd, -.09);
+  const hips = neck.clone().add(new THREE.Vector3(0, -.6, 0)).addScaledVector(fwd, .03);
+  _qy.setFromAxisAngle(AXIS_Y, -by);
+  ME.g.visible = true;
+  HANDS.scaled = true;
   for (const key of ['r', 'l']){
-    const h = HANDS[key], g = climb.hand[key], side = key === 'r' ? 1 : -1;
-    _hv.copy(g.pos); _hv.y -= .045; _hv.z += .05; _hv.applyMatrix4(_inv); _hv.y -= HANDS.down * .35;
+    const h = HANDS[key], g = climb.hand[key], side = key === 'r' ? 1 : -1, i = key === 'r' ? 0 : 1;
+    // the rung sits across the palm: the wrist is a hand's breadth back along the forearm and a little to the back of the hand
+    const zl = _a.copy(AXIS_Z).applyQuaternion(h.arm.quaternion), yl = _b.copy(AXIS_Y).applyQuaternion(h.arm.quaternion);
+    _hv.copy(g.pos).applyMatrix4(_inv).addScaledVector(zl, .075).addScaledVector(yl, .032); _hv.y -= HANDS.down * .35;
     const P = h.p.toArray(), V = h.v.toArray(), T = _hv.toArray();
-    for (let i = 0; i < 3; i++) [P[i], V[i]] = spring(P[i], V[i], T[i], g.moving ? 420 : 2600, g.moving ? 36 : 100, dt);
+    for (let n = 0; n < 3; n++) [P[n], V[n]] = spring(P[n], V[n], T[n], g.moving ? 420 : 2600, g.moving ? 36 : 100, dt);
     h.p.fromArray(P); h.v.fromArray(V); h.w.set(0, 0, 0);
     h.arm.position.copy(h.p);
-    // the forearm points back towards your shoulder (which turns with the body, not with the head), the back of the hand
-    // faces up and towards you, the thumb a little inwards
-    _sh.set(side * .2, -.32, .1).applyAxisAngle(new THREE.Vector3(0, 1, 0), -cam.yaw).add(cam.pos).applyMatrix4(_inv);
-    _up.set(0, 1, 0).transformDirection(_inv).add(_hv.clone().normalize().negate());
-    _m4.lookAt(_sh, h.p, _up);
-    _qw.setFromRotationMatrix(_m4).multiply(_qr.setFromAxisAngle(_z, -side * (g.moving ? .6 : .3)));
+    // the elbow, bent out and down, between the shoulder and the wrist
+    const shoulder = neck.clone().addScaledVector(right, side * .19).add(new THREE.Vector3(0, -.03, 0));
+    const wristW = h.p.clone().applyMatrix4(camera.matrixWorld);
+    const elbow = twoBone(shoulder, wristW, UPPER_ARM, FOREARM, right.clone().multiplyScalar(side * .8).add(new THREE.Vector3(0, -1, 0)).addScaledVector(fwd, -.3));
+    // the forearm points to the elbow, the back of the hand faces up and towards you, the thumb a little inwards
+    const elbowC = toCam(elbow);
+    _up.set(0, 1, 0).transformDirection(_inv).add(_ax.copy(h.p).normalize().negate());
+    _m4.lookAt(elbowC, h.p, _up);
+    _qw.setFromRotationMatrix(_m4).multiply(new THREE.Quaternion().setFromAxisAngle(AXIS_Z, -side * (g.moving ? .5 : .25)));
     h.arm.quaternion.slerp(_qw, 1 - Math.exp(-dt * (g.moving ? 12 : 28)));
     h.r.set(h.arm.rotation.x, h.arm.rotation.y, h.arm.rotation.z);   // so the usual springs carry on from here afterwards
     h.arm.visible = HANDS.down < .98;
-    if (!h.wrist) continue;
-    h.wrist.rotation.set(g.moving ? .1 : -.55, 0, 0); h.wr.set(0, 0); h.wv.set(0, 0);
-    for (let f = 0; f < 5; f++) h.curl[f] += ((f === 4 ? g.curl * .7 : g.curl) - h.curl[f]) * (1 - Math.exp(-dt * 14));
-    poseFingers(h, side, g.moving ? .12 : 0);
+    // the sleeve reaches exactly to the elbow
+    const fl = clamp(elbowC.distanceTo(h.p) / .485, .4, 1.2);
+    h.arm.children.forEach(o => { if (o.material === HAND_MAT.sleeve) o.scale.z = fl; });
+    placeLimb(ME.upper[i], elbow, shoulder);
+    ME.elbow[i].position.copy(elbowC); ME.shoulder[i].position.copy(toCam(shoulder));
+    if (h.wrist){
+      h.wrist.rotation.set(g.moving ? .1 : -.35, 0, 0); h.wr.set(0, 0); h.wv.set(0, 0);
+      for (let f = 0; f < 5; f++) h.curl[f] += ((f === 4 ? g.curl * .75 : g.curl) - h.curl[f]) * (1 - Math.exp(-dt * 14));
+      poseFingers(h, side, g.moving ? .12 : 0);
+    }
+    // the leg on this side: hip, knee bent towards the ladder, boot on its rung
+    const hip = hips.clone().addScaledVector(right, side * .1), ankle = climb.foot[key];
+    const knee = twoBone(hip, ankle, THIGH, SHIN, fwd.clone().addScaledVector(right, side * .25));
+    placeLimb(ME.thigh[i], hip, knee); placeLimb(ME.shin[i], knee, ankle);
+    ME.hip[i].position.copy(toCam(hip)); ME.knee[i].position.copy(toCam(knee));
+    const boot = ME.boot[i]; boot.position.copy(toCam(ankle)); boot.quaternion.copy(_qc).multiply(_qy);
   }
+  // the chest: an oval of 38 by 22 cm from the base of the neck to the hips, turned with the body
+  ME.torso.position.copy(toCam(neck)); ME.torso.quaternion.copy(_qc).multiply(_qy); ME.torso.scale.set(.19, neck.y - hips.y, .11);
+}
+// ### Puts the sleeves back to their own length and hides the body once you have let go of the ladder.
+function leaveLadder(){
+  if (!HANDS.scaled) return;
+  HANDS.scaled = false;
+  for (const key of ['r', 'l']) HANDS[key].arm.children.forEach(o => { if (o.material === HAND_MAT.sleeve) o.scale.z = 1; });
+  if (ME) ME.g.visible = false;
 }
 
 // ---------- Loop ----------

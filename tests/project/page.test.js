@@ -171,9 +171,9 @@ test('escape room: every scanned texture the room loads ships with it and is cre
   assert.match(read('README.md'), /Poly Haven.*CC0/);
 });
 
-test('escape room: the tap and air vent recordings ship with it, are served as audio and are credited as CC0; the API vent is allowed only from its two hosts', () => {
+test('escape room: the tap, air vent and ladder recordings ship with it, are served as audio and are credited as CC0; the API vent is allowed only from its two hosts', () => {
   const files = [...new Set([...escRoom.matchAll(/'sounds\/([a-z-]+\.mp3)'/g)].map(m => m[1]))].sort();
-  assert.deepEqual(files, ['air-vent.mp3', 'tap-water.mp3']);
+  assert.deepEqual(files, ['air-vent.mp3', 'ladder.mp3', 'tap-water.mp3']);
   // the footsteps: every recording room.js asks for ships with it, and each kind is credited
   const steps = JSON.parse(escRoom.match(/const STEP_FILES = (\{[^}]+\})/)[1].replace(/(\w+):/g, '"$1":'));
   assert.deepEqual(Object.keys(steps).sort(), ['floor', 'rung', 'wet']);
