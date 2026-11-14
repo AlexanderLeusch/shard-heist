@@ -75,7 +75,7 @@ shard-heist/
 │   ├── js/rules.js          the rules: scenes, items, clues, lock, clock, saved games (pure functions)
 │   ├── js/room.js           the 3D washroom, camera, markers, cards, sound
 │   ├── js/boot.js           error screen (load failures, no WebGL, unexpected errors)
-│   ├── textures/            CC0 scans from Poly Haven: concrete, cinder blocks, scratched steel, the vault HDRI
+│   ├── textures/            CC0 scans from Poly Haven: concrete, cinder blocks, scratched steel, the vault HDRI, the tunnel's brick, stone and wood
 │   ├── models/              the two hand models (MIT, WebXR Input Profiles) with their licence
 │   ├── sounds/              two CC0 recordings, the hot tap and the air vent, with their credits
 │   └── fonts/               the two fonts with their licences
@@ -120,7 +120,7 @@ shard-heist/
 |---|---|---|
 | Static website, no backend, no build step | Runs anywhere, free hosting on GitHub Pages, nothing to install or keep running, no server to attack | No online leaderboard |
 | three.js r128 from a CDN, pinned to one version, with SRI hashes | A proven 3D engine instead of raw WebGL; the hashes make the browser refuse any file that is not exactly the one we tested | r128 is from 2021; upgrading means re-testing the post-processing add-ons |
-| Everything procedural (buildings, textures, vehicles, sounds), except four CC0 scans from Poly Haven and two CC0 recordings (the hot tap and the air vent) in the escape room | Almost no image or audio files to license or download; the scans (concrete, cinder blocks, scratched steel and one HDRI for the steel's reflections, 1.7 MB) make the washroom photo-real where it matters, and the recordings (230 kB) make it sound like a real washroom | Stylised elsewhere |
+| Everything procedural (buildings, textures, vehicles, sounds), except eight CC0 scans from Poly Haven and two CC0 recordings (the hot tap and the air vent) in the escape room | Almost no image or audio files to license or download; the scans (concrete, cinder blocks, scratched steel and one HDRI for the steel's reflections, plus old brick, stone blocks, brick pavers and rough wood for the tunnel and its ladder, 2.7 MB) make the washroom and the tunnel photo-real where it matters, and the recordings (230 kB) make it sound like a real washroom | Stylised elsewhere |
 | Puddles in the escape room are real mirrors: the room is drawn a second time, smaller, from a camera under the floor | Reflections of what is really there (lamps, steel, the red glow) that move with you, instead of a fixed shine | A second, smaller drawing of the room while you move or look round; standing still it is not redrawn |
 | Rules split out into `core.js` | They can be tested in Node in milliseconds, and the rules are in one place | `game.js` still shares state between its sections |
 | Arcade physics (speed along the heading, collision circles) | Predictable, fun handling at 60 fps on modest hardware | No real tyre grip or weight transfer |
@@ -194,7 +194,7 @@ The team's working rules for people and coding agents are in [AGENTS.md](AGENTS.
 All radio music is composed and synthesised by the game at run time, so there are no music files or licences. The tunes are generated from seeded random walks. The classical station plays J. S. Bach's Prelude in C (BWV 846) and the Ode to Joy from Beethoven's Ninth Symphony, both in the public domain.
 
 
-Escape-room scans from [Poly Haven](https://polyhaven.com) (CC0, fetched through its public API and kept in `room-1-escape/textures/`): the textures *Hangar Concrete Floor*, *Concrete Wall 004* and *Blue Metal Plate*, and the HDRI *Bank Vault*. CC0 asks for no credit; we give it anyway.
+Escape-room scans from [Poly Haven](https://polyhaven.com) (CC0, fetched through its public API and kept in `room-1-escape/textures/`): the textures *Hangar Concrete Floor*, *Concrete Wall 004* and *Blue Metal Plate*, and the HDRI *Bank Vault*; for the tunnel under the hatch *Castle Brick 07* (Rob Tuytel), *Stone Brick Wall 001* (Dimitrios Savva, Rico Cilliers), *Worn Brick Floor* (Amal Kumar) and, for the ladder, *Rough Wood* (Rob Tuytel). The cobwebs and the dust are painted and animated in code. CC0 asks for no credit; we give it anyway.
 
 Escape-room recordings (CC0, kept in `room-1-escape/sounds/` with their sources in `CREDITS.md`): the hot tap is *tap-water-1* from Owlish Media's *Sound Effects Pack* on OpenGameArt, and the air vent is *Fan* by lllBabaBooeylll on Freesound (536942). Both are bundled with the game, so no sound service is called while playing.
 

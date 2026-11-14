@@ -1028,10 +1028,250 @@ const wheelTex = [0, 1, 2, 3].map(() => digitTex());
 wheelTex.forEach((t, i) => { const wm = new THREE.Mesh(new THREE.PlaneGeometry(.036, .04), new THREE.MeshBasicMaterial({ map: t })); wm.position.set(-.06 + i * .04, 0, .0255); lockGroup.add(wm); drawDigit(t, 0); });
 hot('lock', lockBody, lid);
 HOT['go:hatch'] = HOT.lock;   // from the stall, clicking the hatch kneels you down at it
-const shaft = new THREE.Mesh(new THREE.BoxGeometry(HS, 4, HS), new THREE.MeshStandardMaterial({ color: 0x2b2a27, roughness: 1, side: THREE.BackSide }));
-shaft.position.set(HATCH.x, -2.01, HATCH.z); room.add(shaft);
-for (let y = -.3; y > -3.9; y -= .3){ const r = new THREE.Mesh(new THREE.CylinderGeometry(.012, .012, .42, 8), M.dullSteel); r.rotation.z = Math.PI / 2; r.position.set(HATCH.x, y, HATCH.z - HS / 2 + .08); room.add(r); }
-const tunnelLight = new THREE.PointLight(0xffb066, 0, 5, 2); tunnelLight.position.set(HATCH.x, -3.4, HATCH.z); tunnelLight.visible = false; room.add(tunnelLight);
+
+// ---------- The tunnel under the hatch ----------
+// ### Below the hatch an old brick shaft drops 3.6 m into a vaulted catacomb passage that runs off under the corridor:
+// ### walls of rough stone blocks, a barrel vault of old brick and a floor of worn brick pavers. The surfaces are CC0
+// ### scans from Poly Haven ("Castle Brick 07", "Stone Brick Wall 001", "Worn Brick Floor"), fetched once through its
+// ### free public API (no key) and kept in room-1-escape/textures. An old wooden ladder ("Rough Wood" scan) is bolted
+// ### to the north wall, with Hale's note taped to it. Nobody has been down here for years: cobwebs fill the corners and
+// ### hang from the vault, and dust drifts in the light of two old bulbs. It is only ever seen through the hatch, and
+// ### its lights and dust only exist from the moment the hatch opens.
+const TUN = { x: HATCH.x, zN: HATCH.z - HS / 2, zS: 6.4, floor: -3.6, spring: -2.1, r: .65 };
+TUN.crown = TUN.spring + TUN.r;
+TUN.ladderZ = TUN.zN + .14;
+TUN.mid = (TUN.zN + TUN.zS) / 2;
+TUN.len = TUN.zS - TUN.zN;
+const trnd = mulberry32(1912);   // its own random numbers, so the room above keeps its look
+// ### Scales a geometry's texture coordinates so that one picture covers the same number of metres on every surface.
+const uvMetres = (geo, su, sv) => { const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv); return geo; };
+// ### A scanned surface for the tunnel; the tint (linear) greys it with the dust of decades.
+function tunnelMat(color, normal, tint, o){
+  const m = new THREE.MeshStandardMaterial(Object.assign({ map: SCAN(color, true), normalMap: SCAN(normal, false, 1, 1, 4),
+    roughness: .95, side: THREE.DoubleSide }, o));
+  m.color.setRGB(tint[0], tint[1], tint[2]);
+  return m;
+}
+const TM = {
+  brick: tunnelMat('tunnel-brick-color.jpg', 'tunnel-brick-normal.jpg', [.5, .45, .44], { roughnessMap: SCAN('tunnel-brick-rough.jpg', false, 1, 1, 2), roughness: 1 }),
+  stone: tunnelMat('tunnel-stone-color.jpg', 'tunnel-stone-normal.jpg', [.68, .64, .6]),
+  floor: tunnelMat('tunnel-floor-color.jpg', 'tunnel-floor-normal.jpg', [.6, .57, .54], { side: THREE.FrontSide }),
+  wood: tunnelMat('ladder-wood-color.jpg', 'ladder-wood-normal.jpg', [.86, .78, .68], { side: THREE.FrontSide }),
+  iron: new THREE.MeshStandardMaterial({ color: 0x3b2c22, roughness: .75, metalness: .55 })
+};
+// ### A flat piece of tunnel; `tile` is how many metres one picture of the scan covers.
+function tplane(w, h, mat, tile, x, y, z, rx, ry){
+  const m = new THREE.Mesh(uvMetres(new THREE.PlaneGeometry(w, h), w / tile, h / tile), mat);
+  m.position.set(x, y, z); m.rotation.set(rx || 0, ry || 0, 0); room.add(m); return m;
+}
+// ### A box in the tunnel (it casts no shadow: no shadow-casting light reaches down here).
+const tbox = (w, h, d, mat, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); room.add(m); return m; };
+{
+  const { x, zN, zS, floor, spring, r, crown } = TUN, zV = zN + HS, vLen = zS - zV;
+  // the brick shaft under the hatch, down to the height of the vault's crown
+  tplane(HS, -crown, TM.brick, 2.5, x, crown / 2, zN);
+  tplane(HS, -crown, TM.brick, 2.5, x, crown / 2, zV);
+  tplane(HS, -crown, TM.brick, 2.5, x - HS / 2, crown / 2, HATCH.z, 0, Math.PI / 2);
+  tplane(HS, -crown, TM.brick, 2.5, x + HS / 2, crown / 2, HATCH.z, 0, Math.PI / 2);
+  // where the shaft opens into the tunnel: a flat brick ceiling on each side of it, stone up to it
+  for (const s of [-1, 1]){
+    tplane((r - HS / 2), HS, TM.brick, 2.5, x + s * (r + HS / 2) / 2, crown, HATCH.z, -Math.PI / 2);
+    tplane(HS, r, TM.stone, 2.5, x + s * r, spring + r / 2, HATCH.z, 0, Math.PI / 2);
+    tplane(TUN.len, spring - floor, TM.stone, 2.5, x + s * r, (spring + floor) / 2, TUN.mid, 0, Math.PI / 2);
+  }
+  tplane(r * 2, crown - floor, TM.stone, 2.5, x, (crown + floor) / 2, zN);   // the north wall behind the ladder
+  tplane(r * 2, TUN.len, TM.floor, 2, x, floor, TUN.mid, -Math.PI / 2);
+  // the barrel vault, and the brick face where it starts beside the shaft
+  const vault = new THREE.Mesh(uvMetres(new THREE.CylinderGeometry(r, r, vLen, 20, 1, true, Math.PI / 2, Math.PI), Math.PI * r / 2.5, vLen / 2.5).rotateX(Math.PI / 2), TM.brick);
+  vault.position.set(x, spring, zV + vLen / 2); room.add(vault);
+  const face = new THREE.Shape(); face.moveTo(-r, 0); face.lineTo(-r, r); face.lineTo(r, r); face.lineTo(r, 0); face.absarc(0, 0, r, 0, Math.PI, false);
+  const faceM = new THREE.Mesh(uvMetres(new THREE.ShapeGeometry(face, 12), 1 / 2.5, 1 / 2.5), TM.brick); faceM.position.set(x, spring, zV); room.add(faceM);
+  // the far end: a stone wall under a brick half-moon, and an old plank door with cold night light coming in under it
+  tplane(r * 2, spring - floor, TM.stone, 2.5, x, (spring + floor) / 2, zS, 0, Math.PI);
+  const moon = new THREE.Mesh(uvMetres(new THREE.CircleGeometry(r, 18, 0, Math.PI), 1 / 2.5, 1 / 2.5), TM.brick); moon.position.set(x, spring, zS); moon.rotation.y = Math.PI; room.add(moon);
+  const door = new THREE.Mesh(uvMetres(new THREE.BoxGeometry(.78, 1.72, .06), 1.6, 3.4), TM.wood); door.position.set(x, floor + .87, zS - .04); room.add(door);
+  for (const y of [floor + .35, floor + 1.45]) tbox(.8, .06, .02, TM.iron, x, y, zS - .08);
+  const gap = new THREE.Mesh(new THREE.PlaneGeometry(.74, .014), new THREE.MeshBasicMaterial({ color: 0x9fb4c8 })); gap.position.set(x, floor + .008, zS - .072); gap.rotation.y = Math.PI; room.add(gap);
+  // rubble and broken bricks along the walls
+  for (let i = 0; i < 26; i++){
+    const s = .04 + trnd() * .09, side = trnd() < .5 ? -1 : 1;
+    const st = new THREE.Mesh(new THREE.DodecahedronGeometry(s, 0), trnd() < .5 ? TM.stone : TM.brick);
+    st.scale.set(1, .45 + trnd() * .3, .8 + trnd() * .4); st.rotation.set(trnd() * 3, trnd() * 3, trnd() * 3);
+    st.position.set(x + side * (r - .06 - trnd() * .18), floor + s * .3, zV + .3 + trnd() * (vLen - .8)); room.add(st);
+  }
+  // the wooden ladder: two rough rails on iron brackets and eleven rungs, none quite level
+  const top = -.03, len = top - floor;
+  for (const s of [-1, 1]){
+    const rail = new THREE.Mesh(uvMetres(new THREE.BoxGeometry(.055, len, .045), .11, len / .5), TM.wood);
+    rail.position.set(x + s * .21, (top + floor) / 2, TUN.ladderZ); rail.rotation.z = s * .004; room.add(rail);
+    for (const y of [-.55, -1.95, -3.2]){ tbox(.07, .045, .15, TM.iron, x + s * .21, y, zN + .075); }
+  }
+  for (let i = 1; i <= 11; i++){
+    const g = uvMetres(new THREE.CylinderGeometry(.019, .021, .47, 10), .12 / .5, .47 / .5).rotateZ(Math.PI / 2);
+    const rung = new THREE.Mesh(g, TM.wood); rung.position.set(x + (trnd() - .5) * .01, -i * .3 + (trnd() - .5) * .012, TUN.ladderZ); rung.rotation.set(trnd() * 3, (trnd() - .5) * .03, (trnd() - .5) * .025); room.add(rung);
+  }
+  // Hale's note, taped to the left rail where you pass it on the way down
+  const note = new THREE.Mesh(new THREE.PlaneGeometry(.15, .11), new THREE.MeshStandardMaterial({ roughness: .9, map: canvasTex(384, 280, (g, w, h) => {
+    g.fillStyle = '#d9d0b8'; g.fillRect(0, 0, w, h);
+    grime(g, w, h, 6, 'rgba(120,96,60,.2)', 60, false);
+    g.fillStyle = 'rgba(220,214,190,.8)'; g.fillRect(w * .38, 0, w * .24, 26);   // the tape
+    g.fillStyle = '#23262c'; g.font = 'italic 600 34px Georgia, serif';
+    ['Took you long enough.', 'A car is waiting at the', 'end of the tunnel.', '— H.'].forEach((l, i) => g.fillText(l, i === 3 ? w - 110 : 22, 76 + i * 52));
+  }) }));
+  note.position.set(x - .21, -1.05, TUN.ladderZ + .024); note.rotation.z = .06; room.add(note);
+  // two old bulbs on the walls, in wire cages
+  for (const [bx, bz] of [[x + r - .05, .15], [x - r + .05, 4.6]]){
+    const s = Math.sign(bx - x);
+    tbox(.03, .05, .1, TM.iron, bx, -1.92, bz);
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(.032, 12, 8), new THREE.MeshStandardMaterial({ color: 0xffe2b0, emissive: 0xffb45e, emissiveIntensity: 2.2 }));
+    bulb.position.set(bx - s * .07, -1.95, bz); room.add(bulb);
+    for (let k = 0; k < 3; k++){ const ring = new THREE.Mesh(new THREE.TorusGeometry(.046, .0025, 4, 16), TM.iron); ring.position.copy(bulb.position); ring.rotation.set(Math.PI / 2 * (k === 0), k * Math.PI / 3, 0); room.add(ring); }
+  }
+}
+const tunnelLight = new THREE.PointLight(0xffb066, 0, 7, 2); tunnelLight.position.set(TUN.x + TUN.r - .15, -1.95, .15); tunnelLight.visible = false; room.add(tunnelLight);
+const tunnelLight2 = new THREE.PointLight(0xffa458, 0, 4.5, 2); tunnelLight2.position.set(TUN.x - TUN.r + .15, -1.95, 4.6); tunnelLight2.visible = false; room.add(tunnelLight2);
+
+// ### Cobwebs, painted on canvases: a web across a corner (threads anchored on the walls, radial threads from a hub, a
+// ### sagging spiral that is torn in places, grey dust caught in it) and long single strands that hang from the vault.
+const webTex = canvasTex(512, 512, (g, w, h) => {
+  g.clearRect(0, 0, w, h);
+  const hub = [w * (.45 + trnd() * .1), h * (.28 + trnd() * .08)], n = 15, rad = [];
+  for (let i = 0; i < n; i++){
+    const a = Math.PI * 2 * (i + (trnd() - .5) * .5) / n, dx = Math.cos(a), dy = Math.sin(a);
+    // how far the thread runs before it reaches the edge of the picture; the lower threads end free, so the web sags
+    const lx = dx > 0 ? (w - hub[0]) / dx : dx < 0 ? -hub[0] / dx : 1e9, ly = dy > 0 ? (h - hub[1]) / dy : dy < 0 ? -hub[1] / dy : 1e9;
+    let L = Math.min(lx, ly) - 2; if (dy > .3) L *= .5 + trnd() * .25;
+    rad.push([dx, dy, L]);
+  }
+  g.lineCap = 'round';
+  g.strokeStyle = 'rgba(232,229,220,.62)'; g.lineWidth = 1.7;
+  for (const [dx, dy, L] of rad){ g.beginPath(); g.moveTo(hub[0], hub[1]); g.lineTo(hub[0] + dx * L, hub[1] + dy * L); g.stroke(); }
+  const P = (i, f) => { const [dx, dy, L] = rad[(i + n) % n]; return [hub[0] + dx * L * f, hub[1] + dy * L * f]; };
+  g.lineWidth = 1.25;
+  for (let k = 1; k <= 13; k++){
+    const f = Math.pow(k / 13, 1.15) * .97;
+    for (let i = 0; i < n; i++){
+      if (trnd() < .13) continue;   // torn
+      const a = P(i, f), b = P(i + 1, f), sag = 3 + f * 9;
+      g.strokeStyle = `rgba(232,229,220,${.35 + trnd() * .35})`;
+      g.beginPath(); g.moveTo(a[0], a[1]); g.quadraticCurveTo((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + sag, b[0], b[1]); g.stroke();
+      if (trnd() < .05){ g.beginPath(); g.moveTo(a[0], a[1]); g.quadraticCurveTo(a[0] + 6, a[1] + 20, a[0] + (trnd() - .5) * 20, a[1] + 30 + trnd() * 50); g.stroke(); }   // a loose end
+    }
+  }
+  // the free lower edge, sagging from one loose end to the next
+  g.strokeStyle = 'rgba(232,229,220,.4)';
+  for (let i = 0; i < n; i++){ if (rad[i][1] > .3 && rad[(i + 1) % n][1] > .3){ const a = P(i, 1), b = P(i + 1, 1); g.beginPath(); g.moveTo(a[0], a[1]); g.quadraticCurveTo((a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 22, b[0], b[1]); g.stroke(); } }
+  // dust caught in the threads, thickest near the hub, and a grey film where it has gathered for years
+  for (let i = 0; i < 70; i++){
+    const p = P(Math.floor(trnd() * n), Math.pow(trnd(), 1.6)), s = 1.5 + trnd() * 5;
+    const gr = g.createRadialGradient(p[0], p[1], 0, p[0], p[1], s); gr.addColorStop(0, 'rgba(206,200,188,.5)'); gr.addColorStop(1, 'rgba(206,200,188,0)');
+    g.fillStyle = gr; g.fillRect(p[0] - s, p[1] - s, s * 2, s * 2);
+  }
+  const film = g.createRadialGradient(hub[0], hub[1], 0, hub[0], hub[1], w * .35); film.addColorStop(0, 'rgba(210,205,195,.16)'); film.addColorStop(1, 'rgba(210,205,195,0)');
+  g.fillStyle = film; g.fillRect(0, 0, w, h);
+});
+const strandTex = canvasTex(64, 512, (g, w, h) => {
+  g.clearRect(0, 0, w, h); g.lineCap = 'round';
+  for (let i = 0; i < 4; i++){
+    let x = 8 + trnd() * (w - 16); const end = h * (.45 + trnd() * .55);
+    g.strokeStyle = `rgba(232,229,220,${.4 + trnd() * .3})`; g.lineWidth = 1.2;
+    g.beginPath(); g.moveTo(x, 0); for (let y = 16; y < end; y += 16){ x += (trnd() - .5) * 3; g.lineTo(x, y); } g.stroke();
+    const s = 2 + trnd() * 4, gr = g.createRadialGradient(x, end, 0, x, end, s); gr.addColorStop(0, 'rgba(206,200,188,.7)'); gr.addColorStop(1, 'rgba(206,200,188,0)');
+    g.fillStyle = gr; g.fillRect(x - s, end - s, s * 2, s * 2);   // a clump of dust at the end
+  }
+});
+for (const t of [webTex, strandTex]) t.anisotropy = 2;
+const WEB = { web: new THREE.MeshStandardMaterial({ map: webTex, color: 0xb4b0a8, transparent: true, depthWrite: false, side: THREE.DoubleSide, roughness: 1 }),
+  strand: new THREE.MeshStandardMaterial({ map: strandTex, color: 0xb4b0a8, transparent: true, depthWrite: false, side: THREE.DoubleSide, roughness: 1 }) };
+// ### Hangs a web of w x h metres at (x, y, z), facing along (nx, ny, nz); the top of the picture is the side nearest the ceiling.
+function web(mat, w, h, x, y, z, nx, ny, nz){
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+  m.position.set(x, y, z); m.lookAt(x + nx, y + ny, z + nz); room.add(m); return m;
+}
+{
+  const { x, zN, r, crown, spring, floor } = TUN, zV = zN + HS, hs = HS / 2;
+  // across the four upright corners of the shaft, just under the floor, and lower down in two of them
+  for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]){
+    const cx = x + sx * hs, cz = sz > 0 ? zN : zV, s = .2 + trnd() * .08;
+    web(WEB.web, s * 1.414, .34 + trnd() * .12, cx - sx * s / 2, -.24 - trnd() * .06, cz + sz * s / 2, -sx, 0, sz);
+  }
+  web(WEB.web, .3, .3, x + hs - .1, -.95, zV - .1, -1, 0, -1);
+  web(WEB.web, .26, .3, x - hs + .09, -1.25, zV - .09, 1, 0, -1);
+  // between the ladder rails and the wall
+  for (const [s, y] of [[-1, -.75], [1, -1.6], [-1, -2.55], [1, -3.2]]) web(WEB.web, .13, .24, x + s * .21, y, zN + .065, s, 0, 0);
+  // where the flat ceiling meets the side walls beside the shaft, and in the corners of the north wall
+  for (const s of [-1, 1]){
+    web(WEB.web, HS * .9, .3, x + s * (r - .1), crown - .1, HATCH.z, -s, -1, 0);
+    web(WEB.web, .42, .5, x + s * (r - .15), crown - .3, zN + .15, -s, 0, 1);
+    web(WEB.web, .3, .34, x + s * (r - .1), floor + .5, zN + .1, -s, 0, 1);
+  }
+  // big webs spanning the vault further down the tunnel, the corners by the far door, and strands from the vault
+  web(WEB.web, 1.2, .62, x, crown - .3, 1.7, 0, 0, -1);
+  web(WEB.web, 1.1, .55, x + .05, crown - .27, 3.9, 0, 0, -1);
+  for (const s of [-1, 1]) web(WEB.web, .4, .55, x + s * (r - .14), spring - .1, TUN.zS - .14, -s, 0, -1);
+  // along the top of the side walls, where the vault curves away, webs sag between the stones and the bricks
+  for (const [s, z, w] of [[1, .7, .7], [-1, 1.3, .5], [-1, 2.5, .8], [1, 3.3, .6], [-1, 4.2, .5], [1, 5.3, .7]]) web(WEB.web, w, .34, x + s * (r - .1), spring + .2, z, -s, -.8, 0);
+  for (let i = 0; i < 16; i++){
+    const z = zV + .2 + trnd() * (TUN.zS - zV - .5), dx = (trnd() - .5) * .9, top = spring + Math.sqrt(r * r - dx * dx), len = .2 + trnd() * .45, a = trnd() * 6.3;
+    web(WEB.strand, .07, len, x + dx, top - len / 2, z, Math.sin(a), 0, Math.cos(a));
+  }
+  for (let i = 0; i < 6; i++){
+    const a = trnd() * 6.3, len = .2 + trnd() * .3, s = trnd() < .5 ? -1 : 1;
+    web(WEB.strand, .07, len, x + s * (hs + .05 + trnd() * .18), crown - len / 2, zN + .1 + trnd() * (HS - .2), Math.sin(a), 0, Math.cos(a));
+  }
+}
+
+// ### Dust: motes drifting in the still air of the shaft and the tunnel, which only show where the bulbs light them, and
+// ### dust that trickles down from the hatch rim when the lid opens and from each rung your hands grab.
+const DUST_N = 650, DUST_FREE = 480;
+const dust = (() => {
+  const geo = new THREE.BufferGeometry(), pos = new Float32Array(DUST_N * 3), col = new Float32Array(DUST_N * 3);
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  const dot = canvasTex(32, 32, (g, w, h) => { const gr = g.createRadialGradient(16, 16, 0, 16, 16, 16); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(.4, 'rgba(255,255,255,.5)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size: .02, map: dot, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  pts.frustumCulled = false; pts.visible = false; room.add(pts);
+  return { pts, pos, col, vel: new Float32Array(DUST_N * 3), seed: Float32Array.from({ length: DUST_N }, () => trnd() * 100), next: DUST_FREE };
+})();
+// ### Puts a drifting mote somewhere in the shaft or the tunnel.
+function placeMote(i){
+  const p = dust.pos, v = dust.vel, { x, zN, r, floor, spring } = TUN;
+  if (trnd() < .3){ p[i * 3] = x + (trnd() - .5) * HS * .9; p[i * 3 + 1] = trnd() * TUN.crown; p[i * 3 + 2] = HATCH.z + (trnd() - .5) * HS * .9; }
+  else {
+    const y = floor + .05 + trnd() * (TUN.crown - floor - .1), half = y > spring ? Math.sqrt(Math.max(0, r * r - (y - spring) ** 2)) : r;
+    p[i * 3] = x + (trnd() - .5) * 2 * half * .9; p[i * 3 + 1] = y; p[i * 3 + 2] = zN + .1 + trnd() * (TUN.len - .4);
+  }
+  v[i * 3] = (trnd() - .5) * .03; v[i * 3 + 1] = (trnd() - .55) * .02; v[i * 3 + 2] = (trnd() - .5) * .03;
+}
+for (let i = 0; i < DUST_N; i++){ if (i < DUST_FREE) placeMote(i); else dust.pos[i * 3 + 1] = -100; }
+// ### Lets a few grains of dust fall from a spot (the hatch rim, a rung).
+function dustFall(n, x, y, z, spread){
+  for (let k = 0; k < n; k++){
+    const i = dust.next; dust.next = dust.next + 1 >= DUST_N ? DUST_FREE : dust.next + 1;
+    dust.pos[i * 3] = x + (trnd() - .5) * spread; dust.pos[i * 3 + 1] = y - trnd() * .03; dust.pos[i * 3 + 2] = z + (trnd() - .5) * spread * .4;
+    dust.vel[i * 3] = (trnd() - .5) * .08; dust.vel[i * 3 + 1] = -(.15 + trnd() * .5); dust.vel[i * 3 + 2] = (trnd() - .5) * .08;
+  }
+}
+// ### Moves the dust each frame and lights every grain by how close it is to the two bulbs (a mote in the dark is unseen).
+function updateDust(dt, t){
+  if (!dust.pts.visible) return;
+  const p = dust.pos, v = dust.vel, c = dust.col, l1 = tunnelLight.position, l2 = tunnelLight2.position, i1 = tunnelLight.intensity, i2 = tunnelLight2.intensity;
+  for (let i = 0; i < DUST_N; i++){
+    const j = i * 3, s = dust.seed[i];
+    if (p[j + 1] < -50) continue;
+    if (i < DUST_FREE){
+      p[j] += (v[j] + Math.sin(t * .4 + s) * .012) * dt; p[j + 1] += (v[j + 1] + Math.sin(t * .27 + s * 2) * .008) * dt; p[j + 2] += (v[j + 2] + Math.cos(t * .33 + s) * .012) * dt;
+      if (p[j + 1] < TUN.floor || p[j + 1] > 0 || Math.abs(p[j] - TUN.x) > TUN.r || p[j + 2] < TUN.zN || p[j + 2] > TUN.zS) placeMote(i);
+    } else {
+      v[j + 1] = Math.max(-.9, v[j + 1] - dt * .4);   // falling grains soon float at their own slow speed
+      p[j] += (v[j] + Math.sin(t * 2 + s) * .03) * dt; p[j + 1] += v[j + 1] * dt; p[j + 2] += v[j + 2] * dt;
+      if (p[j + 1] < TUN.floor) p[j + 1] = -100;
+    }
+    const d1 = (p[j] - l1.x) ** 2 + (p[j + 1] - l1.y) ** 2 + (p[j + 2] - l1.z) ** 2, d2 = (p[j] - l2.x) ** 2 + (p[j + 1] - l2.y) ** 2 + (p[j + 2] - l2.z) ** 2;
+    const b = .06 + i1 * .8 / (1 + d1 * 1.2) + i2 * .8 / (1 + d2 * 2) + (p[j + 1] > -1.2 ? .12 : 0), tw = .75 + .25 * Math.sin(t * 3 + s * 7);
+    c[j] = b * tw; c[j + 1] = b * tw * .88; c[j + 2] = b * tw * .7;
+  }
+  dust.pts.geometry.attributes.position.needsUpdate = true; dust.pts.geometry.attributes.color.needsUpdate = true;
+}
 
 // ### Details that make the washroom feel used and real: tiled skirting, soft shadows in every corner, a camera watching,
 // ### an air vent, the light switch and intercom by the door, a towel dispenser and a bin by the sinks, lamp housings.
@@ -1404,7 +1644,7 @@ const VIEWS = {
   sinks: { pos: [-2.15, 1.62, .1], look: [-4, 1.15, 0] },
   stall: { pos: [3.25, 1.62, -.95], look: [2.4, .55, -2.6] },
   hatch: { pos: [2.3, 1.02, -.86], look: [2.22, .05, -1.55] },
-  tunnel: { pos: [2.2, -2.6, -1.6], look: [2.2, -3.9, -1.95] },
+  tunnel: { pos: [2.2, -1.98, -1.1], look: [2.2, -2.12, 5] },
   cell: { pos: [0, 1.62, 1.1], look: [0, 1.45, 3] },
   closing: { pos: [.5, 1.5, -.3], look: [-.05, 1.05, 3] }
 };
@@ -1510,6 +1750,12 @@ function walk(dt){
 }
 // ### Moves the camera each frame: a glide when one runs, otherwise walking and looking.
 function updateCamera(dt){
+  if (climb){
+    const p = updateClimb(dt);
+    cam.pos.copy(p.pos); cam.yaw = cam.lookYaw = p.yaw; cam.pitch = cam.lookPitch = p.pitch; cam.bob = cam.sway = 0; cam.t = 1; cam.vel.set(0, 0, 0);
+    camera.position.copy(cam.pos); camera.rotation.set(p.pitch, -p.yaw, p.roll);
+    return;
+  }
   if (cam.t < 1){
     cam.t = Math.min(1, cam.t + dt / cam.dur);
     const e = cam.t < .5 ? 2 * cam.t * cam.t : 1 - Math.pow(-2 * cam.t + 2, 2) / 2;
@@ -1729,6 +1975,7 @@ function spring(x, v, target, k, damping, dt){
 // ### little behind the arms, and the fingers curl and open with the swing and drift on their own. Standing still, the
 // ### hands breathe and now and then make a small gesture. Using something sends the right hand forward, fingers open.
 function updateHands(dt){
+  if (climb && climb.hands){ climbHands(dt); return; }
   const show = !S.ending && hatchAnim < 0 && camera.position.y > 0;
   HANDS.down += ((show ? 0 : 1) - HANDS.down) * (1 - Math.exp(-dt * 5));
   const still = REDUCED ? 0 : 1, t = clock;
@@ -1781,18 +2028,25 @@ function updateHands(dt){
       const target = (CURL_REST[f] - swing * .12 + wobble(sd + 10 + f, t * 1.1) * .07 * still + gc[f]) * (1 - out * .8);
       h.curl[f] += (target - h.curl[f]) * (1 - Math.exp(-dt * (g ? 10 : 6)));
     }
-    const q = new THREE.Quaternion(), e = new THREE.Euler();
-    h.fingers.forEach((bones, f) => bones.forEach((j, n) => {
-      const c = h.curl[f] * [1, 1.25, .8][n], s = n ? 0 : side * (f - 1.5) * (.05 + spread * .5);
-      j.o.quaternion.copy(j.rest).multiply(q.setFromEuler(e.set(-c, s, 0)));
-    }));
-    h.thumb.forEach((j, n) => { const c = h.curl[4] * [.5, 1, .9][n]; j.o.quaternion.copy(j.rest).multiply(q.setFromEuler(e.set(-c, n ? 0 : -side * c * .4, 0))); });
+    poseFingers(h, side, spread);
   }
+}
+// ### Bends every finger joint of a real hand by its curl (index to little finger, then the thumb) and spreads them.
+function poseFingers(h, side, spread){
+  const q = new THREE.Quaternion(), e = new THREE.Euler();
+  h.fingers.forEach((bones, f) => bones.forEach((j, n) => {
+    const c = h.curl[f] * [1, 1.25, .8][n], s = n ? 0 : side * (f - 1.5) * (.05 + spread * .5);
+    j.o.quaternion.copy(j.rest).multiply(q.setFromEuler(e.set(-c, s, 0)));
+  }));
+  h.thumb.forEach((j, n) => { const c = h.curl[4] * [.5, 1, .9][n]; j.o.quaternion.copy(j.rest).multiply(q.setFromEuler(e.set(-c, n ? 0 : -side * c * .4, 0))); });
 }
 // ### Draws the hands over the room with the same lens as the eye, after clearing the depth so nothing hides them.
 function drawHands(){
   if (!HANDS.r.arm.visible) return;
   handScene.environment = scene.environment;
+  // down in the tunnel only the bulbs light your hands
+  const lit = 1 - clamp(-camera.position.y / 1.5, 0, 1) * .6;
+  handScene.traverse(l => { if (l.isLight){ if (l.userData.i0 === undefined) l.userData.i0 = l.intensity; l.intensity = l.userData.i0 * lit; } });
   handCam.projectionMatrix.copy(camera.projectionMatrix); handCam.projectionMatrixInverse.copy(camera.projectionMatrixInverse);
   renderer.autoClear = false; renderer.clearDepth(); renderer.render(handScene, handCam); renderer.autoClear = true;
 }
@@ -1908,7 +2162,11 @@ function syncWorld(){
   repaint(steamTex, paintSteam, S.clues.includes('mirror'));
   repaint(scratchesTex, paintScratches, S.clues.includes('scratches'));
   S.lock.forEach((d, i) => { if (wheelTex[i].userData !== d){ drawDigit(wheelTex[i], d); wheelTex[i].userData = d; } });
-  if (!S.ending){ lidPivot.rotation.x = 0; tunnelLight.intensity = 0; tunnelLight.visible = false; }
+  if (!S.ending){
+    lidPivot.rotation.x = 0; tunnelLight.intensity = tunnelLight2.intensity = 0; tunnelLight.visible = tunnelLight2.visible = dust.pts.visible = false;
+    for (let i = DUST_FREE; i < DUST_N; i++) dust.pos[i * 3 + 1] = -100;
+    scene.fog.density = .03; scene.fog.color.copy(FOG_ROOM);
+  }
   shadowsMoved();
 }
 
@@ -2118,7 +2376,7 @@ card.addEventListener('click', e => {
   else if (d === 'resume') resumeRoom();
   else if (d === 'pause') showPause();
   else if (d === 'ask-new') showAskNew();
-  else if (d === 'new'){ paused = false; seenScenes.clear(); held.clear(); hatchAnim = -1; tileVel = 0; endingShown = false; act('new'); writeStore(R.SAVE_KEY, ''); hud.classList.add('off'); goView('intro', .8); doorFlash = 0; windowLight.intensity = .9; showBrief(0); }
+  else if (d === 'new'){ paused = false; seenScenes.clear(); held.clear(); hatchAnim = -1; climb = null; tileVel = 0; endingShown = false; act('new'); writeStore(R.SAVE_KEY, ''); hud.classList.add('off'); goView('intro', .8); doorFlash = 0; windowLight.intensity = .9; showBrief(0); }
   else if (d === 'close') hideCard();
   else if (d === 'replay' && miniSpot) use('play', miniSpot);
   else if (d === 'try') act('try');
@@ -2300,11 +2558,115 @@ function updateCine(dt){
 }
 
 // ---------- Endings ----------
-// ### Ending A: the lid swings up, warm light comes from below and the camera climbs down the ladder, then the ending
-// ### card. Ending B: the door is flung open, white corridor light floods in, then the card.
-let hatchAnim = -1, doorFlash = 0, endingShown = false;
-function endingA(){ hatchAnim = 0; endingShown = false; tunnelLight.visible = true; }
+// ### Ending A: the lid swings up and dust trickles from the rim, the old bulbs below come on, and you climb down the
+// ### wooden ladder in the first person. You let yourself down into the hatch facing the ladder and hold on to the frame,
+// ### then go down rung by rung: one hand lets go and grabs a lower rung while the other holds on, then your body drops
+// ### one rung, then the other hand. Your hands stay on the rungs while you move, the view sways with each step, every
+// ### grab shakes dust off the wood, and halfway you glance down at the floor and pass Hale's note. At the bottom you let
+// ### go, step back and turn round to face the tunnel, then the ending card. With reduced motion you are simply down there.
+// ### Ending B: the door is flung open, white corridor light floods in, then the card.
+let hatchAnim = -1, doorFlash = 0, endingShown = false, climb = null, endStep = 0;
+const CLIMB = { mount: 1.4, step: .74, steps: 8, off: 2.2, rest: .5, eye: .55 };
+CLIMB.eyeZ = TUN.ladderZ + .42;
+CLIMB.end = CLIMB.mount + CLIMB.steps * CLIMB.step + CLIMB.off;
+const FOG_ROOM = scene.fog.color.clone(), FOG_TUNNEL = new THREE.Color(0x15110c);
+const easeIO = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const bump = (t, a, b) => Math.sin(Math.PI * clamp((t - a) / (b - a), 0, 1));
+// ### Where a hand holds on: the edge of the hatch frame at the top, a rung (at height y) below it.
+const gripAt = (side, y) => y > -.1 ? new THREE.Vector3(TUN.x + side * .2, .035, TUN.zN + .015) : new THREE.Vector3(TUN.x + side * .14, y, TUN.ladderZ);
+function endingA(){
+  hatchAnim = 0; endingShown = false; climb = null; $('lookHint').classList.add('gone');
+  tunnelLight.visible = tunnelLight2.visible = dust.pts.visible = true;
+  dustFall(70, HATCH.x, -.01, HATCH.z, HS * .9);
+}
 function endingB(){ doorFlash = 1; goView('cell', .6); setTimeout(() => { if (S.ending === 'B'){ showEnding(); } }, 1400); }
+// ### Plans the climb: at each step one hand (right, left, right ...) moves from the rung it holds to a lower one, a
+// ### little below where the eye will be after that step.
+function startClimb(){
+  const moves = [], held = { r: .035, l: .035 };
+  for (let k = 0; k < CLIMB.steps; k++){
+    const key = k % 2 ? 'l' : 'r', eyeEnd = CLIMB.eye - .3 * (k + 1);
+    const y = Math.max(-3.3, Math.min(Math.round((eyeEnd - .28) / .3) * .3, held[key] > 0 ? -.3 : held[key] - .3));
+    moves.push({ key, from: held[key], to: y }); held[key] = y;
+  }
+  const hand = side => ({ pos: gripAt(side, .035), moving: true, curl: .2 });
+  climb = { t: REDUCED ? CLIMB.end : 0, moves, from: { pos: cam.pos.clone(), yaw: wrapAngle(cam.yaw), pitch: cam.pitch }, hands: !REDUCED,
+    grabbed: -1, landed: -1, off: false, hand: { r: hand(1), l: hand(-1) } };
+}
+// ### One frame of the climb: where the eye is and where it looks, where each hand holds, sounds and dust.
+function updateClimb(dt){
+  const c = climb, C = CLIMB, x = TUN.x, pose = { pos: new THREE.Vector3(), yaw: 0, pitch: -.5, roll: 0 };
+  c.t += endStep;
+  const bottom = new THREE.Vector3(x, EYE + TUN.floor, -1.1);
+  if (c.t < C.mount){
+    // let yourself down into the hatch, turning to face the ladder, and take hold of the frame
+    const e = easeIO(c.t / C.mount);
+    pose.pos.lerpVectors(c.from.pos, new THREE.Vector3(x, C.eye, C.eyeZ), e);
+    pose.yaw = c.from.yaw * (1 - e); pose.pitch = c.from.pitch + (-.7 - c.from.pitch) * e;
+    for (const key of ['r', 'l']){ const h = c.hand[key]; h.moving = e < .7; h.curl = h.moving ? .2 : 1.2; }
+  } else if (c.t < C.mount + C.steps * C.step){
+    const tt = (c.t - C.mount) / C.step, k = Math.floor(tt), u = tt - k, m = c.moves[k], s = m.key === 'r' ? 1 : -1;
+    const mover = c.hand[m.key], other = c.hand[m.key === 'r' ? 'l' : 'r'];
+    // the moving hand lets go, swings down a little away from the ladder and grabs the lower rung
+    const uh = clamp(u / .5, 0, 1);
+    mover.pos.lerpVectors(gripAt(s, m.from), gripAt(s, m.to), easeIO(uh));
+    mover.pos.z += Math.sin(Math.PI * uh) * .045; mover.pos.y += Math.sin(Math.PI * uh) * .03;
+    mover.moving = uh > .04 && uh < .96; mover.curl = mover.moving ? .15 : 1.2;
+    other.moving = false; other.curl = 1.2;
+    // then the body sinks one rung, leaning a little over the foot that steps down
+    const ed = easeIO(clamp((u - .35) / .6, 0, 1)), sw = Math.sin(Math.PI * ed), look = tt;
+    pose.pos.set(x + s * .03 * sw, C.eye - .3 * (k + ed) + sw * .012, C.eyeZ);
+    pose.roll = s * .035 * sw;
+    // a glance down past your feet early on, a look at the note on the left rail as you pass it
+    const down = bump(look, 1.9, 3.5), note = bump(look, 4.3, 6.1);
+    pose.pitch = -.5 - .22 * clamp(1 - tt / 2, 0, 1) + .05 * sw - .6 * down + .32 * note;   // at first you look further down, at your hands
+    pose.yaw = -s * .03 * sw - .42 * note;
+    if (uh >= 1 && c.grabbed !== k){ c.grabbed = k; dustFall(10, mover.pos.x, mover.pos.y, mover.pos.z, .1); if (ac) noise(.05, .05, 'bandpass', 1500); }
+    if (ed >= 1 && c.landed !== k){
+      c.landed = k;
+      if (ac){ noise(.1, .1, 'lowpass', 320); tone(130 + Math.random() * 70, .28, 'sawtooth', .01, 85); }   // a boot on the rung, the old wood creaks
+      dustFall(8, x, Math.round((pose.pos.y - 1.5) / .3) * .3, TUN.ladderZ, .3);
+    }
+  } else {
+    // at the bottom: step off the last rung, let go, step back and turn round to face the tunnel
+    const v = clamp((c.t - C.mount - C.steps * C.step) / C.off, 0, 1), e = easeIO(v), last = new THREE.Vector3(x, C.eye - .3 * C.steps, C.eyeZ);
+    pose.pos.copy(last).lerp(bottom, easeIO(clamp(v * 1.6, 0, 1)));
+    pose.yaw = Math.PI * easeIO(clamp((v - .2) / .8, 0, 1)); pose.pitch = -.5 + .4 * e;
+    if (v > .2) c.hands = false;
+    if (!c.off){ c.off = true; if (ac) noise(.16, .16, 'lowpass', 220); dustFall(14, x, TUN.floor + .3, C.eyeZ - .1, .4); }
+  }
+  if (REDUCED){ const v = VIEWS.tunnel, a = anglesTo(v.pos, v.look); pose.pos.fromArray(v.pos); pose.yaw = a.yaw; pose.pitch = a.pitch; pose.roll = 0; }
+  return pose;
+}
+// ### The hands on the ladder: each wrist sits just behind and below the rung it holds (or travels to the next one), so
+// ### the fingers close over the wood; the hands are fixed to the rungs in the world, so they stay put while you sink.
+const _inv = new THREE.Matrix4(), _m4 = new THREE.Matrix4(), _qw = new THREE.Quaternion(), _qr = new THREE.Quaternion(), _hv = new THREE.Vector3(), _sh = new THREE.Vector3(), _up = new THREE.Vector3(), _z = new THREE.Vector3(0, 0, 1);
+function climbHands(dt){
+  HANDS.down += (0 - HANDS.down) * (1 - Math.exp(-dt * 6));
+  camera.updateMatrixWorld();
+  _inv.copy(camera.matrixWorld).invert();
+  for (const key of ['r', 'l']){
+    const h = HANDS[key], g = climb.hand[key], side = key === 'r' ? 1 : -1;
+    _hv.copy(g.pos); _hv.y -= .045; _hv.z += .05; _hv.applyMatrix4(_inv); _hv.y -= HANDS.down * .35;
+    const P = h.p.toArray(), V = h.v.toArray(), T = _hv.toArray();
+    for (let i = 0; i < 3; i++) [P[i], V[i]] = spring(P[i], V[i], T[i], g.moving ? 420 : 2600, g.moving ? 36 : 100, dt);
+    h.p.fromArray(P); h.v.fromArray(V); h.w.set(0, 0, 0);
+    h.arm.position.copy(h.p);
+    // the forearm points back towards your shoulder (which turns with the body, not with the head), the back of the hand
+    // faces up and towards you, the thumb a little inwards
+    _sh.set(side * .2, -.32, .1).applyAxisAngle(new THREE.Vector3(0, 1, 0), -cam.yaw).add(cam.pos).applyMatrix4(_inv);
+    _up.set(0, 1, 0).transformDirection(_inv).add(_hv.clone().normalize().negate());
+    _m4.lookAt(_sh, h.p, _up);
+    _qw.setFromRotationMatrix(_m4).multiply(_qr.setFromAxisAngle(_z, -side * (g.moving ? .6 : .3)));
+    h.arm.quaternion.slerp(_qw, 1 - Math.exp(-dt * (g.moving ? 12 : 28)));
+    h.r.set(h.arm.rotation.x, h.arm.rotation.y, h.arm.rotation.z);   // so the usual springs carry on from here afterwards
+    h.arm.visible = HANDS.down < .98;
+    if (!h.wrist) continue;
+    h.wrist.rotation.set(g.moving ? .1 : -.55, 0, 0); h.wr.set(0, 0); h.wv.set(0, 0);
+    for (let f = 0; f < 5; f++) h.curl[f] += ((f === 4 ? g.curl * .7 : g.curl) - h.curl[f]) * (1 - Math.exp(-dt * 14));
+    poseFingers(h, side, g.moving ? .12 : 0);
+  }
+}
 
 // ---------- Loop ----------
 // ### Runs once per screen refresh: the clock (rules.tick), then animations (camera, steam, guard, tile, hatch), then the
@@ -2314,6 +2676,8 @@ let clock = 0, last = performance.now(), guardShow = 0, tileVel = 0;
 function frame(now){
   requestAnimationFrame(frame);
   const elapsed = clamp((now - last) / 1000, 0, 1), dt = Math.min(elapsed, .05); last = now; clock += dt;
+  // the ending runs in real time even on a slow computer (in larger steps), so the card never waits for it
+  endStep = Math.min(elapsed, .25);
   if (!paused && S.scene !== 'intro' && !S.ending){
     const r = R.tick(S, elapsed);
     if (r.state !== S){
@@ -2344,15 +2708,20 @@ function frame(now){
     if (tile.position.y <= .01) tileVel = 0;
     shadowsMoved();
   }
-  // the hatch opens and the camera climbs down
+  // the hatch opens, the bulbs below come on (old ones, they flicker a little) and you climb down
   if (hatchAnim >= 0){
-    hatchAnim += dt;
+    hatchAnim += endStep;
     lidPivot.rotation.x = -Math.min(1.9, hatchAnim * 1.6);
     if (hatchAnim < 1.3) shadowsMoved();
-    tunnelLight.intensity = Math.min(1.6, hatchAnim);
-    if (hatchAnim > 1.3 && cam.t >= 1 && !endingShown && camTarget.pos.y > 0) goView('tunnel', 2.2);
-    if (hatchAnim > 3.8 && !endingShown){ endingShown = true; showEnding(); }
+    const flick = .92 + .08 * Math.sin(clock * 23) * Math.sin(clock * 7.3);
+    tunnelLight.intensity = Math.min(2.6, hatchAnim * 1.6) * flick; tunnelLight2.intensity = Math.min(1.2, hatchAnim * .7);
+    if (hatchAnim > 1.1 && !climb && cam.t >= 1) startClimb();
+    if (climb && climb.t > CLIMB.end + CLIMB.rest && !endingShown){ endingShown = true; showEnding(); }
+    // the air down there is thick with dust
+    const under = clamp(-camera.position.y / 1.5, 0, 1);
+    scene.fog.density = .03 + under * .07; scene.fog.color.copy(FOG_ROOM).lerp(FOG_TUNNEL, under);
   }
+  updateDust(dt, clock);
   if (doorFlash > 0){ doorFlash = Math.max(0, doorFlash - dt * .5); windowLight.intensity = .9 + doorFlash * 8; }
   // dripping tap
   if (ac && !paused && (dripIn -= dt) < 0){ dripIn = 2.5 + Math.random() * 5; tone(1200 + Math.random() * 500, .08, 'sine', .025, 500); }
