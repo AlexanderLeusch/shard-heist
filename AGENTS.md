@@ -13,7 +13,7 @@ A two-room browser game for the Nova SBE course *Introduction to Programming*. *
 
 - **Plain HTML, CSS and JavaScript**, no framework, no build step, **no npm packages**. three.js r128 is loaded from a CDN with SRI hashes; nothing else comes from outside.
 - **Hosting:** GitHub Pages, deployed by `.github/workflows/ci.yml` from `main`, and only when all tests pass.
-- **Data:** only the player's browser (`localStorage`). There is no server, no database and no real account: a leaderboard driver is only a name kept in the browser, with no password. The full list of stored values, and how to reset them, is in `docs/rules/settings.md`.
+- **Data:** the player's browser (`localStorage`) for settings, best times, the boards of this device and the login; and the online leaderboard on Supabase (a hosted Postgres database with login), reached from the page over its web API (`room-2-chase/js/online.js`). The tables and rules are in `supabase/schema.sql` (one member owns changes to them; run it in the Supabase SQL editor), and `supabase/rule-check.sql` checks the rules against the real database and rolls back. The page holds only the publishable key; the secret key never goes into the repository. Tests never call Supabase: `tests/room-2/online.test.js` uses a fake. The full list of stored values, and how to reset them, is in `docs/rules/settings.md`.
 - **No secrets.** The game uses no API key, password or token. See "Secrets" below if that ever changes.
 - The course's default stack is Python with Streamlit. A JavaScript stack needs the teaching staff's approval (course guide *Choosing a stack*).
 

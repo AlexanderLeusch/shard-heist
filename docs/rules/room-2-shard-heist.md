@@ -174,12 +174,12 @@ All of it is composed and synthesised by the game, with no music files. The tune
 
 ## Drivers and the leaderboard
 
-- **Driver.** In the main menu (section 03) you create a driver by typing a name, or pick a saved one. A name keeps letters, digits, spaces and `. _ ' -`, up to 16 characters; capital letters do not matter, so *alex* and *Alex* are the same driver.
+- **Driver.** In the main menu (section 03) you type a driver name and press **Play online**: you are on the online leaderboard at once, with no email and no password. The driver belongs to this browser. A name keeps letters, digits, spaces and `. _ ' -`, up to 16 characters; capital letters do not matter, so *alex* and *Alex* are the same driver, and a name someone already has is refused. If you want the same driver on several devices, open *Use an email account instead* and sign up with email and password.
 - **Leaderboards.** Every finished free ride (Lisbon, Highway, Countryside) goes on two boards of its map under the active driver: the **all-time** board and the board of the **current calendar month**. Each driver has one entry per board, their best time; a slower run never replaces it. The fastest time is first, and on a tie the time that was there first stays ahead. When a new month begins, the monthly board starts empty; the all-time board stays.
 - **Leader of the month.** The fastest driver of the current month on a map is named above the two boards.
 - **Where they are shown.** In the main menu (for the map that is chosen) and on the end screen after the finish. Each board shows the top five, and the driver's own place below them if they are further down. The end screen says whether the run is a new personal best and which place it has on both boards. It is set in large type: the drive time is the one big number, with the best time on this device under it, the stars beside the title, and time left (or shards), damage and wrecked police cars next to it. Without a driver, the end screen asks for a name first; the time is saved as soon as the name is entered.
 - Runs that end busted, wrecked or out of time, and the story mode, do not go on the board.
-- The drivers and the boards are kept in this browser only. There is no password and nothing is sent anywhere, so the board shows the people who play on the same device.
+- **Online.** The boards everybody sees are kept in the game's online database. Every run is also kept on this device; when the online board can't be reached, the game says so and shows the boards of this device instead.
 
 ## Story mode: The Necklace Job
 

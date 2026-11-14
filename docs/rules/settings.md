@@ -1,6 +1,6 @@
 # Settings and options
 
-> Every setting the player can change, in both rooms: where it is, what each choice does, and what the game remembers. All of it is stored only in this browser (`localStorage`). Nothing about you is sent anywhere; the only request the game makes on its own is the escape room's search for an air vent recording (below). The only “account” is a driver name for the leaderboard, with no password, kept on this device.
+> Every setting the player can change, in both rooms: where it is, what each choice does, and what the game remembers. Settings are stored only in this browser (`localStorage`). The one thing that leaves the device is the online leaderboard of room 2: your driver name and your finished free rides (map, time, vehicle, stars) go to the game's Supabase database, where everybody can see them. The quick way needs only a driver name (no email, no password); an email account is optional. The other request the game makes on its own is the escape room's search for an air vent recording (below).
 
 ## Room 2 · Shard Heist: the main menu
 
@@ -12,7 +12,7 @@
 | **Radio** | Off, Reggae, Techno, Hardstyle, Schlager, Sing-Along Pop, Classical, Heavy Metal | The station that plays while you drive. `R` changes it at any time, `Shift` + `R` goes back one |
 | **Graphics** | Ultra, Balanced | **Ultra:** sharper picture (up to twice the screen resolution), smoothed edges, glowing lights and the finest shadows (4096 × 4096). **Balanced:** a lighter picture without the glow and with smaller shadows (2048 × 2048). Computers start in Ultra, phones in Balanced |
 | **Steering** (phones only) | Tilt, Buttons | **Tilt:** hold the phone sideways and lower one side like a steering wheel. **Buttons:** steer with the arrow pads. Tilt is the default on a phone with a motion sensor |
-| **Driver** | The saved drivers, and a field for a new name | Creates a driver (just a name, up to 16 letters, digits, spaces and `. _ ' -`) or picks a saved one. Each finished free ride goes on the leaderboard of its map under the active driver. Names are matched without case, so *alex* and *Alex* are the same driver. Up to 12 drivers are kept; adding a 13th drops the oldest from the list (its times stay on the boards) |
+| **Driver** | A field for the driver name and **Play online**; below it, *Use an email account instead* | Play online makes an online driver with just the name (up to 16 letters, digits, spaces and `. _ ' -`), kept in this browser: no email, no password. A name that is taken (without case: *alex* and *Alex* are the same) is refused. Each finished free ride then goes on the online leaderboard everybody sees, and also on the board of this device. With an email account (email and password, 8+ characters) the same driver works on every device. **Sign out** ends a name-only driver in this browser; its times stay on the board. When the online board can't be reached, the name becomes a driver of this device and the boards of this device are shown |
 | **Volume** | `Game` 0–100 %, `Music` 0–100 % | `Game` is the engine, tyres, sirens, the helicopter and all effects. `Music` is the radio. The music plays for a moment while its slider moves, so it can be heard; letting go of the game slider plays a short tone |
 
 ## Room 2: during a run
@@ -58,6 +58,7 @@ Every stored value comes from outside the program, so each one is checked when i
 | Best time per map | 2 | No best time (only 10 s to 900 s counts) |
 | Drivers and leaderboards (all time, and the current month) | 2 | Empty boards; names are cleaned again, impossible times and unknown maps are dropped, only each driver's best run per map is kept, and a monthly board with an invalid month is dropped |
 | Active driver | 2 | No driver: the end screen asks for a name |
+| Online login (`shard-heist-session`): the login Supabase gave this browser, renewed before it ends | 2 | Signed out; an incomplete or changed login is dropped |
 | Radio station | 2 | Off |
 | Graphics | 2 | Ultra on a computer, Balanced on a phone |
 | Steering | 2 | Tilt |

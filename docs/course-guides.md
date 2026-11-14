@@ -31,8 +31,9 @@
 
 | Guide point | Status | Where / how |
 |---|---|---|
-| What must survive, who shares it, its shape | ✅ | Settings, best times, drivers and leaderboards, and the escape-room save, per browser, in `localStorage`; nothing is shared between devices (the leaderboard compares the players on one device) |
-| No credentials, tests never touch real data | ✅ | No database; tests run on fixed values in Node and on a fresh browser profile |
+| What must survive, who shares it, its shape | ✅ | The online leaderboard is shared by everybody: tables `drivers` and `runs` in a hosted Postgres database (Supabase), defined in `supabase/schema.sql`. Settings, best times, the boards of this device and the escape-room save stay per browser in `localStorage` |
+| No credentials, tests never touch real data | ✅ | The page holds only the publishable key (public by design); `tests/room-2/online.test.js` runs against a fake Supabase; `supabase/rule-check.sql` rolls back everything it writes |
+| One member owns the table structure | ⚠️ | Changes go through `supabase/schema.sql` only; the team names its owner |
 | Storage choice and how to reset it recorded | ✅ | `docs/rules/settings.md` (table of stored values, reset by clearing site data), `AGENTS.md` |
 | Stored data is validated | ✅ | `parsePick`, `parseBest`, `parseRadio`, `parseSteer`, `parseVolume`, `restore` |
 
@@ -50,7 +51,9 @@
 
 | Guide point | Status | Where / how |
 |---|---|---|
-| Accounts only when people need different data or rights | ✅ | Single-player game, everyone sees the same thing: no accounts, on purpose |
+| Accounts only when people need different data or rights | ✅ | Needed for the online leaderboard: each run must belong to its driver, and only that driver may add it. The quick way is a name only (an anonymous Supabase account for the browser); email and password are optional, for the same driver on every device |
+| A provider handles passwords | ✅ | Supabase Auth; the game never sees or stores a password |
+| Rules enforced where the data is | ✅ | Row Level Security and column grants in `supabase/schema.sql`: read for all, insert only your own name and runs, no update or delete of runs, impossible values refused; checked by `supabase/rule-check.sql` |
 | Permissions checked where the action happens | ✅ | `Core.actionAllowed` and room 1's `perform` refuse actions in the wrong state, not just by hiding buttons; tested |
 
 ## Real-time and multiplayer
@@ -63,7 +66,8 @@
 
 | Guide point | Status | Where / how |
 |---|---|---|
-| Plan for failure | ✅ | No API is called. The only outside dependency is the three.js CDN: if it fails, the error screen explains it (tested in the browser) |
+| Plan for failure | ✅ | Supabase calls never throw and time out after 8 s: the game then keeps the time on this device and says the online board is not reachable. The three.js CDN: if it fails, the error screen explains it (tested in the browser) |
+| Free plan limits checked | ⚠️ | The free Supabase project pauses after a week without use: wake it in the dashboard before the demo |
 | Tests never call a real service | ✅ | Unit tests run in Node; the browser test serves the game locally |
 
 ## AI in your app
@@ -96,7 +100,7 @@
 
 | Guide point | Status | Where / how |
 |---|---|---|
-| Secrets out of the repository; `.env` ignored before the first commit | ✅ | `.gitignore` lists `.env`; the game uses no secret |
+| Secrets out of the repository; `.env` ignored before the first commit | ✅ | `.gitignore` lists `.env`; the page uses only the publishable Supabase key, and a test fails if a secret key (`sb_secret_…`) or a JWT appears in any file |
 | `.env.example` if secrets exist | ✅ | Not needed: no secrets. `AGENTS.md` says what to do if one is added |
 | After a leak: revoke at the provider | ✅ | `AGENTS.md` |
 | Least privilege | ✅ | CI runs with `contents: read`; only the deploy job may write to Pages |

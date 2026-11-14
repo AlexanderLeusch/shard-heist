@@ -455,6 +455,22 @@ body.start{overflow:auto;touch-action:auto;user-select:auto;-webkit-user-select:
 @keyframes drvshake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
 .card .drv-hint{font-family:var(--f-mono);font-size:12px;line-height:1.6}
 .card .drv-hint b{color:var(--ink);font-weight:600}
+.acc{display:grid;gap:10px;border:1px solid rgba(85,236,255,.35);border-radius:16px;padding:14px 16px;background:rgba(85,236,255,.05)}
+.acc p{margin:0;font-family:var(--f-mono);font-size:13px;line-height:1.5;color:var(--muted)}
+.acc p b{color:var(--ink)}
+.acc.on{grid-template-columns:1fr auto;align-items:center}
+.acc-fields{display:flex;gap:8px;flex-wrap:wrap}
+.acc-btns{display:flex;gap:8px;flex-wrap:wrap}
+.acc-btns .drv-add,.acc-btns .drv{border-radius:14px;padding:12px 20px}
+.acc-link{appearance:none;justify-self:start;background:none;border:0;padding:2px 0;cursor:pointer;font-family:var(--f-mono);font-size:12px;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.acc-link:hover{color:var(--ink)}
+.acc-link:focus-visible{outline:2px solid var(--spark);outline-offset:2px}
+.acc-mail{display:grid;gap:10px;padding-top:10px;border-top:1px solid var(--line)}
+.acc button[disabled]{opacity:.5;cursor:wait}
+.acc .acc-msg{grid-column:1/-1;color:var(--spark)}
+.acc .acc-msg.bad,.lb-head.bad{color:var(--stop)}
+.card .lb-where,.lb-where{margin:0;font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lb-where.on{color:var(--spark)}
 .lb{display:grid;gap:12px;border:1px solid var(--line);border-radius:16px;padding:16px 18px;background:rgba(255,255,255,.025)}
 .card .lb-head{font-size:15px;color:var(--ink);max-width:none}
 .card .lb-head b{color:var(--gold)}

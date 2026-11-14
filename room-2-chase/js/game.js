@@ -4512,7 +4512,12 @@ addEventListener('keydown', e => {
   if (!$('fatal').hidden || e.ctrlKey || e.metaKey || e.altKey) return;
   // typing a driver name: the letters go into the field, not to the car, and Enter saves the name
   if (e.target && e.target.classList && e.target.classList.contains('drv-input')){
-    if (e.code === 'Enter' || e.code === 'NumpadEnter'){ e.preventDefault(); if (!e.repeat) addDriverFrom(e.target); }
+    if (e.code === 'Enter' || e.code === 'NumpadEnter'){
+      e.preventDefault();
+      if (e.repeat) return;
+      const f = e.target.dataset.accField;
+      if (f) accountAction(f === 'play' ? 'play' : f === 'name' ? 'name' : 'in', e.target); else addDriverFrom(e.target);
+    }
     return;
   }
   // on a volume slider the arrow keys move the slider, not the car
@@ -4896,9 +4901,10 @@ const best = {};
 for (const k of Object.keys(MODES)){ const b = Core.parseBest(readStore(MODES[k].store)); if (b) best[k] = b; }
 
 // ---------- Drivers & leaderboard ----------
-// ### The player creates a driver (just a name) in the menu. Each finished free ride goes on the leaderboard of its map under that
-// ### driver, and the end screen shows the board. Without a driver, the end screen asks for a name before the time is saved.
-// ### Drivers and times stay in this browser (localStorage); nothing is sent anywhere. The rules are in Core (cleanName, recordRun, ...).
+// ### Two ways to be on a leaderboard. Offline, the player creates a driver (just a name) that stays in this browser
+// ### (localStorage), and the board compares the drivers of this device. Online, the player signs in with an account
+// ### (online.js, Supabase): the driver name belongs to the account and every finished run goes on one board that everybody
+// ### sees. Each run is always kept on this device too, so nothing is lost when the internet is gone. The rules are in Core.
 let board = Core.parseBoard(readStore('shard-heist-board')), pendingRun = null, lastRank = null;
 let driver = board.drivers.find(d => Core.sameName(d, Core.cleanName(readStore('shard-heist-driver') || ''))) || '';
 // names are cleaned by Core already; escaping them again keeps any HTML out of the page
@@ -4911,11 +4917,95 @@ function setDriver(raw){
   board = r.board; driver = r.name; saveBoard();
   return true;
 }
-// ### Saves the run that just ended under the active driver (once).
+
+// ---------- Online account ----------
+// ### net is the Supabase client (null when online.js is missing). online holds what the page shows: the account's driver
+// ### name, the boards loaded per map, a message for the player, and the place of the last run on the online boards.
+const Online = window.ShardOnline || null;
+const net = Online && typeof fetch === 'function' ? Online.createClient({ fetch: (u, o) => fetch(u, o), store: { get: readStore, set: writeStore } }) : null;
+const online = { name: '', ready: false, mail: false, busy: false, msg: '', bad: false, boards: {}, down: false, rank: null };
+const signedIn = () => !!(net && net.user && online.name);
+// ### Loads both online boards of a map and redraws the boards on screen. Fails quietly: the local board stays.
+async function loadBoards(m){
+  if (!net) return;
+  const r = await net.boards(m);
+  if (r.ok){ online.boards[m] = { all: r.all, month: r.month }; online.down = false; }
+  else online.down = true;
+  redrawBoards();
+}
+// The boards of one map in the shape Core.boardRows reads: online when signed in and loaded, otherwise this device's
+function boardFor(m){
+  const ob = signedIn() && online.boards[m];
+  if (!ob) return { src: board, me: driver, online: false };
+  const empty = { city: [], highway: [], country: [] };
+  return { src: { runs: Object.assign({}, empty, { [m]: ob.all }), month: { key: Core.monthKey(Date.now()), runs: Object.assign({}, empty, { [m]: ob.month }) } }, me: online.name, online: true };
+}
+// ### After sign-in (or when the page opens signed in): fetch the account's driver name and use it as the driver here too.
+async function afterSignIn(){
+  online.busy = true; redrawAccount();
+  // a slow start or a weak connection gets two more tries before the player is told the board is not reachable
+  let r = await net.driverName();
+  for (let i = 0; i < 2 && !r.ok && r.status === 0 && net.user; i++){ await new Promise(ok => setTimeout(ok, 2000)); r = await net.driverName(); }
+  online.busy = false;
+  if (!r.ok){ online.msg = r.error; online.bad = true; if (!net.user) online.name = ''; }
+  else { online.name = r.name; online.msg = ''; online.bad = false; if (r.name) setDriver(r.name); }
+  online.ready = true;
+  redrawAccount();
+  if (online.name){ loadBoards(sel.mode); const lb = card.querySelector('[data-board]'); if (lb) loadBoards(lb.dataset.board); }
+}
+// ### The account buttons. play: the quick start with a name only (an anonymous account for this browser); mail: shows the
+// ### email form; in / up: sign in or create an account with email and password; name: the driver name of a new email account;
+// ### out: sign out. When the online board can't be reached, play keeps the name as a driver on this device instead.
+async function accountAction(kind, el){
+  if (!net || online.busy) return;
+  if (kind === 'mail'){ online.mail = !online.mail; online.msg = ''; redrawAccount(); return; }
+  const box = (el && el.closest && el.closest('[data-account], .lb-ask')) || card.querySelector('[data-account]');
+  const val = n => { const x = box && box.querySelector(`[data-acc-field="${n}"]`); return x ? x.value : ''; };
+  // read every field before the box is redrawn (the redraw empties the password field on purpose)
+  const email = val('email'), password = val('password'), typedName = val(kind === 'play' ? 'play' : 'name');
+  const name = Core.cleanName(typedName);
+  if ((kind === 'play' || kind === 'name') && !name){
+    online.msg = 'Enter a driver name: letters, digits, spaces and . _ \' -'; online.bad = true; redrawAccount({ email }); return;
+  }
+  let r;
+  online.busy = true; online.msg = kind === 'out' ? '' : 'One moment…'; online.bad = false;
+  redrawAccount({ email, name: typedName });
+  if (kind === 'play') r = await net.playAs(name);
+  else if (kind === 'in') r = await net.signIn(email, password);
+  else if (kind === 'up') r = await net.signUp(email, password);
+  else if (kind === 'name') r = await net.setDriverName(name);
+  else if (kind === 'out'){ r = await net.signOut(); online.name = ''; online.boards = {}; online.rank = null; }
+  online.busy = false;
+  if (kind === 'play' && r && !r.ok && r.status === 0){
+    // offline: drive on as a driver of this device
+    setDriver(name); online.msg = 'The online board is not reachable right now. You drive as ' + driver + ' on this device.'; online.bad = true;
+    redrawAccount(); refreshDriverViews(); return;
+  }
+  if (!r || !r.ok){ online.msg = r ? r.error : ''; online.bad = true; redrawAccount({ email, name: typedName }); return; }
+  if (kind === 'play' || kind === 'name'){ online.name = name; online.ready = true; setDriver(name); }
+  online.msg = kind === 'up' ? 'Account created. Now choose your driver name.' : kind === 'play' || kind === 'name' ? 'You are on the online leaderboard.' : kind === 'out' ? 'Signed out. Times are kept on this device.' : '';
+  online.bad = false;
+  if (kind === 'in' || kind === 'up') return afterSignIn();
+  redrawAccount();
+  if (kind === 'play' || kind === 'name') loadBoards(sel.mode);
+  refreshDriverViews();
+}
+// ### Saves the run that just ended under the active driver (once): always on this device, and online when signed in.
 function recordPending(){
   if (!pendingRun || !driver) return;
-  lastRank = Core.recordRun(board, pendingRun.mode, driver, pendingRun.time, pendingRun.veh, pendingRun.stars, Date.now());
+  const run = pendingRun;
+  lastRank = Core.recordRun(board, run.mode, driver, run.time, run.veh, run.stars, Date.now());
   board = lastRank.board; pendingRun = null; saveBoard();
+  if (signedIn()){
+    online.rank = { pending: true };
+    net.submitRun(run).then(async r => {
+      if (!r.ok){ online.rank = { error: r.error }; redrawBoards(); return; }
+      await loadBoards(run.mode);
+      const ob = online.boards[run.mode], at = l => l ? l.findIndex(x => Core.sameName(x.name, online.name)) + 1 : 0;
+      online.rank = ob ? { all: at(ob.all), n: ob.all.length, month: at(ob.month) } : null;
+      redrawBoards();
+    });
+  }
 }
 // The name field with its button; the same one is used in the menu and on the end screen
 const nameField = (ph, label) => `<span class="drv-new"><input type="text" class="drv-input" maxlength="${Core.NAME_MAX}" placeholder="${ph}" aria-label="${ph}" autocomplete="off" spellcheck="false"><button type="button" class="drv-add" data-driver-add>${label}</button></span>`;
@@ -4925,34 +5015,66 @@ const boardList = (rows, empty) => rows.length
   : `<p class="lb-empty">${empty}</p>`;
 // ### The two boards of one map side by side: all time, and the current calendar month with its leader named above it.
 function boardPanels(m){
-  const key = Core.monthKey(Date.now()), month = Core.monthName(key), lead = Core.boardList(board, m, key)[0];
-  return `<p class="lb-leader"><span>Leader of the month</span><b>${lead ? esc(lead.name) : 'nobody yet'}</b>${lead ? `<i>${fmtTimeExact(lead.time)} · ${VEH[lead.veh].name}</i>` : ''}</p>
+  const B = boardFor(m), key = Core.monthKey(Date.now()), month = Core.monthName(key), lead = Core.boardList(B.src, m, key)[0];
+  const where = B.online ? '<p class="lb-where on">Online · everybody\'s times</p>' : `<p class="lb-where">This device only${signedIn() && online.down ? ' · online board not reachable right now' : ''}</p>`;
+  return `${where}<p class="lb-leader"><span>Leader of the month</span><b>${lead ? esc(lead.name) : 'nobody yet'}</b>${lead ? `<i>${fmtTimeExact(lead.time)} · ${VEH[lead.veh].name}</i>` : ''}</p>
     <div class="lb-cols">
-      <div class="lb-col"><h3>All time</h3>${boardList(Core.boardRows(board, m, driver), 'No times on this map yet.')}</div>
-      <div class="lb-col"><h3>${month}</h3>${boardList(Core.boardRows(board, m, driver, key), 'No times this month yet.')}</div>
+      <div class="lb-col"><h3>All time</h3>${boardList(Core.boardRows(B.src, m, B.me), 'No times on this map yet.')}</div>
+      <div class="lb-col"><h3>${month}</h3>${boardList(Core.boardRows(B.src, m, B.me, key), 'No times this month yet.')}</div>
     </div>`;
 }
-// ### The menu section: every driver as a button (the active one pressed), a large field for a new one, and the two leaderboards
-// ### (all time and this month) of the map that is chosen.
+// ### The account box in the menu. Signed out: one field for the driver name and "Play online" (no email, no password); below
+// ### it a link opens the email form for players who want the same driver on every device. Signed in: the name and Sign out.
+const quickField = (label, value) => `<span class="drv-new"><input type="text" class="drv-input" data-acc-field="play" maxlength="${Core.NAME_MAX}" placeholder="Driver name" aria-label="Driver name" autocomplete="nickname" spellcheck="false" value="${esc(value || '')}"><button type="button" class="drv-add" data-acc="play"${online.busy ? ' disabled' : ''}>${label}</button></span>`;
+function accountBox(keep){
+  if (!net) return '';
+  const msg = online.msg ? `<p class="acc-msg${online.bad ? ' bad' : ''}" role="status">${esc(online.msg)}</p>` : '';
+  const dis = online.busy ? ' disabled' : '';
+  if (net.user && online.name){
+    const where = net.user.anon ? 'on this browser. Signing out ends this driver here.' : 'on every device where you sign in.';
+    return `<div class="acc on"><p>Online as <b>${esc(online.name)}</b> · your runs go on the online leaderboard, ${where}</p><button type="button" class="drv" data-acc="out"${dis}>Sign out</button>${msg}</div>`;
+  }
+  if (net.user && online.ready) return `<div class="acc"><p>Signed in. Choose the driver name everybody will see (it can't be changed later).</p>
+      <span class="drv-new"><input type="text" class="drv-input" data-acc-field="name" maxlength="${Core.NAME_MAX}" placeholder="Driver name" aria-label="Driver name" autocomplete="nickname" spellcheck="false" value="${esc(driver)}"><button type="button" class="drv-add" data-acc="name"${dis}>Save name</button></span>
+      <button type="button" class="drv" data-acc="out"${dis}>Sign out</button>${msg}</div>`;
+  if (net.user) return `<div class="acc"><p>Signing in…</p>${msg}</div>`;
+  const email = keep && keep.email ? esc(keep.email) : '';
+  const mail = online.mail ? `<div class="acc-mail"><p>With email and password you get the same driver on every device.</p>
+      <div class="acc-fields"><input type="email" class="drv-input" data-acc-field="email" maxlength="254" placeholder="Email" aria-label="Email" autocomplete="username" spellcheck="false" value="${email}"><input type="password" class="drv-input" data-acc-field="password" maxlength="72" placeholder="Password (8+ characters)" aria-label="Password" autocomplete="current-password"></div>
+      <div class="acc-btns"><button type="button" class="drv-add" data-acc="in"${dis}>Sign in</button><button type="button" class="drv" data-acc="up"${dis}>Create account</button></div></div>` : '';
+  return `<div class="acc"><p>Type a driver name and you are on the online leaderboard. No email, no password.</p>
+      ${quickField('Play online', keep && keep.name !== undefined ? keep.name : driver)}${msg}
+      <button type="button" class="acc-link" data-acc="mail" aria-expanded="${!!online.mail}">${online.mail ? 'Hide the email sign-in' : 'Use an email account instead (same driver on every device)'}</button>${mail}</div>`;
+}
+// ### The menu section: the account box and the two leaderboards (all time and this month) of the chosen map. Without the
+// ### online part (online.js missing), the drivers of this device are shown instead, as before.
 function driverSection(){
-  return `<div class="m-label"><span>03</span>Driver · your name on the leaderboard</div>
-      <div class="drivers">${board.drivers.slice().reverse().map(d => `<button class="drv" data-driver="${esc(d)}" aria-pressed="${Core.sameName(d, driver)}">${esc(d)}</button>`).join('')}</div>
+  const local = net ? '' : `<div class="drivers">${board.drivers.slice().reverse().map(d => `<button class="drv" data-driver="${esc(d)}" aria-pressed="${Core.sameName(d, driver)}">${esc(d)}</button>`).join('')}</div>
       ${nameField(board.drivers.length ? 'New driver name' : 'Your name', 'Add driver')}
-      <p class="drv-hint">${driver ? `Driving as <b>${esc(driver)}</b>. Each finished run goes on the leaderboard of its map.` : 'Add a name to put your times on the leaderboard. It stays on this device.'}</p>
-      <div class="lb"><div class="eyebrow">Leaderboard · ${MODES[sel.mode].title}</div>${boardPanels(sel.mode)}</div>`;
+      <p class="drv-hint">${driver ? `Driving as <b>${esc(driver)}</b> on this device. Each finished run goes on the leaderboard of its map.` : 'Add a name to put your times on the leaderboard. It stays on this device.'}</p>`;
+  return `<div class="m-label"><span>03</span>Driver · your name on the leaderboard</div>
+      <div data-account>${accountBox()}</div>
+      ${local}
+      <div class="lb" data-lb-menu><div class="eyebrow">Leaderboard · ${MODES[sel.mode].title}</div>${boardPanels(sel.mode)}</div>`;
 }
 // ### The end screen's leaderboards for one map: what this run did, the all-time and monthly boards with the leader of the month,
 // ### and the name field when nobody is signed in.
 function boardSection(m){
   let head = '';
-  if (lastRank && lastRank.rank){
+  const R = online.rank;
+  if (signedIn() && R){
+    const who = esc(online.name);
+    head = R.pending ? `<p class="lb-head">Saving ${who}'s time online…</p>`
+      : R.error ? `<p class="lb-head bad">${esc(R.error)}</p>`
+      : R.all ? `<p class="lb-head">Online, all time: ${who} is in place <b>${R.all}</b> of ${R.n}${R.month ? ` · This month: place <b>${R.month}</b>${R.month === 1 ? ': you lead the month' : ''}` : ''}.</p>` : '';
+  } else if (lastRank && lastRank.rank){
     const who = esc(driver), n = board.runs[m].length;
     head = lastRank.personalBest
       ? (lastRank.prev ? `New personal best for ${who} (was ${fmtTimeExact(lastRank.prev)}).` : `${who} is on the board.`)
       : `${who}'s best stays ${fmtTimeExact(lastRank.prev)}.`;
     head = `<p class="lb-head">${head} All time: place <b>${lastRank.rank}</b> of ${n}${lastRank.monthRank ? ` · This month: place <b>${lastRank.monthRank}</b>${lastRank.monthRank === 1 && lastRank.monthBest ? ': you lead the month' : ''}` : ''}.</p>`;
   }
-  const ask = !driver && pendingRun ? `<div class="lb-ask"><span>Enter your name to put this time on the board</span>${nameField('Your name', 'Save time')}</div>` : '';
+  const ask = !driver && pendingRun ? `<div class="lb-ask"><span>Enter a driver name to put this time on the ${net ? 'online ' : ''}leaderboard</span>${net ? quickField('Save time', '') : nameField('Your name', 'Save time')}</div>${net && online.msg && online.bad ? `<p class="lb-head bad">${esc(online.msg)}</p>` : ''}` : '';
   return `<div class="eyebrow">Leaderboard · ${MODES[m].title}</div>${head}${ask}${boardPanels(m)}`;
 }
 // ### Reads the name field next to the button (or the field itself) and creates the driver.
@@ -4968,6 +5090,21 @@ function refreshDriverViews(){
   if (sec) sec.innerHTML = driverSection();
   const lb = card.querySelector('[data-board]');
   if (lb){ recordPending(); lb.innerHTML = boardSection(lb.dataset.board); }
+}
+// Redraws only the account box (keeping a typed email), or only the boards, so a field being typed in is never wiped
+function redrawAccount(keep){
+  const box = card.querySelector('[data-account]');
+  if (!box) return;
+  const sec = card.querySelector('[data-drivers]');
+  const b2 = card.querySelector('[data-account]');
+  if (b2) b2.innerHTML = accountBox(keep);
+  redrawBoards();
+}
+function redrawBoards(){
+  const mb = card.querySelector('[data-lb-menu]');
+  if (mb) mb.innerHTML = `<div class="eyebrow">Leaderboard · ${MODES[sel.mode].title}</div>${boardPanels(sel.mode)}`;
+  const lb = card.querySelector('[data-board]');
+  if (lb) lb.innerHTML = boardSection(lb.dataset.board);
 }
 
 // ### Switches map. A map is built the first time it is chosen, then bent over its hills once.
@@ -5859,6 +5996,8 @@ card.addEventListener('input', e => {
 });
 card.addEventListener('change', e => { const r = e.target.closest('[data-vol="game"]'); if (r) sfx.collect(); });
 card.addEventListener('click', e => {
+  const ac = e.target.closest('[data-acc]');
+  if (ac){ accountAction(ac.dataset.acc, ac); return; }
   const da = e.target.closest('[data-driver-add]');
   if (da){ addDriverFrom(da); return; }
   const db = e.target.closest('[data-driver]');
@@ -5891,7 +6030,7 @@ card.addEventListener('click', e => {
     card.querySelectorAll(`[data-pick="${pick.dataset.pick}"]`).forEach(b => b.setAttribute('aria-pressed', String(b === pick)));
     if (pick.dataset.pick === 'veh') setVehicle(sel.veh);
     renderVehDetail();
-    if (pick.dataset.pick === 'mode'){ const sec = card.querySelector('[data-drivers]'), typed = sec && sec.querySelector('.drv-input').value; if (sec){ sec.innerHTML = driverSection(); sec.querySelector('.drv-input').value = typed; } }
+    if (pick.dataset.pick === 'mode'){ redrawBoards(); if (signedIn()) loadBoards(sel.mode); }
     writeStore('shard-heist-pick', JSON.stringify(sel));
     return;
   }
@@ -6697,5 +6836,7 @@ resetNpcs();
 renderChips();
 showMenu();
 warmUp();
+// a saved online login is checked only now: while the world is being built the page is too busy to answer in time
+if (net && net.user) setTimeout(afterSignIn, 0);
 requestAnimationFrame(frame);
 })();

@@ -34,12 +34,13 @@ test('every data-action on a card is a known action', () => {
   }
 });
 
-test('scripts load in the right order: error screen, libraries, rules, game', () => {
+test('scripts load in the right order: error screen, libraries, rules, online account, game', () => {
   const srcs = scripts.map(a => a.match(/src="([^"]+)"/)[1]);
   assert.equal(srcs[0], 'js/boot.js');
-  assert.equal(srcs.at(-2), 'js/core.js');
+  assert.equal(srcs.at(-3), 'js/core.js');
+  assert.equal(srcs.at(-2), 'js/online.js');
   assert.equal(srcs.at(-1), 'js/game.js');
-  assert.ok(srcs.slice(1, -2).every(s => s.startsWith('https://')));
+  assert.ok(srcs.slice(1, -3).every(s => s.startsWith('https://')));
   assert.ok(!/<script>\s*\S/.test(html), 'no inline scripts, so the CSP can forbid them');
   for (const f of srcs.filter(s => !s.startsWith('http'))) assert.ok(fs.existsSync(path.join(ROOT, 'room-2-chase', f)), f);
 });
@@ -64,10 +65,11 @@ test('the Content Security Policy only allows this site and the two CDNs to run 
   assert.deepEqual(dir['object-src'], ["'none'"]);
   assert.deepEqual(dir['base-uri'], ["'none'"]);
   assert.ok(!csp.includes("'unsafe-eval'"));
+  assert.deepEqual(dir['connect-src'], ["'self'", 'https://nqjeonoudywpdwivfuyp.supabase.co'], 'the page may talk only to itself and the Supabase project');
 });
 
 test('no credentials or secrets anywhere in the repository', () => {
-  const patterns = [/AKIA[0-9A-Z]{16}/, /gh[pousr]_[A-Za-z0-9]{30,}/, /sk-[A-Za-z0-9]{20,}/, /-----BEGIN [A-Z ]*PRIVATE KEY-----/, /(api[_-]?key|secret|password|token)\s*[:=]\s*['"][^'"]{8,}['"]/i];
+  const patterns = [/AKIA[0-9A-Z]{16}/, /gh[pousr]_[A-Za-z0-9]{30,}/, /sk-[A-Za-z0-9]{20,}/, /-----BEGIN [A-Z ]*PRIVATE KEY-----/, /sb_secret_[A-Za-z0-9_-]{8,}/, /eyJ[A-Za-z0-9_-]{20,}.eyJ[A-Za-z0-9_-]{20,}./, /(api[_-]?key|secret|password|token)\s*[:=]\s*['"][^'"]{8,}['"]/i];
   // Every file git tracks, so local folders such as original-solo-project/.venv (installed packages, ignored by git) do not count
   // A downloaded ZIP has no git: then walk the folder and leave out what git would ignore
   const walk = (dir, out = []) => { for (const e of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })){ if (/^(\.git|\.venv|node_modules|__pycache__)$/.test(e.name)) continue; const p = path.posix.join(dir, e.name); if (e.isDirectory()) walk(p, out); else out.push(p); } return out; };

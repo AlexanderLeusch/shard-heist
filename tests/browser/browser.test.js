@@ -40,6 +40,28 @@ function standIn(p){
     responseHeaders: [{ name: 'Content-Type', value: api ? 'application/json' : 'audio/mpeg' }, { name: 'Access-Control-Allow-Origin', value: '*' }] });
 }
 
+// ### The online leaderboard (Supabase) is answered by a stand-in too: a tiny fake that keeps driver names and board rows in
+// ### memory. So the test never touches the real database, and it can switch the "internet" off (supa.down).
+const SUPA = 'https://nqjeonoudywpdwivfuyp.supabase.co/', SUPA_UID = '11111111-2222-4333-8444-555555555555';
+const supa = { down: false, names: [], mine: null, rows: [], calls: [] };
+function supaStandIn(p){
+  const u = new URL(p.request.url), m = p.request.method, key = m + ' ' + u.pathname;
+  supa.calls.push(key);
+  if (supa.down) return send('Fetch.failRequest', { requestId: p.requestId, errorReason: 'InternetDisconnected' });
+  let status = 200, body = '[]';
+  if (m === 'OPTIONS'){ status = 204; body = ''; }
+  else if (key === 'GET /rest/v1/drivers'){
+    const q = u.searchParams.get('name');
+    body = JSON.stringify(q ? supa.names.filter(n => n.toLowerCase() === q.replace(/^ilike\./, '').replace(/\\(.)/g, '$1').toLowerCase()).map(name => ({ name })) : supa.mine ? [{ name: supa.mine }] : []);
+  } else if (key === 'POST /auth/v1/signup') body = JSON.stringify({ access_token: 't'.repeat(40), refresh_token: 'r', expires_in: 3600, user: { id: SUPA_UID, is_anonymous: true } });
+  else if (key === 'POST /rest/v1/drivers'){ const n = JSON.parse(p.request.postData).name; supa.names.push(n); supa.mine = n; status = 201; body = ''; }
+  else if (key === 'GET /rest/v1/board_all' || key === 'GET /rest/v1/board_month') body = JSON.stringify(supa.rows);
+  else if (key === 'POST /auth/v1/logout'){ status = 204; body = ''; supa.mine = null; }
+  send('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: status, body: Buffer.from(body).toString('base64'),
+    responseHeaders: [{ name: 'Content-Type', value: 'application/json' }, { name: 'Access-Control-Allow-Origin', value: '*' },
+      { name: 'Access-Control-Allow-Headers', value: '*' }, { name: 'Access-Control-Allow-Methods', value: 'GET, POST, OPTIONS' }] });
+}
+
 function send(method, params = {}){
   const id = ++seq;
   ws.send(JSON.stringify({ id, method, params }));
@@ -101,13 +123,13 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
     const msg = JSON.parse(ev.data);
     if (msg.id && pending.has(msg.id)){ const p = pending.get(msg.id); pending.delete(msg.id); msg.error ? p.reject(new Error(msg.error.message)) : p.resolve(msg.result); }
     else if (msg.method === 'Runtime.exceptionThrown') errors.push(msg.params.exceptionDetails.exception ? msg.params.exceptionDetails.exception.description : msg.params.exceptionDetails.text);
-    else if (msg.method === 'Fetch.requestPaused') standIn(msg.params);
+    else if (msg.method === 'Fetch.requestPaused') (msg.params.request.url.startsWith(SUPA) ? supaStandIn : standIn)(msg.params);
     else if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') errors.push(msg.params.args.map(a => a.value || a.description).join(' '));
     // CSP violations, blocked or failed requests (the browser asks for a favicon on its own, which this game does not have)
     else if (msg.method === 'Log.entryAdded' && msg.params.entry.level === 'error' && !/favicon.ico/.test(msg.params.entry.url || '')) errors.push(msg.params.entry.text);
   };
   await send('Runtime.enable'); await send('Log.enable'); await send('Page.enable'); await send('Network.enable');
-  await send('Fetch.enable', { patterns: VENT_HOSTS.map(h => ({ urlPattern: h + '*' })) });
+  await send('Fetch.enable', { patterns: VENT_HOSTS.concat(SUPA).map(h => ({ urlPattern: h + '*' })) });
   await send('Emulation.setFocusEmulationEnabled', { enabled: true });
   // Software rendering is slow, so start in Balanced graphics unless a test sets something else on purpose
   await send('Page.addScriptToEvaluateOnNewDocument', { source: "try { if (!localStorage.getItem('shard-heist-gfx')) localStorage.setItem('shard-heist-gfx', 'balanced'); } catch (e) {}" });
@@ -246,27 +268,43 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       assert.deepEqual(errors, []);
     });
 
-    await t.test('drivers: a name is added in the menu and kept; Enter in the field saves it; bad names and HTML are refused', async () => {
-      await evaluate(`localStorage.setItem('shard-heist-board', JSON.stringify({ drivers: ['Sarah', '<img src=x onerror=window.__xss=1>'], runs: { city: [{ name: '<b>Eve</b>', time: 99 }] } })), true`);
+    await t.test('online driver: a name alone puts you on the online board; taken, empty and HTML names are refused; offline falls back to this device', async () => {
+      await evaluate(`localStorage.setItem('shard-heist-board', JSON.stringify({ drivers: ['Sarah'], runs: { city: [{ name: '<b>Eve</b>', time: 99 }] } })), localStorage.removeItem('shard-heist-session'), true`);
+      Object.assign(supa, { down: false, names: ['Taken'], mine: null, rows: [{ name: '<img src=x onerror=window.__xss=1>', time: '70.00', veh: 'car', stars: 3, driver_id: 'x' }], calls: [] });
       await load();
-      const names = "[...document.querySelectorAll('#card [data-driver]')].map(b => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? '*' : '')).join()";
-      assert.equal(await evaluate(names), 'img srcx onerror,Sarah', 'rejected: the HTML in a saved name is shown as plain text');
-      assert.equal(await evaluate("!document.querySelector('#card img[src=\"x\"]') && !window.__xss"), true);
-      const type = (v, how) => evaluate(`(() => { const i = document.querySelector('#card .drv-input'); i.value = ${JSON.stringify(v)}; ${how === 'enter' ? "i.dispatchEvent(new KeyboardEvent('keydown', { code: 'Enter', bubbles: true }))" : "document.querySelector('#card .drv-add').click()"}; return true; })()`);
-      await type('  Alex  ', 'enter');
-      assert.equal(await evaluate(names), 'Alex*,img srcx onerror,Sarah');
+      const acc = () => text('#card [data-account]');
+      const board = () => text('#card [data-lb-menu]');
+      assert.match(await acc(), /No email, no password/);
+      assert.match(await board(), /This device only/);
+      assert.match(await board(), /bEveb/, 'rejected: HTML in a saved name is cleaned away');
+      assert.equal(await evaluate("!document.querySelector('#card [data-lb-menu] .lb-name b')"), true);
+      const play = (v, how) => evaluate(`(() => { const i = document.querySelector('#card [data-acc-field="play"]'); i.value = ${JSON.stringify(v)}; ${how === 'enter' ? "i.dispatchEvent(new KeyboardEvent('keydown', { code: 'Enter', bubbles: true }))" : "document.querySelector('#card [data-acc=\"play\"]').click()"}; return true; })()`);
+      await play('<>', 'click');
+      assert.match(await acc(), /Enter a driver name/, 'rejected: a name that is empty after cleaning');
+      assert.equal(supa.calls.length, 0, 'nothing was sent');
+      await play('taken', 'click');
+      await waitFor("/taken/.test(document.querySelector('#card [data-account]').innerText)", 5000, 'taken message');
+      assert.equal(await evaluate("localStorage.getItem('shard-heist-session')"), null, 'rejected: no account is made for a taken name');
+      await play('  Alex  ', 'enter');
+      await waitFor("/Online as Alex/.test(document.querySelector('#card [data-account]').innerText)", 5000, 'signed in as Alex');
       assert.ok(await evaluate(menuReady), 'Enter in the name field does not start a run');
       assert.equal(await evaluate("localStorage.getItem('shard-heist-driver')"), 'Alex');
-      await type('<>', 'click');
-      assert.ok(await evaluate("document.querySelector('#card .drv-input').classList.contains('bad')"), 'rejected: an empty name is marked');
-      assert.equal(await evaluate(names), 'Alex*,img srcx onerror,Sarah');
+      await waitFor("/Online/.test(document.querySelector('#card [data-lb-menu]').textContent) && /img src/.test(document.querySelector('#card [data-lb-menu]').textContent)", 5000, 'online board');
+      assert.equal(await evaluate("!document.querySelector('#card img[src=\"x\"]') && !window.__xss"), true, 'rejected: HTML in an online name is shown as text');
+      assert.ok(!supa.calls.some(c => c.startsWith('POST /auth/v1/signup') && supa.calls.indexOf(c) < supa.calls.indexOf('GET /rest/v1/drivers')), 'the name is checked before an account is made');
       await load();
-      assert.equal(await evaluate(names), 'Alex*,img srcx onerror,Sarah', 'kept after a reload');
-      assert.match(await text('#card .drv-hint'), /Driving as Alex/);
-      await click('#card [data-driver="Sarah"]');
-      assert.equal(await evaluate(names), 'Sarah*,Alex,img srcx onerror');
-      assert.equal(await evaluate("localStorage.getItem('shard-heist-driver')"), 'Sarah');
-      await evaluate("localStorage.removeItem('shard-heist-board'), localStorage.removeItem('shard-heist-driver'), true");
+      await waitFor("/Online as Alex/.test(document.querySelector('#card [data-account]').innerText)", 60000, 'still signed in after a reload');
+      await click('#card [data-acc="out"]');
+      await waitFor("!!document.querySelector('#card [data-acc-field=\"play\"]')", 5000, 'signed out');
+      assert.equal(await evaluate("localStorage.getItem('shard-heist-session')"), '');
+      supa.down = true;
+      await play('Bea', 'click');
+      await waitFor("/not reachable/.test(document.querySelector('#card [data-account]').innerText)", 10000, 'offline message');
+      assert.equal(await evaluate("localStorage.getItem('shard-heist-driver')"), 'Bea', 'offline: the name becomes a driver of this device');
+      supa.down = false;
+      // the failed requests of the offline step are expected; anything else would still fail the test
+      for (let i = errors.length - 1; i >= 0; i--) if (/supabase\.co|ERR_INTERNET_DISCONNECTED|Failed to fetch/i.test(errors[i])) errors.splice(i, 1);
+      await evaluate("localStorage.removeItem('shard-heist-board'), localStorage.removeItem('shard-heist-driver'), localStorage.removeItem('shard-heist-session'), true");
       assert.deepEqual(errors, []);
     });
 
