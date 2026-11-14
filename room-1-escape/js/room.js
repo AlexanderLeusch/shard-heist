@@ -410,6 +410,44 @@ const WATER = (() => {
       }`,
     transparent: true, depthWrite: false, premultipliedAlpha: true, polygonOffset: true, polygonOffsetFactor: -4
   });
+  // ### The mop water in the bucket uses the same mirror picture. Its surface is higher than the floor, and a mirror at
+  // ### height h shows the floor's mirror picture shifted up by 2 (h - floor) (camera and mirrored room move together),
+  // ### so each point looks the picture up that far lower down. The water itself is murky grey-brown with grey scum and
+  // ### bubbles on it; seen from above you look into it, and the flatter you look the more it mirrors the room.
+  const bucketMat = new THREE.ShaderMaterial({
+    uniforms: { tRefl: mat.uniforms.tRefl, tNoise: mat.uniforms.tNoise, texMat: mat.uniforms.texMat, time: mat.uniforms.time, lift: { value: 0 }, tScum: { value: null } },
+    vertexShader: `
+      uniform mat4 texMat; uniform float lift; varying vec4 vProj; varying vec3 vWorld; varying vec2 vUv;
+      void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xyz; vUv = uv; vProj = texMat * (w - vec4(0.0, lift, 0.0, 0.0)); gl_Position = projectionMatrix * viewMatrix * w; }`,
+    fragmentShader: `
+      uniform sampler2D tRefl, tNoise, tScum; uniform float time; varying vec4 vProj; varying vec3 vWorld; varying vec2 vUv;
+      void main(){
+        // fine slow ripples: the water in a bucket hardly moves
+        vec2 w = vec2(sin(vWorld.x * 47.0 + time * 0.7) + sin(vWorld.z * 59.0 - time * 0.9), sin(vWorld.z * 41.0 + time * 0.8) + sin(vWorld.x * 53.0 - time * 0.6)) * 0.0009;
+        vec4 p = vProj; p.xy += w * p.w;
+        vec2 b = vec2(0.0012, 0.002) * p.w;
+        vec3 refl = (sRGBToLinear(texture2DProj(tRefl, p + vec4(b, 0.0, 0.0))).rgb + sRGBToLinear(texture2DProj(tRefl, p - vec4(b, 0.0, 0.0))).rgb
+          + sRGBToLinear(texture2DProj(tRefl, p + vec4(b.y, -b.x, 0.0, 0.0))).rgb + sRGBToLinear(texture2DProj(tRefl, p - vec4(b.y, -b.x, 0.0, 0.0))).rgb) * 0.25;
+        refl *= 1.0 + smoothstep(0.6, 1.0, max(refl.r, max(refl.g, refl.b))) * 2.5;
+        float F = 0.25 + 0.75 * pow(1.0 - clamp(normalize(cameraPosition - vWorld).y, 0.0, 1.0), 4.0);
+        // the murk: grey-brown, cloudier in patches, darker in the shadow of the bucket's wall
+        float n = texture2D(tNoise, vWorld.xz * 5.0 + vec2(time * 0.003, 0.0)).r;
+        float r = length((vUv - 0.5) * 2.0);
+        vec3 murk = vec3(0.075, 0.068, 0.05) * (0.75 + 0.6 * n) * (1.0 - 0.45 * smoothstep(0.7, 1.0, r));
+        // grey scum and bubbles drift slowly round
+        float c = cos(time * 0.02), s = sin(time * 0.02); vec2 su = mat2(c, -s, s, c) * (vUv - 0.5) + 0.5;
+        vec4 scum = sRGBToLinear(texture2D(tScum, su));
+        float sc = clamp((scum.r - 0.03) * 4.0, 0.0, 1.0);
+        vec3 col = mix(murk, refl, F * (1.0 - sc * 0.7));
+        col = mix(col, scum.rgb * 0.6, sc * 0.6);
+        // a thin wet ring where the water meets the plastic catches the light
+        col += refl * smoothstep(0.93, 1.0, r) * 0.6;
+        gl_FragColor = linearToOutputTexel(vec4(col, 1.0));
+        gl_FragColor.a = mix(0.86, 1.0, max(F, sc));
+        gl_FragColor.rgb *= gl_FragColor.a;
+      }`,
+    transparent: true, depthWrite: false, premultipliedAlpha: true
+  });
   const boxes = [], mirror = new THREE.PerspectiveCamera(), frustum = new THREE.Frustum(), pv = new THREE.Matrix4();
   const camPos = new THREE.Vector3(), look = new THREE.Vector3(), rot = new THREE.Matrix4(), plane = new THREE.Plane(), clip = new THREE.Vector4(), q = new THREE.Vector4(), size = new THREE.Vector2();
   const N = new THREE.Vector3(0, 1, 0), P0 = new THREE.Vector3(0, .004, 0);
@@ -422,6 +460,13 @@ const WATER = (() => {
     mat, rt,
     // ### A puddle of w x d metres (the water fills about four fifths of it).
     puddle(w, d, x, z){ const m = flat(w, d, mat, x, z, .005); m.renderOrder = 1; boxes.push(new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(x, .005, z), new THREE.Vector3(w, .02, d))); return m; },
+    // ### The water in a bucket: a disc of radius r at height y, with a picture of the scum and bubbles on it.
+    bucket(r, x, y, z, scum){
+      bucketMat.uniforms.lift.value = 2 * (y - P0.y); bucketMat.uniforms.tScum.value = scum;
+      const m = new THREE.Mesh(new THREE.CircleGeometry(r, 48), bucketMat); m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); m.renderOrder = 1; room.add(m);
+      boxes.push(new THREE.Box3().setFromCenterAndSize(new THREE.Vector3(x, y, z), new THREE.Vector3(2 * r, .02, 2 * r)));
+      return m;
+    },
     resize(){ renderer.getDrawingBufferSize(size); rt.setSize(Math.max(1, size.x * .4 | 0), Math.max(1, size.y * .4 | 0)); lastT = -1; },
     // ### Moves the ripples and the drop on, then draws the mirror picture again, but only when a puddle is in view and
     // ### the view has changed (or a fifth of a second has passed, for the steam and the guard): standing still costs nothing.
@@ -452,9 +497,9 @@ const WATER = (() => {
       q.set((Math.sign(clip.x) + e[8]) / e[0], (Math.sign(clip.y) + e[9]) / e[5], -1, (1 + e[10]) / e[14]);
       clip.multiplyScalar(2 / clip.dot(q));
       e[2] = clip.x; e[6] = clip.y; e[10] = clip.z + 1; e[14] = clip.w;
-      mat.visible = false;
+      mat.visible = bucketMat.visible = false;
       renderer.setRenderTarget(rt); renderer.render(scene, mirror); renderer.setRenderTarget(null);
-      mat.visible = true;
+      mat.visible = bucketMat.visible = true;
     }
   };
 })();
@@ -809,14 +854,14 @@ const bucketTex = canvasTex(1024, 256, (g, w, h) => {
 {
   const bucket = new THREE.Mesh(new THREE.LatheGeometry(bucketProfile, 48), new THREE.MeshStandardMaterial({ map: bucketTex, roughness: .48 }));
   bucket.position.set(BUCKET.x, 0, BUCKET.z); bucket.rotation.y = .9; add(bucket);
-  // ### The mop water: murky grey-brown, glossy, with grey scum and a few bubbles floating on it.
+  // ### The mop water mirrors the room like the puddles do (WATER.bucket); this picture is the grey scum and the bubbles
+  // ### floating on it, on black (no scum).
   const scumTex = canvasTex(256, 256, (g, w, h) => {
-    g.fillStyle = '#4a4535'; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 60; i++){ const x = rnd() * w, y = rnd() * h, r = 4 + rnd() * 26, gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(150,145,125,.5)'); gr.addColorStop(1, 'rgba(150,145,125,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
+    g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 60; i++){ const x = rnd() * w, y = rnd() * h, r = 4 + rnd() * 26, gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(170,165,145,.6)'); gr.addColorStop(1, 'rgba(170,165,145,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
     for (let i = 0; i < 90; i++){ const x = rnd() * w, y = rnd() * h, r = .8 + rnd() * 3; g.strokeStyle = 'rgba(225,225,210,.6)'; g.lineWidth = .8; g.beginPath(); g.arc(x, y, r, 0, 7); g.stroke(); }
   });
-  const water = new THREE.Mesh(new THREE.CircleGeometry(bucketIn(BUCKET.water) - .001, 40), new THREE.MeshStandardMaterial({ map: scumTex, roughness: .08, metalness: 0, transparent: true, opacity: .8, envMapIntensity: .3 }));
-  water.rotation.x = -Math.PI / 2; water.position.set(BUCKET.x, BUCKET.water, BUCKET.z); water.receiveShadow = true; room.add(water);
+  WATER.bucket(bucketIn(BUCKET.water) - .001, BUCKET.x, BUCKET.water, BUCKET.z, scumTex);
   // the wire handle with its plastic grip, hooked into two lugs on the rim and dropped down over the front
   const lugs = new THREE.Group(); lugs.position.set(BUCKET.x, .322, BUCKET.z); lugs.rotation.y = -.75; room.add(lugs);
   const lugMat = new THREE.MeshStandardMaterial({ map: bucketTex, roughness: .5 });
@@ -844,8 +889,9 @@ const MOP_LEN = 1.37, MOP_R = .0125;
 // ### a twist pattern on strands this thin only shimmers.
 const mopYarn = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
 // ### Where the mop stands: the middle of its clamp and the end of its handle. In the corner the handle leans into the
-// ### corner of the two walls; at the door its end is jammed under the door handle and presses on the door leaf (whose
-// ### face is at z 2.90), so the door cannot swing in.
+// ### corner of the two walls. At the door its end is jammed into the gap between the door leaf (face at z 2.90) and the
+// ### lever of the door handle (a bar along x at y 1.02, z 2.86, radius 0.022): the end presses on the door and the lever
+// ### rests on top of the handle, so the door cannot swing in.
 function mopPose(clamp, top, floor, wall){
   const u = top.clone().sub(clamp).normalize(), q = new THREE.Quaternion().setFromUnitVectors(v3(0, 1, 0), u);
   return { p: clamp, q, r: new THREE.Euler().setFromQuaternion(q), floor, wall };
@@ -854,7 +900,18 @@ const MOP_CORNER = mopPose(v3(3.3, .26, 2.41), v3(3.976, 0, 2.976), BUCKET.botto
 const MOP_DOOR = mopPose(v3(.26, .05, 0), v3(.36, .975, 2.904), 0, false);
 // the handle is always MOP_LEN long: solve for the missing height (corner) or distance (door)
 { const c = MOP_CORNER.p, h = Math.hypot(3.976 - c.x, 2.976 - c.z); Object.assign(MOP_CORNER, mopPose(c, v3(3.976, c.y + Math.sqrt(MOP_LEN ** 2 - h ** 2), 2.976), BUCKET.bottom, true)); }
-{ const t = v3(.36, .975, 2.904), dy = t.y - .05, dx = -.1, dz = Math.sqrt(MOP_LEN ** 2 - dy * dy - dx * dx); Object.assign(MOP_DOOR, mopPose(v3(t.x + dx, .05, t.z - dz), t, 0, false)); }
+{ // the end sits 8 mm into the door leaf, so the tilted end of the handle meets its face; its height is found (by halving)
+  // where the handle just touches the underside of the lever
+  const LEVER = { y: 1.02, z: 2.86, r: .022 }, ex = .37, ez = 2.908, dx = -.06;
+  const at = ey => { const dy = ey - .05, dz = Math.sqrt(MOP_LEN ** 2 - dy * dy - dx * dx); return v3(ex + dx, .05, ez - dz); };
+  let lo = .95, hi = 1.06;
+  for (let i = 0; i < 40; i++){
+    const ey = (lo + hi) / 2, c = at(ey), u = v3(ex, ey, ez).sub(c).normalize(), n = Math.hypot(u.y, u.z);
+    const gap = ((LEVER.y - ey) * u.z - (LEVER.z - ez) * u.y) / n - LEVER.r - MOP_R;   // from the handle's axis to the lever's, less both radii
+    if (gap > 0) lo = ey; else hi = ey;
+  }
+  const t = v3(ex, lo, ez); Object.assign(MOP_DOOR, mopPose(at(lo), t, 0, false));
+}
 // ### The strands for one pose: each starts in the clamp, falls out to its side and drops; it lies down where it reaches
 // ### the floor (or the bucket's bottom) and stays inside the bucket's wall. Built in the room's coordinates and then
 // ### moved into the mop's own, so the strands hang right for the pose they belong to. Returns one mesh of all strands.
