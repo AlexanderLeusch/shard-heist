@@ -839,7 +839,8 @@ const mopWoodTex = canvasTex(64, 512, (g, w, h) => {
   const hand = g.createLinearGradient(0, h * .04, 0, h * .4); hand.addColorStop(0, 'rgba(70,45,25,.35)'); hand.addColorStop(1, 'rgba(70,45,25,0)'); g.fillStyle = hand; g.fillRect(0, h * .04, w, h * .36);
 });
 const MOP_LEN = 1.37, MOP_R = .0125;
-// ### Cotton yarn: no picture, each strand has its own colour (clean near the clamp, dirty at the tips, darker where wet);
+// ### Cotton yarn: no picture, each strand has its own colour, a used mop's grubby grey-brown, darker and browner towards
+// ### the tips, with dark blotches of old dirt and darker still where wet;
 // ### a twist pattern on strands this thin only shimmers.
 const mopYarn = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
 // ### Where the mop stands: the middle of its clamp and the end of its handle. In the corner the handle leans into the
@@ -862,7 +863,7 @@ function mopFringe(pose){
   const toLocal = new THREE.Matrix4().compose(pose.p, pose.q, v3(1, 1, 1)).invert();
   const SEG = 18, SIDES = 6, N = 150, R = .0055, pos = [], nor = [], col = [], uv = [], idx = [];
   for (let s = 0; s < N; s++){
-    const side = s % 2 ? 1 : -1, a = (rnd() * 2 - 1), dirt = .6 + rnd() * .5, shade = .9 + rnd() * .15, len = .25 + rnd() * .07, seg = len / SEG;
+    const side = s % 2 ? 1 : -1, a = (rnd() * 2 - 1), dirt = .7 + rnd() * .3, shade = .8 + rnd() * .3, brown = rnd(), blot = rnd() < .6 ? .25 + rnd() * .3 : 0, bf = 6 + rnd() * 10, bp = rnd() * 7, len = .25 + rnd() * .07, seg = len / SEG;
     let p = pose.p.clone().addScaledVector(ax, a * .066).addScaledVector(az, side * (.006 + rnd() * .014)).addScaledVector(up, -.014);
     let d = az.clone().multiplyScalar(side * (.5 + rnd() * .4)).addScaledVector(ax, a * .35).addScaledVector(up, -.6).normalize();
     const pts = [p.clone()];
@@ -884,8 +885,11 @@ function mopFringe(pose){
       n0 = n0.clone().sub(t.clone().multiplyScalar(n0.dot(t))).normalize();
       const b = t.clone().cross(n0), f = k / SEG, rad = R * (k === SEG ? .25 : 1 - .25 * f * f);
       if (k) arcLen += pts[k].distanceTo(pts[k - 1]);
-      const wet = pose.wall && pts[k].y < BUCKET.water ? .55 : 1, dirty = 1 - dirt * .5 * f * f;
-      const c = [.74 * shade * dirty * wet, .7 * shade * dirty * wet, .6 * shade * (dirty - .08 * f) * wet];
+      // linear colours: a dingy grey (about #5a5954) near the clamp, a muddy brown-grey (about #38342c) at the tips; the
+      // warm lamps of the washroom lift them a good deal
+      const wet = pose.wall && pts[k].y < BUCKET.water ? .5 : 1, m = Math.min(1, dirt * Math.pow(f, 1.1)), stain = 1 - blot * Math.max(0, Math.sin(f * bf + bp));
+      const top = [.1 + .008 * brown, .1, .09 - .012 * brown], tip = [.04 + .006 * brown, .035, .026 - .004 * brown], k2 = shade * stain * wet;
+      const c = top.map((v, i) => (v + (tip[i] - v) * m) * k2);
       for (let j = 0; j < SIDES; j++){
         const an = j / SIDES * Math.PI * 2, nv = n0.clone().multiplyScalar(Math.cos(an)).addScaledVector(b, Math.sin(an));
         const v = pts[k].clone().addScaledVector(nv, rad).applyMatrix4(toLocal), nl = nv.clone().transformDirection(toLocal);
