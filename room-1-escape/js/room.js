@@ -1928,21 +1928,60 @@ handScene.add(new THREE.HemisphereLight(0xb9c6bf, 0x1c1410, .42));
   const fill = new THREE.DirectionalLight(0xd9c7b8, .18); fill.position.set(-.3, -.4, .6); handScene.add(fill);   // light bouncing off the floor
   const red = new THREE.PointLight(0xff2a1a, .12, 3); red.position.set(-.8, .5, -.6); handScene.add(red);   // the emergency lamps
 }
+const brnd = mulberry32(4471);   // the cloth's and the boots' own random numbers, so the room keeps its look
+// ### The skin of the real hands, drawn at 0.2 mm a pixel: the warm base with faint blotches and redder patches, freckles,
+// ### veins showing blue-green through the skin, the fine criss-cross lines of the skin and its pores, and some dust from
+// ### the ladder. The bump map gives the lines and the pores their depth. The first two loops draw from the room's own
+// ### random numbers exactly as before (so everything after them in the room keeps its look); the rest uses its own.
+function skinTextures(){
+  const srnd = mulberry32(2207), S = 512, LINES = [];
+  for (let i = 0; i < 900; i++){ const a = (srnd() < .5 ? .7 : -.7) + (srnd() - .5) * .35, x = srnd() * S, y = srnd() * S, l = 8 + srnd() * 30; LINES.push([x, y, x + Math.cos(a) * l, y + Math.sin(a) * l, srnd()]); }
+  const PORES = []; for (let i = 0; i < 9000; i++) PORES.push([srnd() * S, srnd() * S, srnd()]);
+  const wrap = (g, f) => { for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]){ g.save(); g.translate(dx, dy); f(); g.restore(); } };   // so the tiles meet without a seam
+  const map = canvasTex(S, S, (g, w, h) => {
+    g.fillStyle = '#a8765c'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 260; i++){ const r = (2 + rnd() * 9) * 4; g.fillStyle = rnd() < .5 ? `rgba(176,104,84,${rnd() * .12})` : `rgba(214,170,140,${rnd() * .12})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, r, 0, Math.PI * 2); g.fill(); }
+    for (let i = 0; i < 1600; i++){ g.fillStyle = `rgba(90,52,40,${rnd() * .07})`; g.fillRect(rnd() * w, rnd() * h, 2, 2); }   // pores
+    const blob = (x, y, r, c) => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, c); gr.addColorStop(1, c.replace(/[\d.]+\)$/, '0)')); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); };
+    wrap(g, () => {
+      for (let i = 0; i < 26; i++) blob(srnd() * w, srnd() * h, 40 + srnd() * 90, srnd() < .5 ? 'rgba(186,96,80,.09)' : 'rgba(198,160,110,.08)');   // redder and yellower patches
+      g.lineCap = 'round';
+      for (let i = 0; i < 9; i++){   // veins, faint and soft
+        let x = srnd() * w, y = srnd() * h, a = srnd() * Math.PI * 2;
+        g.strokeStyle = 'rgba(70,92,118,.05)';
+        for (const lw of [9, 5]){ g.lineWidth = lw; g.beginPath(); g.moveTo(x, y); let px = x, py = y, pa = a; for (let k = 0; k < 6; k++){ pa += (srnd() - .5) * .9; px += Math.cos(pa) * 22; py += Math.sin(pa) * 22; g.lineTo(px, py); } g.stroke(); }
+      }
+      for (let i = 0; i < 70; i++) blob(srnd() * w, srnd() * h, 1.5 + srnd() * 3, `rgba(120,66,44,${.2 + srnd() * .25})`);   // freckles
+      for (const [x1, y1, x2, y2, v] of LINES){ g.strokeStyle = `rgba(112,66,52,${.05 + v * .06})`; g.lineWidth = 1; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); }
+      for (let i = 0; i < 18; i++) blob(srnd() * w, srnd() * h, 14 + srnd() * 46, `rgba(84,72,60,${.08 + srnd() * .1})`);   // dust and grime from the ladder
+    });
+    for (const [x, y, v] of PORES){ g.fillStyle = `rgba(92,50,38,${.04 + v * .08})`; g.fillRect(x, y, 1.4, 1.4); }
+  }, [3, 3]);
+  const bump = canvasTex(S, S, (g, w, h) => {
+    g.fillStyle = '#808080'; g.fillRect(0, 0, w, h);
+    wrap(g, () => { g.lineCap = 'round'; for (const [x1, y1, x2, y2, v] of LINES){ g.strokeStyle = `rgba(0,0,0,${.25 + v * .3})`; g.lineWidth = 1.2; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); } });
+    for (const [x, y, v] of PORES){ g.fillStyle = `rgba(0,0,0,${.2 + v * .3})`; g.fillRect(x, y, 1.6, 1.6); }
+    for (let i = 0; i < 4000; i++){ g.fillStyle = srnd() < .5 ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'; g.fillRect(srnd() * w, srnd() * h, 3, 3); }   // the soft unevenness between
+  }, [3, 3]);
+  bump.encoding = THREE.LinearEncoding;
+  return { map, bump };
+}
+const SKIN = skinTextures();
+// ### Gives a geometry a white colour per corner, for materials that shade their folds with vertex colours.
+function plainColours(geo){ geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count * 3).fill(1), 3)); return geo; }
 const HAND_MAT = {
   skin: new THREE.MeshStandardMaterial({ color: 0xa06e55, roughness: .66 }),
   nail: new THREE.MeshStandardMaterial({ color: 0xd9b3a0, roughness: .35 }),
-  // the real hands: skin with faint blotches and redder patches, matt but with a soft sheen
-  real: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .6, envMapIntensity: .35, skinning: true, map: canvasTex(128, 128, (g, w, h) => {
-    g.fillStyle = '#a8765c'; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 260; i++){ const r = 2 + rnd() * 9; g.fillStyle = rnd() < .5 ? `rgba(176,104,84,${rnd() * .12})` : `rgba(214,170,140,${rnd() * .12})`; g.beginPath(); g.arc(rnd() * w, rnd() * h, r, 0, Math.PI * 2); g.fill(); }
-    for (let i = 0; i < 1600; i++){ g.fillStyle = `rgba(90,52,40,${rnd() * .07})`; g.fillRect(rnd() * w, rnd() * h, 1, 1); }   // pores
-  }, [3, 3]) }),
-  sleeve: (() => { const c = prisonCloth(256, 256, [1, 3.2], .25); return new THREE.MeshStandardMaterial({ color: 0xc8c8c8, roughness: .97, side: THREE.DoubleSide, map: c.map, bumpMap: c.bump, bumpScale: .0004 }); })()
+  // the real hands: the skin above, matt but with a soft sheen
+  real: new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: .58, envMapIntensity: .35, skinning: true, map: SKIN.map, bumpMap: SKIN.bump, bumpScale: .00025 }),
+  sleeve: (() => { const c = prisonCloth(256, 256, [1, 3.2], .25); return new THREE.MeshStandardMaterial({ color: 0xc8c8c8, roughness: .97, side: THREE.DoubleSide, map: c.map, bumpMap: c.bump, bumpScale: .0004, vertexColors: true }); })()
 };
-// ### The cuff and the sleeve, running from the wrist (the origin) back out of the picture along +z.
+// ### The cuff and the sleeve, running from the wrist (the origin) back out of the picture along +z. The sleeve is a tube
+// ### of cloth with soft folds, pushed up into rings of wrinkles behind the cuff and at the elbow.
 function addSleeve(arm){
-  arm.add(new THREE.Mesh(new THREE.CylinderGeometry(.038, .04, .035, 18, 1, true).rotateX(Math.PI / 2).translate(0, 0, .05), HAND_MAT.sleeve));
-  arm.add(new THREE.Mesh(new THREE.CylinderGeometry(.042, .052, .42, 18).rotateX(Math.PI / 2).translate(0, -.004, .275), HAND_MAT.sleeve));
+  arm.add(new THREE.Mesh(plainColours(new THREE.CylinderGeometry(.038, .04, .035, 18, 1, true).rotateX(Math.PI / 2).translate(0, 0, .05)), HAND_MAT.sleeve));
+  const tube = clothTube([[0, .05], [.12, .049], [.6, .045], [1, .043]], [[.12, .1, .07], [.92, .1, .05]], 22, 30, (y, a) => (1 - y / .3) * .35 * (.7 + .3 * Math.sin(a * 4 + y * 9)), [0, 1]);
+  arm.add(new THREE.Mesh(tube.rotateX(Math.PI / 2).scale(1, 1, .42).translate(0, -.004, .065), HAND_MAT.sleeve));
 }
 // ### The drawn stand-in hand with its forearm in a sleeve. The wrist is at the origin and the fingers point along -z, as
 // ### the camera looks; side is 1 for the right hand and -1 for the left. Every part with the same material is merged, so
@@ -1987,10 +2026,12 @@ function bakeArm(arm){
   for (const [mat, list] of groups){
     const parts = list.map(o => { const g = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone()).applyMatrix4(m4.multiplyMatrices(inv, o.matrixWorld)); o.geometry.dispose(); return g; });
     const n = parts.reduce((a, g) => a + g.attributes.position.count, 0), pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), uv = new Float32Array(n * 2);
+    const col = mat.vertexColors ? new Float32Array(n * 3) : null;
     let o = 0;
-    for (const g of parts){ pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); uv.set(g.attributes.uv.array, o * 2); o += g.attributes.position.count; g.dispose(); }
+    for (const g of parts){ pos.set(g.attributes.position.array, o * 3); nor.set(g.attributes.normal.array, o * 3); uv.set(g.attributes.uv.array, o * 2); if (col) col.set(g.attributes.color.array, o * 3); o += g.attributes.position.count; g.dispose(); }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    if (col) geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.computeBoundingSphere();
     arm.add(new THREE.Mesh(geo, mat));
   }
@@ -2826,8 +2867,8 @@ const easeIO = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 const bump = (t, a, b) => Math.sin(Math.PI * clamp((t - a) / (b - a), 0, 1));
 // ### Where a hand holds on: the edge of the hatch frame at the top, a rung (at height y) below it.
 const gripAt = (side, y) => y > -.1 ? new THREE.Vector3(TUN.x + side * .2, .035, TUN.zN + .015) : new THREE.Vector3(TUN.x + side * .14, y, TUN.ladderZ);
-// ### Where a boot stands: the ankle just above the rung at height y, a little out from the ladder.
-const footAt = (side, y) => new THREE.Vector3(TUN.x + side * .1, y + .075, TUN.ladderZ + .07);
+// ### Where a boot stands: the ankle above the rung at height y, so the sole rests on it under the ball of the foot.
+const footAt = (side, y) => new THREE.Vector3(TUN.x + side * .1, y + .113, TUN.ladderZ + .1);
 function endingA(){
   hatchAnim = 0; endingShown = false; climb = null; $('lookHint').classList.add('gone');
   tunnelLight.visible = tunnelLight2.visible = dust.pts.visible = true;
@@ -2914,23 +2955,156 @@ function updateClimb(dt){
   if (REDUCED){ const v = VIEWS.tunnel, a = anglesTo(v.pos, v.look); pose.pos.fromArray(v.pos); pose.yaw = a.yaw; pose.pitch = a.pitch; pose.roll = 0; c.hands = false; }
   return pose;
 }
-// ### Your body on the ladder, drawn with the hands (so a wall never hides it): the chest in the striped uniform, the
-// ### shoulders, the upper arms and elbows, the legs with knees and boots. Built the first time you climb.
+// ### Your body on the ladder, drawn with the hands (so a wall never hides it): the chest in the striped uniform with
+// ### its collar and number, the shoulders, the upper arms and elbows, the legs with knees, and leather work boots. The
+// ### cloth is shaped like a body in loose clothes (narrower at the waist, a calf under the trouser leg) and creased:
+// ### it bunches into rings of wrinkles at the elbows, the knees, the waist and over the boots. Built the first time you climb.
 let ME = null;
+// ### The radius of a profile [[y, r], ...] at height y (straight lines between the points).
+function profileAt(pr, y){
+  for (let i = 1; i < pr.length; i++) if (y <= pr[i][0]){ const [y0, r0] = pr[i - 1], [y1, r1] = pr[i]; return r0 + (r1 - r0) * (y - y0) / (y1 - y0); }
+  return pr[pr.length - 1][1];
+}
+// ### A tube of cloth from y = 0 to y = 1 (stretched to its length later) whose radius follows the profile. Folds are
+// ### pushed into it: soft lengthwise drape all along, and rings of wrinkles where the cloth bunches ([height, reach,
+// ### depth] in bunch), each ring wavering round the tube so no two folds are alike. Each corner gets a colour: darker
+// ### deep in a fold, where little light reaches, and browner where dirt(y, angle) says the cloth is dusty.
+function clothTube(profile, bunch, seg = 24, rows = 36, dirt, seal = [1, 1]){
+  const pts = []; for (let j = 0; j <= rows; j++){ const y = j / rows; pts.push(new THREE.Vector2(profileAt(profile, y), y)); }
+  const geo = new THREE.LatheGeometry(pts, seg), p = geo.attributes.position, uv = geo.attributes.uv, s1 = brnd() * 6.3, s2 = brnd() * 6.3;
+  const col = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++){
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), a = Math.atan2(x, z);
+    let f = .025 * Math.sin(a * 3 + s1 + y * 2) + .012 * Math.sin(a * 7 + s2 - y * 3), fold = 0;
+    for (const [c, w, amp] of bunch){
+      const d = (y - c) / w;
+      if (Math.abs(d) < 1) fold += amp * (1 - d * d) * Math.sin((y - c) / w * 9 + Math.sin(a * 2 + s1) * 1.8 + Math.sin(a * 5 + s2) * .6);
+    }
+    // where the tube meets a joint the folds die away, so its edge closes neatly round the joint
+    const fade = Math.min(1, seal[0] ? y / .08 : 1, seal[1] ? (1 - y) / .08 : 1);
+    f = (f + fold) * fade; fold *= fade;
+    p.setX(i, x * (1 + f)); p.setZ(i, z * (1 + f));
+    uv.setY(i, uv.getY(i) + f * .3 + .012 * Math.sin(a * 2 + s2 + y * 4));   // the stripes are pulled out of line by the folds
+    const shade = clamp(1 + f * 3 + Math.min(0, fold) * 6, .42, 1.08), dust = dirt ? clamp(dirt(y, a + s2), 0, 1) : 0;
+    col[i * 3] = shade * (1 - dust * .3); col[i * 3 + 1] = shade * (1 - dust * .36); col[i * 3 + 2] = shade * (1 - dust * .46);
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  geo.computeVertexNormals();
+  // the first and last column of the lathe are the same seam: give them the same normal so it does not show
+  const n = geo.attributes.normal, cols = rows + 1;
+  for (let j = 0; j < cols; j++){
+    const a = j, b = seg * cols + j, v = new THREE.Vector3(n.getX(a) + n.getX(b), n.getY(a) + n.getY(b), n.getZ(a) + n.getZ(b)).normalize();
+    n.setXYZ(a, v.x, v.y, v.z); n.setXYZ(b, v.x, v.y, v.z);
+  }
+  return geo;
+}
+// ### A leather work boot (or its sole), shaped from a sphere: the ankle at the origin, the toe towards -z. Along its
+// ### length it is narrow at the heel and widest at the ball of the foot with a round toe; its cross-section is a
+// ### rounded rectangle from the sole (bottom) to the top, which rises into the shaft round the ankle and slopes down
+// ### to the toe. Creases cross the instep where the boot bends. bootPoint gives one point of that surface, from a
+// ### point of the unit sphere, so the eyelets and laces can be put right on the leather.
+const smoothStep = (a, b, v) => { const q = clamp((v - a) / (b - a), 0, 1); return q * q * (3 - 2 * q); };
+function bootPoint(sx, sy, sz, bottom, topAt, widen, creases, out){
+  const sq = v => Math.sign(v) * Math.pow(Math.abs(v), .55);   // a circle pushed out towards a rounded square
+  const rho = Math.sqrt(Math.max(0, 1 - sy * sy)), t = (1 - sy) / 2, cx = rho > 1e-5 ? sx / rho : 0, cz = rho > 1e-5 ? sz / rho : 0;
+  const w = .034 + .017 * Math.sin(Math.PI * Math.min(1, t * 1.12)) + widen;
+  const tip = Math.pow(rho, t > .5 ? .5 : .32);   // round at the heel and the toe
+  const top = topAt(t), h = (sq(cz) + 1) / 2;
+  let y = bottom + (top - bottom) * h * (.35 + .65 * tip) + (top - bottom) * .65 * (1 - tip) * .5;
+  if (creases && h > .7 && t > .5 && t < .66) y += Math.sin((t - .5) * 120) * .0022 * (h - .7) / .3;
+  return out.set(sq(cx) * w * tip, y, .08 - t * .3);
+}
+function bootGeometry(bottom, topAt, widen, creases){
+  const geo = new THREE.SphereGeometry(1, 28, 24), p = geo.attributes.position, v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++){ bootPoint(p.getX(i), p.getY(i), p.getZ(i), bottom, topAt, widen, creases, v); p.setXYZ(i, v.x, v.y, v.z); }
+  geo.computeVertexNormals();
+  return geo;
+}
 function buildBody(){
-  const cloth = prisonCloth(256, 256, [2, 4.2], .25);
-  const mat = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, roughness: .97, map: cloth.map, bumpMap: cloth.bump, bumpScale: .0004 });
-  const leather = new THREE.MeshStandardMaterial({ color: 0x17120e, roughness: .55, envMapIntensity: .25 });
+  const cloth = prisonCloth(512, 512, [2, 4.2], .3);
+  // the side seams: a ridge down the edge of the cloth (twice round each tube), sewn with a row of pale stitches either side
+  for (const [tex, paint] of [[cloth.map, (g, h) => {
+    g.fillStyle = 'rgba(20,18,16,.45)'; g.fillRect(0, 0, 3, h); g.fillRect(509, 0, 3, h);
+    g.fillStyle = 'rgba(214,204,176,.55)'; for (let y = 0; y < h; y += 9){ g.fillRect(6, y, 1.5, 5); g.fillRect(505, y + 4, 1.5, 5); }
+  }], [cloth.bump, (g, h) => {
+    g.fillStyle = 'rgba(0,0,0,.6)'; g.fillRect(0, 0, 2, h); g.fillRect(510, 0, 2, h);
+    g.fillStyle = 'rgba(255,255,255,.45)'; g.fillRect(3, 0, 5, h); g.fillRect(504, 0, 5, h);
+    g.fillStyle = 'rgba(0,0,0,.4)'; for (let y = 0; y < h; y += 9){ g.fillRect(6, y + 5, 1.5, 4); g.fillRect(505, y, 1.5, 4); }
+  }]]){ paint(tex.image.getContext('2d'), 512); tex.needsUpdate = true; }
+  const mat = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, roughness: .95, map: cloth.map, bumpMap: cloth.bump, bumpScale: .0006, side: THREE.DoubleSide, vertexColors: true });
+  // where the uniform has picked up dust: round the hems and the knees from the ladder and the floor, in patches
+  const patchy = (a, y) => .65 + .35 * Math.sin(a * 3 + y * 11) * Math.sin(a * 5 - y * 7);
+  const smooth = smoothStep;
+  // the boots: dark brown leather, scuffed pale at the toe and the heel, creased where they bend, on black rubber soles
+  const leatherMap = canvasTex(256, 256, (g, w, h) => {
+    g.fillStyle = '#2a1d14'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 4000; i++){ const v = brnd(); g.fillStyle = v > .5 ? `rgba(90,64,44,${(v - .5) * .3})` : `rgba(8,5,3,${v * .3})`; g.fillRect(brnd() * w, brnd() * h, 2, 2); }
+    for (let i = 0; i < 26; i++){ const y = h * (brnd() < .6 ? .8 + brnd() * .2 : brnd() * .12), x = brnd() * w, r = 5 + brnd() * 16;   // scuffs at the toe and the heel
+      const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(120,96,74,.35)'); gr.addColorStop(1, 'rgba(120,96,74,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
+    g.strokeStyle = 'rgba(160,130,90,.5)'; g.setLineDash([3, 3]); g.lineWidth = 1.2;   // stitching round the toe cap
+    g.beginPath(); g.moveTo(0, h * .72); g.lineTo(w, h * .72); g.stroke(); g.beginPath(); g.moveTo(0, h * .3); g.lineTo(w, h * .3); g.stroke();
+  });
+  const leatherBump = canvasTex(256, 256, (g, w, h) => {
+    g.fillStyle = '#808080'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 6000; i++){ g.fillStyle = brnd() < .5 ? 'rgba(0,0,0,.18)' : 'rgba(255,255,255,.12)'; g.fillRect(brnd() * w, brnd() * h, 1.5, 1.5); }   // the grain
+    g.strokeStyle = 'rgba(0,0,0,.35)'; g.lineWidth = 1.5;
+    for (let i = 0; i < 30; i++){ const y = h * (.55 + brnd() * .12), x = brnd() * w; g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + 12, y + (brnd() - .5) * 6, x + 20 + brnd() * 20, y + (brnd() - .5) * 4); g.stroke(); }   // creases
+  });
+  leatherBump.encoding = THREE.LinearEncoding;
+  const leather = new THREE.MeshStandardMaterial({ map: leatherMap, bumpMap: leatherBump, bumpScale: .0008, roughness: .48, envMapIntensity: .5 });
+  const rubber = new THREE.MeshStandardMaterial({ color: 0x141211, roughness: .95, envMapIntensity: .25 });
+  const lace = new THREE.MeshStandardMaterial({ color: 0x3a3026, roughness: .9 });
+  const brass = new THREE.MeshStandardMaterial({ color: 0x8a7650, metalness: 1, roughness: .45 });
   const g = new THREE.Group(); handScene.add(g);
-  const mesh = (geo, m) => { const o = new THREE.Mesh(geo, m || mat); o.frustumCulled = false; g.add(o); return o; };
-  // a limb runs from y = 0 (radius r0) to y = 1 (radius r1); it is stretched to its length
-  const limb = (r0, r1) => mesh(new THREE.CylinderGeometry(r1, r0, 1, 14, 1, true).translate(0, .5, 0));
-  const ball = r => mesh(new THREE.SphereGeometry(r, 14, 10));
+  const add = (o, parent) => { o.frustumCulled = false; (parent || g).add(o); return o; };
+  const mesh = (geo, m, parent) => add(new THREE.Mesh(geo, m || mat), parent);
+  const ball = (r, dust = 0) => { const geo = plainColours(new THREE.SphereGeometry(r, 16, 12)), c = geo.attributes.color; for (let i = 0; i < c.count; i++) c.setXYZ(i, 1 - dust * .3, 1 - dust * .36, 1 - dust * .46); return mesh(geo); };
   const two = f => [f(), f()];
-  return { g, torso: mesh(new THREE.CylinderGeometry(1, .84, 1, 22).translate(0, -.5, 0)),
-    shoulder: two(() => ball(.062)), upper: two(() => limb(.058, .048)), elbow: two(() => ball(.047)),
-    hip: two(() => ball(.08)), thigh: two(() => limb(.078, .062)), knee: two(() => ball(.062)), shin: two(() => limb(.058, .045)),
-    boot: two(() => mesh(new THREE.BoxGeometry(.105, .085, .27).translate(0, -.01, -.05), leather)) };
+  // the chest: hips (y = -1) to the base of the neck (y = 0), a body's outline, scaled to 38 by 22 cm
+  const torso = add(new THREE.Group());
+  const chest = mesh(clothTube([[0, .92], [.25, .84], [.6, .97], [.85, 1], [.95, .8], [1, .46]], [[.22, .12, .05], [.62, .3, .02]], 28, 40,
+    (y, a) => (1 - smooth(0, .35, y)) * .35 * patchy(a, y)).translate(0, -1, 0), mat, torso);
+  const collar = mesh(plainColours(new THREE.TorusGeometry(.083, .013, 8, 28).rotateX(Math.PI / 2)), mat, torso); collar.scale.set(1, 1, .6); collar.position.y = -.01;
+  // the inmate number stencilled on a cloth patch on the chest
+  const patch = mesh(new THREE.PlaneGeometry(.11, .05), new THREE.MeshStandardMaterial({ roughness: .95, map: canvasTex(256, 116, (c, w, h) => {
+    c.fillStyle = '#d9d2bd'; c.fillRect(0, 0, w, h); grime(c, w, h, 5, 'rgba(90,70,40,.25)', 50, false);
+    c.fillStyle = '#1d1c1b'; c.font = '700 80px "Arial Narrow", Arial, sans-serif'; c.textAlign = 'center'; c.fillText('4471', w / 2, h * .8);
+  }) }), torso);
+  patch.position.set(-.07, -.17, -.112); patch.rotation.set(-.12, Math.PI, 0);
+  // a boot: upper, sole with its heel, and the laces criss-crossing between two rows of brass eyelets on the leather
+  const upperTop = t => .075 - .088 * smoothStep(.3, .72, t) - .012 * smoothStep(.85, 1, t);
+  const boot = () => {
+    const b = add(new THREE.Group());
+    mesh(bootGeometry(-.07, upperTop, 0, true), leather, b);
+    mesh(bootGeometry(-.093, () => -.066, .006, false), rubber, b);
+    mesh(new THREE.BoxGeometry(.066, .024, .072).translate(0, -.1, .044), rubber, b);   // the heel
+    const holes = [];
+    for (let k = 0; k < 6; k++){
+      const sy = 1 - 2 * (.36 + k * .052), rho = Math.sqrt(1 - sy * sy), row = [];
+      for (const s of [-1, 1]){
+        const at = bootPoint(s * rho * .34, sy, rho * .94, -.07, upperTop, 0, false, new THREE.Vector3()), up = bootPoint(0, sy, rho, -.07, upperTop, 0, false, new THREE.Vector3());
+        at.y += .0008; row.push(at.clone().add(new THREE.Vector3(0, .0022, 0)));
+        const e = mesh(new THREE.TorusGeometry(.0036, .0012, 5, 10), brass, b); e.position.copy(at);
+        e.quaternion.setFromUnitVectors(AXIS_Z, new THREE.Vector3(s * (at.y - up.y) * -6, 1, 0).normalize());   // lying flat on the leather
+      }
+      holes.push(row);
+    }
+    // a lace: a thin cord from one eyelet across to the other row, one rung further up, and the bar across the bottom
+    const cord = (A, B) => { const d = B.clone().sub(A), m = mesh(new THREE.CylinderGeometry(.0017, .0017, 1, 5), lace, b); m.position.copy(A).addScaledVector(d, .5); m.quaternion.setFromUnitVectors(AXIS_Y, d.clone().normalize()); m.scale.y = d.length(); };
+    cord(holes[holes.length - 1][0], holes[holes.length - 1][1]);
+    for (let k = holes.length - 1; k > 0; k--){ cord(holes[k][0], holes[k - 1][1]); cord(holes[k][1], holes[k - 1][0]); }
+    return b;
+  };
+  return { g, torso, chest,
+    shoulder: two(() => ball(.064)),
+    upper: two(() => mesh(clothTube([[0, .05], [.5, .057], [1, .064]], [[.1, .2, .09], [.9, .12, .04]], 24, 36, (y, a) => (1 - smooth(0, .3, y)) * .25 * patchy(a, y)))),
+    elbow: two(() => ball(.049)),
+    hip: two(() => ball(.083)),
+    thigh: two(() => mesh(clothTube([[0, .088], [.25, .086], [.7, .072], [1, .064]], [[.0, .12, .05], [.86, .17, .08]], 24, 36, (y, a) => smooth(.7, 1, y) * .55 * patchy(a, y)))),
+    knee: two(() => ball(.064, .45)),
+    shin: two(() => mesh(clothTube([[0, .063], [.28, .069], [.62, .062], [.9, .058], [.97, .063], [1, .06]], [[.1, .14, .05], [.88, .14, .1]], 24, 36,
+      (y, a) => ((1 - smooth(0, .18, y)) * .5 + smooth(.5, 1, y) * .9) * patchy(a, y), [1, 0]))),
+    boot: two(boot) };
 }
 // ### Where the middle joint goes for a limb from root to end with two bones of lengths a and b, bending towards pole.
 function twoBone(root, end, a, b, pole){
@@ -2943,6 +3117,9 @@ const _inv = new THREE.Matrix4(), _m4 = new THREE.Matrix4(), _qw = new THREE.Qua
 const _hv = new THREE.Vector3(), _up = new THREE.Vector3(), _a = new THREE.Vector3(), _b = new THREE.Vector3(), _ax = new THREE.Vector3();
 const AXIS_X = new THREE.Vector3(1, 0, 0), AXIS_Y = new THREE.Vector3(0, 1, 0), AXIS_Z = new THREE.Vector3(0, 0, 1);
 const toCam = v => v.clone().applyMatrix4(_inv);
+// ### Turns a joint so that the poles of its sphere (where the cloth pattern bunches up) point along a world direction.
+const _dv = new THREE.Vector3();
+function aimJoint(m, dir){ m.quaternion.setFromUnitVectors(AXIS_Y, _dv.copy(dir).transformDirection(_inv)); }
 // ### Stretches a limb from world point A to world point B.
 function placeLimb(m, A, B){
   _a.copy(A).applyMatrix4(_inv); _b.copy(B).applyMatrix4(_inv).sub(_a);
@@ -2992,6 +3169,9 @@ function climbHands(dt){
     h.arm.children.forEach(o => { if (o.material === HAND_MAT.sleeve) o.scale.z = fl; });
     placeLimb(ME.upper[i], elbow, shoulder);
     ME.elbow[i].position.copy(elbowC); ME.shoulder[i].position.copy(toCam(shoulder));
+    // the joints' poles hide inside the sleeve, or point out sideways along the hinge of the elbow
+    aimJoint(ME.shoulder[i], elbow.clone().sub(shoulder));
+    aimJoint(ME.elbow[i], shoulder.clone().sub(elbow).cross(wristW.clone().sub(elbow)));
     if (h.wrist){
       h.wrist.rotation.set(g.moving ? .1 : -.35, 0, 0); h.wr.set(0, 0); h.wv.set(0, 0);
       for (let f = 0; f < 5; f++) h.curl[f] += ((f === 4 ? g.curl * .75 : g.curl) - h.curl[f]) * (1 - Math.exp(-dt * 14));
@@ -3002,10 +3182,12 @@ function climbHands(dt){
     const knee = twoBone(hip, ankle, THIGH, SHIN, fwd.clone().addScaledVector(right, side * .25));
     placeLimb(ME.thigh[i], hip, knee); placeLimb(ME.shin[i], knee, ankle);
     ME.hip[i].position.copy(toCam(hip)); ME.knee[i].position.copy(toCam(knee));
+    aimJoint(ME.hip[i], knee.clone().sub(hip));
+    aimJoint(ME.knee[i], hip.clone().sub(knee).cross(ankle.clone().sub(knee)));
     const boot = ME.boot[i]; boot.position.copy(toCam(ankle)); boot.quaternion.copy(_qc).multiply(_qy);
   }
   // the chest: an oval of 38 by 22 cm from the base of the neck to the hips, turned with the body
-  ME.torso.position.copy(toCam(neck)); ME.torso.quaternion.copy(_qc).multiply(_qy); ME.torso.scale.set(.19, neck.y - hips.y, .11);
+  ME.torso.position.copy(toCam(neck)); ME.torso.quaternion.copy(_qc).multiply(_qy); ME.chest.scale.set(.19, neck.y - hips.y, .11);
 }
 // ### Puts the sleeves back to their own length and hides the body once you have let go of the ladder.
 function leaveLadder(){
