@@ -401,7 +401,8 @@
   // ### 4. Deck run: run along the icy decks of the Titanic to the bow on the night of the collision. First along the side of
   // ### the ship under the deck above, past its round portholes; then out onto the open deck with the railing and its life
   // ### rings, benches, ventilators, lifeboats, a funnel and the foremast with the crow's nest. Everything that belongs to
-  // ### the ship is painted once into long tiles that scroll with the deck; only the sky and the sea stay behind.
+  // ### the ship is painted once into tiles that scroll with the deck; only the sky and the sea stay behind. The crates,
+  // ### trunks, barrels and ice are painted into the same tiles, so they move exactly with the deck and never wobble.
   // ### Every obstacle is drawn exactly as big as the box that can knock you down, and your own box is your body.
   const RUN_KINDS = {
     crate: { w: 30, h: 30 }, trunk: { w: 46, h: 22 }, barrel: { w: 24, h: 30 }, ice: { w: 36, h: 16 }
@@ -529,7 +530,7 @@
     const glow = (x, y, r, a) => { const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(255,205,120,${a})`); gr.addColorStop(1, 'rgba(255,205,120,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); };
     // ---- the covered promenade along the side of the ship ----
     if (vis(-400, PE + 40)){
-      const xa = Math.max(x0 - 2, -400), xb = Math.min(x0 + w + 2, PE);
+      const xa = Math.max(x0 - 4, -400), xb = Math.min(x0 + w + 2, PE);
       // the deck above: its railing against the sky, the slab, the steel side with seams and rivets
       g.strokeStyle = '#d9dee2'; g.lineWidth = 1.4; g.beginPath(); g.moveTo(xa, 8); g.lineTo(xb, 8); g.moveTo(xa, 18); g.lineTo(xb, 18); g.stroke();
       for (let x = Math.ceil(xa / 22) * 22; x < xb; x += 22){ g.beginPath(); g.moveTo(x + .5, 8); g.lineTo(x + .5, 30); g.stroke(); }
@@ -545,7 +546,7 @@
       for (const y of [89, 125, 193]) for (let x = Math.ceil(xa / 12) * 12; x < xb; x += 12){ g.beginPath(); g.arc(x, y, .9, 0, 7); g.fill(); }
       // two rows of round portholes: brass rims, warm light inside, frost on the lower edge
       for (const px of L.portholes) for (const [py, rr, off] of [[160, 13, 0], [70, 9, 32]]){
-        const x = px + off; if (!vis(x - 30, x + 30) || x > PE - 30) continue;
+        const x = px + off; if (!vis(x - 36, x + 36) || x > PE - 30) continue;
         glow(x, py, rr * 2.6, .25);
         const rim = g.createLinearGradient(x - rr, py - rr, x + rr, py + rr); rim.addColorStop(0, '#f0d58c'); rim.addColorStop(.5, '#b58b3a'); rim.addColorStop(1, '#6e5220');
         g.fillStyle = rim; g.beginPath(); g.arc(x, py, rr + 3.5, 0, 7); g.fill();
@@ -558,7 +559,7 @@
       }
       // watertight doors with a small round window, pipes beside them
       for (const dx of L.doors){
-        if (!vis(dx - 30, dx + 60)) continue;
+        if (!vis(dx - 30, dx + 66)) continue;
         g.fillStyle = '#b7b6ad'; g.fillRect(dx - 3, GROUND - 78, 42, 78);
         g.fillStyle = '#d2cfc4'; g.beginPath(); g.moveTo(dx, GROUND); g.lineTo(dx, GROUND - 68); g.quadraticCurveTo(dx, GROUND - 75, dx + 7, GROUND - 75); g.lineTo(dx + 29, GROUND - 75); g.quadraticCurveTo(dx + 36, GROUND - 75, dx + 36, GROUND - 68); g.lineTo(dx + 36, GROUND); g.fill();
         g.strokeStyle = 'rgba(70,70,64,.6)'; g.lineWidth = 1; g.stroke();
@@ -569,11 +570,12 @@
         g.fillStyle = '#c0392b'; g.fillRect(dx + 46, GROUND - 70, 16, 22); g.fillStyle = '#efe6cf'; g.fillRect(dx + 48, GROUND - 66, 12, 3);   // fire hose box
       }
       // lamps under the deck above
-      for (const lx of L.lamps){ if (!vis(lx - 40, lx + 40)) continue; glow(lx, 52, 46, .45); g.fillStyle = '#6e5220'; g.fillRect(lx - 1, 46, 2, 4); g.fillStyle = '#fff3c4'; g.beginPath(); g.arc(lx, 53, 3.2, 0, 7); g.fill(); }
-      // snow blown in along the foot of the wall
-      g.fillStyle = 'rgba(240,248,252,.9)'; g.beginPath(); g.moveTo(xa, GROUND);
-      for (let x = xa; x <= xb; x += 16) g.lineTo(x, GROUND - 3 - Math.abs(Math.sin(x * .013)) * 6);
-      g.lineTo(xb, GROUND); g.fill();
+      for (const lx of L.lamps){ if (!vis(lx - 48, lx + 48)) continue; glow(lx, 52, 46, .45); g.fillStyle = '#6e5220'; g.fillRect(lx - 1, 46, 2, 4); g.fillStyle = '#fff3c4'; g.beginPath(); g.arc(lx, 53, 3.2, 0, 7); g.fill(); }
+      // snow blown in along the foot of the wall (its points are fixed on the deck, so two tiles meet without a kink)
+      const s0 = Math.max(-400, Math.floor(xa / 16) * 16), s1 = Math.min(x0 + w + 18, PE);
+      g.fillStyle = 'rgba(240,248,252,.9)'; g.beginPath(); g.moveTo(s0, GROUND);
+      for (let x = s0; ; x += 16){ const sx = Math.min(x, s1); g.lineTo(sx, GROUND - 3 - Math.abs(Math.sin(sx * .013)) * 6); if (sx >= s1) break; }
+      g.lineTo(s1, GROUND); g.fill();
       // the end of the promenade: a steep stairway up to the deck above, and the corner of the deckhouse
       if (vis(PE - 140, PE + 40)){
         const s0 = [PE - 118, GROUND], s1 = [PE - 14, 44], n = 15, sx = (s1[0] - s0[0]) / n, sy = (s1[1] - s0[1]) / n;
@@ -588,9 +590,9 @@
     }
     // ---- the open deck ----
     if (vis(PE, RUN.LEN + 400)){
-      const xa = Math.max(x0 - 2, PE), xb = x0 + w + 2;
+      const xa = Math.max(x0 - 4, PE), xb = x0 + w + 2;
       // a funnel and lifeboats in their davits behind the railing
-      if (vis(L.funnel - 10, L.funnel + 90)){
+      if (vis(L.funnel - 32, L.funnel + 116)){
         const fx = L.funnel;
         const fg = g.createLinearGradient(fx, 0, fx + 84, 0); fg.addColorStop(0, '#7d6844'); fg.addColorStop(.35, '#b4935a'); fg.addColorStop(1, '#5f4d31');
         g.fillStyle = fg; g.fillRect(fx, -4, 84, RAIL - 30);
@@ -700,13 +702,15 @@
     }
     g.fillStyle = 'rgba(240,248,252,.9)'; g.fillRect(x0 - 2, GROUND, w + 4, 1.5);
     // ---- the bow: the deck narrows to the stem, the railing sweeps round with it, and beyond is the black sea ----
-    if (vis(BOW0, BOW + 600)){
-      const edge = x => GROUND + (H - GROUND) * (1 - Math.sqrt(Math.max(0, 1 - Math.min(1, (x - BOW0) / (BOW - BOW0)) ** 2)));
-      const xs = []; for (let x = BOW0; x < BOW; x += 3) xs.push(x); xs.push(BOW);
-      // the anchor chains, from the capstans along the deck to the hawse pipes at the stem
+    // the anchor chains, from the capstans along the deck to the hawse pipes at the stem
+    if (vis(RUN.LEN - 152, BOW)){
       g.strokeStyle = '#2b2f33'; g.lineWidth = 2.2; g.setLineDash([3, 1.6]);
       for (const [cx, y] of [[RUN.LEN - 150, GROUND + 9], [RUN.LEN - 70, GROUND + 16]]){ g.beginPath(); g.moveTo(cx, GROUND - 2); g.quadraticCurveTo(cx + 10, y, cx + 40, y); g.lineTo(BOW - 90, y + 6); g.lineTo(BOW - 30, H - 8); g.stroke(); }
       g.setLineDash([]);
+    }
+    if (vis(BOW0, BOW + 600)){
+      const edge = x => GROUND + (H - GROUND) * (1 - Math.sqrt(Math.max(0, 1 - Math.min(1, (x - BOW0) / (BOW - BOW0)) ** 2)));
+      const xs = []; for (let x = BOW0; x < BOW; x += 3) xs.push(x); xs.push(BOW);
       g.fillStyle = '#04080f'; g.beginPath(); g.moveTo(BOW0, GROUND - .5); for (const x of xs) g.lineTo(x, edge(x)); g.lineTo(BOW + 600, H); g.lineTo(BOW + 600, GROUND - .5); g.fill();
       g.fillStyle = 'rgba(200,220,240,.16)'; for (let k = 0; k < 9; k++){ const x = BOW0 + 60 + k * 61, y = GROUND + 6 + (k * 17) % 40; if (y < edge(x) - 3) g.fillRect(x, y, 9 + (k % 3) * 5, 1); }
       // the gunwale along the edge of the deck, then the railing on top of it
@@ -733,10 +737,11 @@
   }
 
   BUILD.deckrun = api => {
-    const { GROUND, H, LEN } = RUN, W = 640, SPEED = 230, TW = 512;
+    const { GROUND, H, LEN } = RUN, W = 640, SPEED = 230, TW = 256, AHEAD = 3;
     const c = api.canvas(W, H), g = c.getContext('2d');
     const night = paintNight(W, 205, 170, 1912), layout = runLayout(api.rand);
-    const scale = Math.max(1, c.width / W), tiles = new Map();
+    const tiles = new Map();
+    let tileK = 0, TD = TW;   // the screen pixels per unit the tiles are painted for, and the width of a tile in screen pixels
     const p = { x: 90, y: GROUND, vy: 0, hurt: 0 };
     let dist = 0, lives = 3, t = 0, breath = 0;
     const kinds = Object.keys(RUN_KINDS), obs = [];
@@ -745,17 +750,22 @@
     const jump = () => { if (p.y >= GROUND - .5 && !api.over){ p.vy = -610; api.sound('jump'); } };
     const Rn = Math.round;
     const body = () => ({ x: p.x - 7, y: p.y - 56, w: 14, h: 56 });
-    // ### One tile of the ship, painted the first time it comes near the screen and forgotten once it is behind.
+    // ### One tile of the ship (TW units wide, TD screen pixels), with the obstacles standing on it, painted a few tiles before
+    // ### it comes onto the screen and forgotten once it is behind. A tile is always drawn in whole screen pixels and never
+    // ### scaled, so the deck stays sharp and steady while it scrolls.
     function tile(i){
       if (!tiles.has(i)){
-        const cv = document.createElement('canvas'); cv.width = Math.ceil(TW * scale); cv.height = Math.ceil(H * scale);
-        const tg = cv.getContext('2d'); tg.scale(cv.width / TW, cv.height / H);
-        paintRunTile(tg, i * TW, TW, layout); tiles.set(i, cv);
+        const cv = document.createElement('canvas'); cv.width = TD; cv.height = c.height;
+        const tg = cv.getContext('2d'), x0 = i * TW; tg.scale(TD / TW, c.height / H);
+        paintRunTile(tg, x0, TW, layout);
+        tg.translate(-x0, 0);
+        for (const o of obs) if (o.x < x0 + TW + 2 && o.x + o.w > x0 - 2) drawObstacle(tg, o);
+        tiles.set(i, cv);
       }
       return tiles.get(i);
     }
-    function drawObstacle(o, sx){
-      const x = Rn(sx), y = GROUND - o.h, w = o.w, h = o.h;
+    function drawObstacle(g, o){
+      const x = o.x, y = GROUND - o.h, w = o.w, h = o.h;
       if (o.k === 'crate'){
         g.fillStyle = '#8a6136'; g.fillRect(x, y, w, h);
         g.fillStyle = '#6d4a26'; g.fillRect(x, y, w, 3); g.fillRect(x, y + h - 3, w, 3); g.fillRect(x, y, 3, h); g.fillRect(x + w - 3, y, 3, h);
@@ -808,11 +818,18 @@
         g.fillStyle = 'rgba(200,220,240,.18)';
         for (let i = 0; i < 14; i++){ const x = ((i * 97 - dist * .15) % (W + 40) + W + 40) % (W + 40) - 20; g.fillRect(x, 176 + (i % 4) * 7, 10 + (i % 3) * 6, 1); }
         g.fillStyle = '#04080f'; g.fillRect(0, 205, W, GROUND - 205);   // the dark sea seen low through the railing
-        // the ship, in tiles that scroll with the deck (world x = screen x - p.x + dist)
-        const wx0 = dist - p.x, first = Math.floor(wx0 / TW), last = Math.floor((wx0 + W) / TW);
-        for (let i = first; i <= last + 1; i++){ const cv = tile(i); if (i <= last) g.drawImage(cv, Rn(i * TW - wx0), 0, TW, H); }
-        for (const k of [...tiles.keys()]) if (k < first - 1) tiles.delete(k);
-        for (const o of obs){ const sx = o.x - dist + p.x; if (sx > -60 && sx < W + 60) drawObstacle(o, sx); }
+        // the ship and the obstacles, in tiles that scroll with the deck (world x = screen x - p.x + dist), placed on whole
+        // screen pixels; when the canvas changes size the tiles are painted again for the new size
+        const k = c.width / W;
+        if (k !== tileK){ tileK = k; TD = Math.max(1, Math.round(TW * k)); tiles.clear(); }
+        const off = Math.round((dist - p.x) * TD / TW), first = Math.floor(off / TD), last = Math.floor((off + c.width - 1) / TD);
+        const fresh = !tiles.size;
+        g.save(); g.setTransform(1, 0, 0, 1, 0, 0);
+        for (let i = first; i <= last; i++) g.drawImage(tile(i), i * TD - off, 0);
+        g.restore();
+        // the next tiles are painted ahead, one per frame (all at once at the start, before the clock runs)
+        for (let i = last + 1, n = 0; i <= last + AHEAD && (fresh || n < 1); i++) if (!tiles.has(i)){ tile(i); n++; }
+        for (const i of tiles.keys()) if (i < first) tiles.delete(i);
         // the sailor, breathing out little clouds in the cold
         if (!(p.hurt > 0 && Math.floor(p.hurt * 10) % 2)){
           g.fillStyle = 'rgba(0,0,0,.22)'; g.beginPath(); g.ellipse(p.x + 2, GROUND + 1, 11 - (GROUND - p.y) * .05, 2.2, 0, 0, 7); g.fill();
