@@ -341,9 +341,6 @@ const M = {
   plate: new THREE.MeshStandardMaterial({ map: plateTex, metalness: .75, roughness: .4 }),
   dark: new THREE.MeshStandardMaterial({ color: 0x0c0d0e, roughness: 1 }),
   pipe: new THREE.MeshStandardMaterial({ color: 0x59605c, metalness: .6, roughness: .45 }),
-  bucket: new THREE.MeshStandardMaterial({ color: 0xe0b021, roughness: .55 }),
-  wood: new THREE.MeshStandardMaterial({ color: 0x9c7a50, roughness: .7 }),
-  mopHead: new THREE.MeshStandardMaterial({ color: 0xbdb7a6, roughness: 1 }),
   paper: new THREE.MeshStandardMaterial({ color: 0xe9dfc4, roughness: .9, side: THREE.DoubleSide }),
   tube: new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffe9d2, emissiveIntensity: 2.4 }),
   corridor: new THREE.MeshBasicMaterial({ map: corridorTex }),
@@ -756,16 +753,175 @@ const steamPuffs = [];
 const puffTex = canvasTex(64, 64, (g, w) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,.6)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, w); });
 for (let i = 0; i < 14; i++){ const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: puffTex, transparent: true, opacity: 0, depthWrite: false })); s.userData.t = i / 14; room.add(s); steamPuffs.push(s); }
 
-// Mop and bucket in the south-east corner
-cyl(.2, .16, .34, M.bucket, 3.35, .17, 2.45, 22);
-cyl(.19, .19, .01, new THREE.MeshStandardMaterial({ color: 0x3c4a3c, roughness: .2 }), 3.35, .3, 2.45, 22);
+// ---------- Mop and bucket ----------
+// ### A janitor's round bucket of yellow moulded plastic in the south-east corner, a quarter full of grey mop water, and a
+// ### cotton string mop standing in it, its wooden handle leaning into the corner. Both are built here from many small
+// ### parts (no model files): the bucket is turned on a lathe with a rolled rim, a foot ring and two ribs, scuffed and
+// ### grubby with a faded stencil and a tide line inside; the mop is about a hundred and fifty yarn strands gripped in a
+// ### steel clamp on a varnished handle. Wedged against the door, the handle braces under the door handle and presses on
+// ### the door leaf, and the strands lie spread on the floor.
+const BUCKET = { x: 3.35, z: 2.45, water: .11, bottom: .026 };
+// the bucket's wall: radius at height y outside and inside
+const bucketOut = y => .158 + (y - .016) * .109, bucketIn = y => bucketOut(y) - .007;
+const bucketProfile = (() => {
+  const p = [[0, .003], [.13, .003], [.148, .006], [.156, .011], [.158, .016]];
+  for (let i = 1; i <= 20; i++){ const y = .016 + i * .0157, rib = Math.abs(y - .1) < .01 || Math.abs(y - .262) < .01 ? .0045 : 0; p.push([bucketOut(y) + rib, y]); }
+  p.push([.2, .338], [.207, .341], [.209, .347], [.205, .353], [.196, .354], [.189, .349]);
+  for (let i = 1; i <= 8; i++){ const y = .345 - i * (.345 - BUCKET.bottom) / 8; p.push([bucketIn(y), y]); }
+  p.push([.11, BUCKET.bottom], [0, BUCKET.bottom]);
+  return p.map(([x, y]) => new THREE.Vector2(x, y));
+})();
+// ### The bucket's plastic: yellow, scuffed and streaked on the outside with a faded stencil, dirty inside with a grey
+// ### tide line where the mop water stands. The picture runs once round (u) and along the lathe profile (v).
+const bucketTex = canvasTex(1024, 256, (g, w, h) => {
+  const n = bucketProfile.length, rowOf = j => (1 - j / (n - 1)) * h, out0 = rowOf(4), out1 = rowOf(25), in0 = rowOf(31);
+  g.fillStyle = '#e2ad1c'; g.fillRect(0, 0, w, h);
+  // inside: darker, with a dirty tide line at the water level and silt at the bottom
+  const tide = rowOf(30 + 8 * (.345 - BUCKET.water) / (.345 - BUCKET.bottom));
+  const ig = g.createLinearGradient(0, in0, 0, h); ig.addColorStop(0, '#b98d1f'); ig.addColorStop(1, '#5c5032'); g.fillStyle = ig; g.fillRect(0, in0, w, h - in0);
+  g.fillStyle = 'rgba(70,64,48,.55)'; g.fillRect(0, tide - 5, w, 7); g.fillStyle = 'rgba(70,64,48,.2)'; g.fillRect(0, tide - 14, w, 9);
+  // outside: grime gathered towards the foot, drips run down from the rim, scuffs from being kicked about
+  const og = g.createLinearGradient(0, out1, 0, out0); og.addColorStop(0, 'rgba(90,70,30,0)'); og.addColorStop(.75, 'rgba(90,70,30,.12)'); og.addColorStop(1, 'rgba(70,55,25,.45)');
+  g.fillStyle = og; g.fillRect(0, out1, w, out0 - out1);
+  for (let i = 0; i < 34; i++){
+    const x = rnd() * w, y0 = out1 + rnd() * 8, len = 20 + rnd() * (out0 - out1) * .9;
+    g.strokeStyle = `rgba(95,80,45,${.08 + rnd() * .14})`; g.lineWidth = 1 + rnd() * 2.5;
+    g.beginPath(); g.moveTo(x, y0); g.quadraticCurveTo(x + (rnd() - .5) * 6, y0 + len / 2, x + (rnd() - .5) * 4, y0 + len); g.stroke();
+  }
+  for (let i = 0; i < 55; i++){
+    const x = rnd() * w, y = out1 + rnd() * (out0 - out1), l = 4 + rnd() * 26, a = (rnd() - .5) * .7;
+    g.strokeStyle = rnd() < .6 ? `rgba(255,236,170,${.15 + rnd() * .2})` : `rgba(60,45,20,${.12 + rnd() * .2})`; g.lineWidth = .6 + rnd();
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+  }
+  grime(g, w, out0, 26, 'rgba(80,62,28,.18)', 30, true);
+  // a faded stencil, twice round the bucket
+  g.save(); g.font = '800 30px "Arial Narrow", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (const u of [.12, .62]){
+    g.fillStyle = 'rgba(28,26,22,.62)'; g.fillText('BLOCK D', u * w, out1 + (out0 - out1) * .42);
+    g.font = '700 21px "Arial Narrow", Arial, sans-serif'; g.fillText('WASHROOM 2', u * w, out1 + (out0 - out1) * .62); g.font = '800 30px "Arial Narrow", Arial, sans-serif';
+  }
+  g.restore();
+  // the stencil has worn away in flecks
+  for (const u of [.12, .62]) for (let i = 0; i < 260; i++){ g.fillStyle = `rgba(226,173,28,${.5 + rnd() * .5})`; g.fillRect((u - .07 + rnd() * .14) * w, out1 + (out0 - out1) * (.3 + rnd() * .42), 1 + rnd() * 2, 1 + rnd() * 2); }
+  // the rim is rubbed paler
+  g.fillStyle = 'rgba(255,240,190,.18)'; g.fillRect(0, out1 - (out1 - in0) * .9, w, (out1 - in0) * .7);
+});
+{
+  const bucket = new THREE.Mesh(new THREE.LatheGeometry(bucketProfile, 48), new THREE.MeshStandardMaterial({ map: bucketTex, roughness: .48 }));
+  bucket.position.set(BUCKET.x, 0, BUCKET.z); bucket.rotation.y = .9; add(bucket);
+  // ### The mop water: murky grey-brown, glossy, with grey scum and a few bubbles floating on it.
+  const scumTex = canvasTex(256, 256, (g, w, h) => {
+    g.fillStyle = '#4a4535'; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 60; i++){ const x = rnd() * w, y = rnd() * h, r = 4 + rnd() * 26, gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, 'rgba(150,145,125,.5)'); gr.addColorStop(1, 'rgba(150,145,125,0)'); g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2); }
+    for (let i = 0; i < 90; i++){ const x = rnd() * w, y = rnd() * h, r = .8 + rnd() * 3; g.strokeStyle = 'rgba(225,225,210,.6)'; g.lineWidth = .8; g.beginPath(); g.arc(x, y, r, 0, 7); g.stroke(); }
+  });
+  const water = new THREE.Mesh(new THREE.CircleGeometry(bucketIn(BUCKET.water) - .001, 40), new THREE.MeshStandardMaterial({ map: scumTex, roughness: .08, metalness: 0, transparent: true, opacity: .8, envMapIntensity: .3 }));
+  water.rotation.x = -Math.PI / 2; water.position.set(BUCKET.x, BUCKET.water, BUCKET.z); water.receiveShadow = true; room.add(water);
+  // the wire handle with its plastic grip, hooked into two lugs on the rim and dropped down over the front
+  const lugs = new THREE.Group(); lugs.position.set(BUCKET.x, .322, BUCKET.z); lugs.rotation.y = -.75; room.add(lugs);
+  const lugMat = new THREE.MeshStandardMaterial({ map: bucketTex, roughness: .5 });
+  for (const s of [-1, 1]){ const l = new THREE.Mesh(new THREE.BoxGeometry(.018, .05, .03), lugMat); l.position.set(s * .2, -.006, 0); add(l, lugs); }
+  const arc = new THREE.Group(); arc.rotation.x = -1.28; lugs.add(arc);
+  add(new THREE.Mesh(new THREE.TorusGeometry(.214, .0028, 6, 40, Math.PI), M.dullSteel), arc);
+  for (const s of [-1, 1]){ const hook = new THREE.Mesh(new THREE.TorusGeometry(.007, .0026, 5, 10), M.dullSteel); hook.position.set(s * .214, 0, 0); hook.rotation.y = Math.PI / 2; add(hook, arc); }
+  const grip = new THREE.Mesh(new THREE.CylinderGeometry(.011, .011, .1, 12), M.black); grip.rotation.z = Math.PI / 2; grip.position.y = .214; add(grip, arc);
+}
+
+// ### Varnished wood for the mop handle: grain running along it, darker and greyer at the foot where it stands in the
+// ### water, and polished darker where hands hold it.
+const mopWoodTex = canvasTex(64, 512, (g, w, h) => {
+  g.fillStyle = '#a8865a'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 46; i++){
+    const x = rnd() * w; g.strokeStyle = `rgba(${rnd() < .5 ? '110,72,36' : '210,170,115'},${.15 + rnd() * .3})`; g.lineWidth = .5 + rnd() * 2.2;
+    g.beginPath(); g.moveTo(x, 0); for (let y = 0; y <= h; y += 32) g.lineTo(x + Math.sin(y * .02 + i) * 1.5, y); g.stroke();
+  }
+  const foot = g.createLinearGradient(0, h * .82, 0, h); foot.addColorStop(0, 'rgba(70,62,48,0)'); foot.addColorStop(1, 'rgba(70,62,48,.7)'); g.fillStyle = foot; g.fillRect(0, h * .82, w, h * .18);
+  const hand = g.createLinearGradient(0, h * .04, 0, h * .4); hand.addColorStop(0, 'rgba(70,45,25,.35)'); hand.addColorStop(1, 'rgba(70,45,25,0)'); g.fillStyle = hand; g.fillRect(0, h * .04, w, h * .36);
+});
+const MOP_LEN = 1.37, MOP_R = .0125;
+// ### Cotton yarn: no picture, each strand has its own colour (clean near the clamp, dirty at the tips, darker where wet);
+// ### a twist pattern on strands this thin only shimmers.
+const mopYarn = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
+// ### Where the mop stands: the middle of its clamp and the end of its handle. In the corner the handle leans into the
+// ### corner of the two walls; at the door its end is jammed under the door handle and presses on the door leaf (whose
+// ### face is at z 2.90), so the door cannot swing in.
+function mopPose(clamp, top, floor, wall){
+  const u = top.clone().sub(clamp).normalize(), q = new THREE.Quaternion().setFromUnitVectors(v3(0, 1, 0), u);
+  return { p: clamp, q, r: new THREE.Euler().setFromQuaternion(q), floor, wall };
+}
+const MOP_CORNER = mopPose(v3(3.3, .26, 2.41), v3(3.976, 0, 2.976), BUCKET.bottom, true);
+const MOP_DOOR = mopPose(v3(.26, .05, 0), v3(.36, .975, 2.904), 0, false);
+// the handle is always MOP_LEN long: solve for the missing height (corner) or distance (door)
+{ const c = MOP_CORNER.p, h = Math.hypot(3.976 - c.x, 2.976 - c.z); Object.assign(MOP_CORNER, mopPose(c, v3(3.976, c.y + Math.sqrt(MOP_LEN ** 2 - h ** 2), 2.976), BUCKET.bottom, true)); }
+{ const t = v3(.36, .975, 2.904), dy = t.y - .05, dx = -.1, dz = Math.sqrt(MOP_LEN ** 2 - dy * dy - dx * dx); Object.assign(MOP_DOOR, mopPose(v3(t.x + dx, .05, t.z - dz), t, 0, false)); }
+// ### The strands for one pose: each starts in the clamp, falls out to its side and drops; it lies down where it reaches
+// ### the floor (or the bucket's bottom) and stays inside the bucket's wall. Built in the room's coordinates and then
+// ### moved into the mop's own, so the strands hang right for the pose they belong to. Returns one mesh of all strands.
+function mopFringe(pose){
+  const rot = new THREE.Matrix4().makeRotationFromQuaternion(pose.q), ax = v3(1, 0, 0).applyMatrix4(rot), az = v3(0, 0, 1).applyMatrix4(rot), up = v3(0, 1, 0).applyMatrix4(rot);
+  const toLocal = new THREE.Matrix4().compose(pose.p, pose.q, v3(1, 1, 1)).invert();
+  const SEG = 18, SIDES = 6, N = 150, R = .0055, pos = [], nor = [], col = [], uv = [], idx = [];
+  for (let s = 0; s < N; s++){
+    const side = s % 2 ? 1 : -1, a = (rnd() * 2 - 1), dirt = .6 + rnd() * .5, shade = .9 + rnd() * .15, len = .25 + rnd() * .07, seg = len / SEG;
+    let p = pose.p.clone().addScaledVector(ax, a * .066).addScaledVector(az, side * (.006 + rnd() * .014)).addScaledVector(up, -.014);
+    let d = az.clone().multiplyScalar(side * (.5 + rnd() * .4)).addScaledVector(ax, a * .35).addScaledVector(up, -.6).normalize();
+    const pts = [p.clone()];
+    for (let k = 0; k < SEG; k++){
+      if (d.y > -.04 || p.y > pose.floor + R * 2){ d.y -= .45 + rnd() * .1; d.x += (rnd() - .5) * .14; d.z += (rnd() - .5) * .14; d.normalize(); }
+      p = p.clone().addScaledVector(d, seg);
+      if (p.y < pose.floor + R){ p.y = pose.floor + R; d.y = 0; d.x += (rnd() - .5) * .14; d.z += (rnd() - .5) * .14; d.normalize(); d.y = -.03; }
+      if (pose.wall){
+        const dx = p.x - BUCKET.x, dz = p.z - BUCKET.z, rr = Math.hypot(dx, dz), lim = bucketIn(p.y) - R - .004;
+        if (rr > lim){ p.x = BUCKET.x + dx / rr * lim; p.z = BUCKET.z + dz / rr * lim; d.x -= dx / rr * .6; d.z -= dz / rr * .6; d.normalize(); }
+      }
+      pts.push(p);
+    }
+    // a tube round the strand's points; its colour follows its length
+    const base = pos.length / 3; let n0 = null, arcLen = 0;
+    for (let k = 0; k <= SEG; k++){
+      const t = pts[Math.min(SEG, k + 1)].clone().sub(pts[Math.max(0, k - 1)]).normalize();
+      if (!n0) n0 = Math.abs(t.y) < .9 ? v3(0, 1, 0).cross(t).normalize() : v3(1, 0, 0).cross(t).normalize();
+      n0 = n0.clone().sub(t.clone().multiplyScalar(n0.dot(t))).normalize();
+      const b = t.clone().cross(n0), f = k / SEG, rad = R * (k === SEG ? .25 : 1 - .25 * f * f);
+      if (k) arcLen += pts[k].distanceTo(pts[k - 1]);
+      const wet = pose.wall && pts[k].y < BUCKET.water ? .55 : 1, dirty = 1 - dirt * .5 * f * f;
+      const c = [.74 * shade * dirty * wet, .7 * shade * dirty * wet, .6 * shade * (dirty - .08 * f) * wet];
+      for (let j = 0; j < SIDES; j++){
+        const an = j / SIDES * Math.PI * 2, nv = n0.clone().multiplyScalar(Math.cos(an)).addScaledVector(b, Math.sin(an));
+        const v = pts[k].clone().addScaledVector(nv, rad).applyMatrix4(toLocal), nl = nv.clone().transformDirection(toLocal);
+        pos.push(v.x, v.y, v.z); nor.push(nl.x, nl.y, nl.z); col.push(...c); uv.push(arcLen / .03, j / SIDES);
+      }
+    }
+    for (let k = 0; k < SEG; k++) for (let j = 0; j < SIDES; j++){
+      const a0 = base + k * SIDES + j, a1 = base + k * SIDES + (j + 1) % SIDES, b0 = a0 + SIDES, b1 = a1 + SIDES;
+      idx.push(a0, a1, b0, a1, b1, b0);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(idx); geo.computeBoundingSphere();
+  const m = new THREE.Mesh(geo, mopYarn); m.castShadow = true;   // no shadows on itself: on strands this thin they only flicker
+  return m;
+}
 const mop = new THREE.Group();
-const mopStick = new THREE.Mesh(new THREE.CylinderGeometry(.017, .017, 1.45, 10), M.wood); mopStick.position.y = .72; mopStick.castShadow = true;
-const mopFringe = new THREE.Mesh(new THREE.CylinderGeometry(.06, .13, .2, 14), M.mopHead); mopFringe.position.y = .02; mopFringe.castShadow = true;
-mop.add(mopStick, mopFringe); room.add(mop);
-const MOP_CORNER = { p: new THREE.Vector3(3.35, .24, 2.45), r: new THREE.Euler(.18, 0, -.16) };
-const MOP_DOOR = { p: new THREE.Vector3(.58, 0, 2.15), r: new THREE.Euler(.36, 0, .14) };
-hot('take:mop', mopStick, mopFringe);
+const mopStick = new THREE.Mesh(new THREE.CylinderGeometry(MOP_R, MOP_R, MOP_LEN - .12, 14), new THREE.MeshStandardMaterial({ map: mopWoodTex, roughness: .42 }));
+mopStick.position.y = .06 + (MOP_LEN - .12) / 2;
+// the blue plastic cap on the end of the handle, with its rounded tip
+const mopCapMat = new THREE.MeshStandardMaterial({ color: 0x2c5a86, roughness: .38 });
+const mopCap = new THREE.Mesh(new THREE.CylinderGeometry(MOP_R + .002, MOP_R + .002, .055, 14), mopCapMat); mopCap.position.y = MOP_LEN - .06 - .0275 + .0035;
+const mopTip = new THREE.Mesh(new THREE.SphereGeometry(MOP_R + .002, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2), mopCapMat); mopTip.scale.y = .4; mopTip.position.y = MOP_LEN - .06 + .0035;
+// the clamp: a steel ferrule on the handle and a jaw that grips the folded strands, closed with a bolt and a wing nut
+const mopFerrule = new THREE.Mesh(new THREE.CylinderGeometry(MOP_R + .003, MOP_R + .006, .075, 14), M.dullSteel); mopFerrule.position.y = .05;
+const mopJaw = new THREE.Mesh(new THREE.BoxGeometry(.15, .03, .046), M.dullSteel); mopJaw.position.y = .008;
+const mopJawLip = new THREE.Mesh(new THREE.BoxGeometry(.156, .008, .05), M.dullSteel); mopJawLip.position.y = -.008;
+const mopBolt = new THREE.Mesh(new THREE.CylinderGeometry(.0045, .0045, .07, 8), M.steel); mopBolt.rotation.x = Math.PI / 2; mopBolt.position.set(.05, .008, 0);
+const mopNut = new THREE.Mesh(new THREE.BoxGeometry(.03, .012, .006), M.steel); mopNut.position.set(.05, .008, .031);
+const mopBoltHead = new THREE.Mesh(new THREE.CylinderGeometry(.007, .007, .005, 6), M.steel); mopBoltHead.rotation.x = Math.PI / 2; mopBoltHead.position.set(.05, .008, -.026);
+const fringeCorner = mopFringe(MOP_CORNER), fringeDoor = mopFringe(MOP_DOOR);
+for (const m of [mopStick, mopCap, mopTip, mopFerrule, mopJaw, mopJawLip, mopBolt, mopNut, mopBoltHead]){ m.castShadow = m.receiveShadow = true; mop.add(m); }
+mop.add(fringeCorner, fringeDoor); room.add(mop);
+hot('take:mop', mopStick, mopFerrule, mopJaw, fringeCorner);
 // The scratches in the tiles beside the door (east of the door frame, facing into the room)
 const scratches = plane(1.0, .62, M.scratches, 1.75, 1.3, D / 2 - .006, Math.PI);
 hot('read:scratches', scratches); hot('play:scratches', scratches);
@@ -981,8 +1137,6 @@ const tunnelLight = new THREE.PointLight(0xffb066, 0, 5, 2); tunnelLight.positio
     for (const s of [-1, 1]){ const p = new THREE.Mesh(new THREE.BoxGeometry(.3, .6, .012), [M.yellow, M.yellow, M.yellow, M.yellow, face, face]); p.position.set(0, .3, s * .09); p.rotation.x = s * -.16; p.castShadow = p.receiveShadow = true; g.add(p); }
     flat(.5, .5, M.blob, 2.7, 1.35);
   }
-  // the bucket's wire handle
-  { const hd = new THREE.Mesh(new THREE.TorusGeometry(.2, .006, 6, 24, Math.PI), M.dullSteel); hd.position.set(3.35, .33, 2.45); hd.rotation.set(-1.0, .5, 0); add(hd); }
   // housings over both lamps and a cage over the stall lamp
   box(1.42, .035, .2, M.dullSteel, -.6, H - .02, .3); box(.7, .035, .16, M.dullSteel, 2.75, H - .02, -1.8);
   for (let i = 0; i < 3; i++) box(.012, .07, .15, M.dullSteel, 2.5 + i * .25, 2.94, -1.8);
@@ -1645,7 +1799,7 @@ function drawHands(){
 // ### Clicking an object in the 3D view does the same as its marker. With a keyboard you walk with the arrow keys; only a
 // ### touch screen shows the "Walk to" buttons that glide you to another part of the room.
 const ANCHORS = {
-  'take:mop': [3.35, .9, 2.45], 'wedge': [.38, 1.02, 2.86], 'tap': [-3.94, 1.08, -.53],
+  'take:mop': [3.6, .66, 2.66], 'wedge': [.38, 1.02, 2.86], 'tap': [-3.94, 1.08, -.53],
   'read:mirror': [-3.97, 1.75, .45], 'play:mirror': [-3.97, 1.75, .45], 'read:graffiti': [1.53, 1.5, -1.9], 'play:tile': [2.62, .58, -2.97], 'take:carkey': [2.62, .58, -2.97],
   'read:scratches': [1.75, 1.3, 2.95], 'play:scratches': [1.75, 1.3, 2.95],
   'lock': [2.2, .1, -1.1], 'go:hatch': [2.2, .06, -1.75]
@@ -1743,7 +1897,7 @@ function act(action, target, quiet){
 function syncWorld(){
   const mp = S.wedged ? MOP_DOOR : S.inventory.includes('mop') ? null : MOP_CORNER;
   mop.visible = !!mp;
-  if (mp){ mop.position.copy(mp.p); mop.rotation.copy(mp.r); }
+  if (mp){ mop.position.copy(mp.p); mop.quaternion.copy(mp.q); fringeCorner.visible = mp === MOP_CORNER; fringeDoor.visible = mp === MOP_DOOR; }
   if (S.tileOpen && tile.userData.fall === undefined) tile.userData.fall = 0;
   if (!S.tileOpen){ tile.position.copy(TILE_POS); tile.rotation.set(0, 0, .07); delete tile.userData.fall; }
   carKey.visible = S.tileOpen && !S.inventory.includes('carkey');
