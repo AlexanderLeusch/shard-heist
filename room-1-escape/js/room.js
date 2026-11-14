@@ -351,7 +351,6 @@ const M = {
   sign: new THREE.MeshStandardMaterial({ map: signTex, roughness: .8 }),
   rubber: new THREE.MeshStandardMaterial({ color: 0x1c1d1e, roughness: .9 }),
   frost: new THREE.MeshStandardMaterial({ color: 0x9fb4c4, emissive: 0x24384e, emissiveIntensity: 1, roughness: .2, metalness: 0 }),
-  yellow: new THREE.MeshStandardMaterial({ color: 0xf2c014, roughness: .5 }),
   black: new THREE.MeshStandardMaterial({ color: 0x141516, roughness: .6 })
 };
 
@@ -1433,11 +1432,73 @@ function updateDust(dt, t){
     box(.16, .05, .1, M.dullSteel, X, .45, Z + .04); box(.05, .5, .01, M.dullSteel, X, .6, Z + .095);
     box(.08, .16, .08, M.steel, -3.955, 1.1, 0); box(.02, .02, .03, M.black, -3.91, 1.015, 0);
   }
-  { // the wet-floor sign: a yellow A-frame by the showers
+  { // ### The wet-floor sign by the showers: a folding A-frame of moulded yellow plastic, as cleaners use them. Two panels
+    // ### with rounded tops hang from one hinge pin along the top, so they meet there without a gap, and splay out to the
+    // ### floor. Each has a grip slot near the top, a raised rim round its edge and the print on its outer face: CAUTION,
+    // ### the warning triangle with a person slipping, WET FLOOR and the Spanish line below, a little worn. The plastic is
+    // ### scuffed and grubby towards the feet; small black rubber feet keep it from sliding.
     const g = new THREE.Group(); g.position.set(2.7, 0, 1.35); g.rotation.y = .5; room.add(g);
-    const signFace = canvasTex(128, 256, (c, w, h) => { c.fillStyle = '#f2c014'; c.fillRect(0, 0, w, h); c.fillStyle = '#141516'; c.font = '800 26px "Arial Narrow", Arial, sans-serif'; c.textAlign = 'center'; c.fillText('CAUTION', w / 2, 46); c.fillText('WET', w / 2, 200); c.fillText('FLOOR', w / 2, 230); c.beginPath(); c.moveTo(w / 2, 70); c.lineTo(w - 18, 170); c.lineTo(18, 170); c.closePath(); c.lineWidth = 6; c.strokeStyle = '#141516'; c.stroke(); c.fillRect(w / 2 - 4, 100, 8, 40); c.fillRect(w / 2 - 4, 148, 8, 8); });
-    const face = new THREE.MeshStandardMaterial({ map: signFace, roughness: .5 });
-    for (const s of [-1, 1]){ const p = new THREE.Mesh(new THREE.BoxGeometry(.3, .6, .012), [M.yellow, M.yellow, M.yellow, M.yellow, face, face]); p.position.set(0, .3, s * .09); p.rotation.x = s * -.16; p.castShadow = p.receiveShadow = true; g.add(p); }
+    const PW = .3, PL = .64, PD = .007, R0 = .055, PHI = Math.asin(.15 / PL), HY = PL * Math.cos(PHI) + .004;
+    // the outline in the panel's plane: x across, y down from the hinge (0) to the foot (-PL); rounded top, small round feet
+    const outline = (w, l, rt, rb, inset = 0) => {
+      const s = new THREE.Shape(), x0 = -w / 2 + inset, x1 = w / 2 - inset, y0 = -l + inset, y1 = -inset;
+      s.moveTo(x0 + rb, y0); s.lineTo(x1 - rb, y0); s.quadraticCurveTo(x1, y0, x1, y0 + rb);
+      s.lineTo(x1, y1 - rt); s.quadraticCurveTo(x1, y1, x1 - rt, y1); s.lineTo(x0 + rt, y1); s.quadraticCurveTo(x0, y1, x0, y1 - rt);
+      s.lineTo(x0, y0 + rb); s.quadraticCurveTo(x0, y0, x0 + rb, y0);
+      return s;
+    };
+    const slot = () => { const h = new THREE.Path(), w = .055, y = -.06, r = .016; h.absarc(w, y, r, -Math.PI / 2, Math.PI / 2, false); h.absarc(-w, y, r, Math.PI / 2, Math.PI * 1.5, false); return h; };
+    // the plastic: sign yellow, paler where it is rubbed, grey dirt and scuffs towards the feet (the caps' UVs are metres)
+    const plasticTex = canvasTex(256, 512, (c, w, h) => {
+      c.fillStyle = '#f2c417'; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 40; i++){ c.fillStyle = `rgba(255,236,150,${rnd() * .12})`; c.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 30, 1 + rnd() * 3); }
+      const d = c.createLinearGradient(0, h * .7, 0, h); d.addColorStop(0, 'rgba(90,80,50,0)'); d.addColorStop(1, 'rgba(90,80,50,.45)'); c.fillStyle = d; c.fillRect(0, h * .7, w, h * .3);
+      grime(c, w, h, 14, 'rgba(110,95,50,.16)', 40, true);
+      for (let i = 0; i < 70; i++){ const x = rnd() * w, y = h * (.45 + rnd() * .55), l = 3 + rnd() * 16, a = (rnd() - .5) * .8; c.strokeStyle = `rgba(70,60,35,${.15 + rnd() * .25})`; c.lineWidth = .6 + rnd(); c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); c.stroke(); }
+    });
+    plasticTex.wrapS = plasticTex.wrapT = THREE.RepeatWrapping; plasticTex.repeat.set(1 / PW, 1 / PL); plasticTex.offset.set(.5, 1);
+    const plastic = new THREE.MeshStandardMaterial({ map: plasticTex, roughness: .38 });
+    // the print, on a clear layer the size of the panel: u across, v from the foot (0) to the hinge (1)
+    const printTex = canvasTex(400, 853, (c, w, h) => {
+      const Y = f => (1 - f) * h;   // f: share of the panel's length from the foot
+      c.fillStyle = '#141414'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.font = '900 64px "Arial Narrow", Arial, sans-serif'; c.fillText('CAUTION', w / 2, Y(.79));
+      // the warning triangle with rounded corners and a person slipping on the wet floor
+      const tx = w / 2, ty0 = Y(.715), ty1 = Y(.43), half = (ty1 - ty0) * .62;
+      c.lineJoin = 'round'; c.lineWidth = 16; c.strokeStyle = '#141414';
+      c.beginPath(); c.moveTo(tx, ty0); c.lineTo(tx + half, ty1); c.lineTo(tx - half, ty1); c.closePath(); c.stroke();
+      c.save(); c.translate(tx, ty1 - (ty1 - ty0) * .38); const k = (ty1 - ty0) / 220;
+      c.lineCap = 'round'; c.lineWidth = 15 * k;
+      c.beginPath(); c.arc(-26 * k, -52 * k, 13 * k, 0, 7); c.fillStyle = '#141414'; c.fill();                    // head, thrown back
+      c.beginPath(); c.moveTo(-14 * k, -36 * k); c.lineTo(10 * k, 8 * k); c.stroke();                                 // body falling backwards
+      c.beginPath(); c.moveTo(10 * k, 8 * k); c.lineTo(44 * k, -14 * k); c.lineTo(60 * k, -4 * k); c.stroke();       // one leg kicked up
+      c.beginPath(); c.moveTo(10 * k, 8 * k); c.lineTo(24 * k, 40 * k); c.lineTo(42 * k, 46 * k); c.stroke();         // the other sliding away
+      c.beginPath(); c.moveTo(-6 * k, -22 * k); c.lineTo(-44 * k, -14 * k); c.stroke();                                // arms flung out
+      c.beginPath(); c.moveTo(-4 * k, -20 * k); c.lineTo(22 * k, -46 * k); c.stroke();
+      c.lineWidth = 6 * k; c.beginPath(); for (let x = -70; x <= 70; x += 4) c.lineTo(x * k, 66 * k + Math.sin(x * .25) * 3 * k); c.stroke();   // the wet floor
+      c.restore();
+      c.font = '900 92px "Arial Narrow", Arial, sans-serif'; c.fillText('WET', w / 2, Y(.33)); c.fillText('FLOOR', w / 2, Y(.225));
+      c.font = '800 34px "Arial Narrow", Arial, sans-serif'; c.fillText('CUIDADO', w / 2, Y(.145)); c.fillText('PISO MOJADO', w / 2, Y(.1));
+      // worn away in flecks and along the edges where hands and mops knock it
+      c.globalCompositeOperation = 'destination-out';
+      for (let i = 0; i < 500; i++){ c.fillStyle = `rgba(0,0,0,${.4 + rnd() * .6})`; c.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 3, 1 + rnd() * 2); }
+      for (let i = 0; i < 18; i++){ const x = rnd() * w, y = h * (.75 + rnd() * .25); c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(x, y, 6 + rnd() * 40, 1 + rnd() * 2); }
+    });
+    const print = new THREE.MeshStandardMaterial({ map: printTex, transparent: true, roughness: .45, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
+    const panelGeo = (() => { const s = outline(PW, PL, R0, .012); s.holes.push(slot()); return new THREE.ExtrudeGeometry(s, { depth: PD, bevelEnabled: true, bevelThickness: .0015, bevelSize: .0015, bevelSegments: 2, curveSegments: 10 }).translate(0, 0, -PD / 2); })();
+    // the raised rim round the outer face
+    const rimGeo = (() => { const s = outline(PW - .004, PL - .004, R0 - .002, .01); s.holes.push(outline(PW - .03, PL - .03, R0 - .014, .004)); return new THREE.ExtrudeGeometry(s, { depth: .003, bevelEnabled: false, curveSegments: 10 }).translate(0, -.002, PD / 2); })();
+    const printGeo = new THREE.PlaneGeometry(PW - .03, PL - .1).translate(0, -PL / 2 - .035, PD / 2 + .0022);
+    const rubber = new THREE.MeshStandardMaterial({ color: 0x1b1b1b, roughness: .85 });
+    for (const ry of [0, Math.PI]){
+      const side = new THREE.Group(); side.rotation.y = ry; side.position.y = HY; g.add(side);
+      const pivot = new THREE.Group(); pivot.rotation.x = -PHI; side.add(pivot);
+      for (const [geo, mat] of [[panelGeo, plastic], [rimGeo, plastic], [printGeo, print]]){ const m = new THREE.Mesh(geo, mat); m.castShadow = mat !== print; m.receiveShadow = true; pivot.add(m); }
+      for (const x of [-1, 1]){ const f = new THREE.Mesh(new THREE.BoxGeometry(.035, .012, .014), rubber); f.position.set(x * (PW / 2 - .03), -PL + .004, -.001); f.castShadow = true; pivot.add(f); }
+    }
+    // the hinge along the top: a steel pin through moulded knuckles from both panels
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(.0035, .0035, PW - .05, 8), M.dullSteel); pin.rotation.z = Math.PI / 2; pin.position.y = HY; g.add(pin);
+    for (const x of [-.1, -.035, .035, .1]){ const k = new THREE.Mesh(new THREE.CylinderGeometry(.0085, .0085, .055, 14), plastic); k.rotation.z = Math.PI / 2; k.position.set(x, HY, 0); k.castShadow = k.receiveShadow = true; g.add(k); }
     flat(.5, .5, M.blob, 2.7, 1.35);
   }
   // housings over both lamps and a cage over the stall lamp
