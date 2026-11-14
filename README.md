@@ -146,15 +146,15 @@ Writing the tests found two real bugs. Both are fixed:
 
 ## Security
 
-- **No real accounts, no server, no personal data.** A driver for the leaderboard is only a name, with no password, kept in this browser; names are cleaned and escaped before they are shown. The only data the game stores is your last map and vehicle, best times, the drivers and leaderboards, the radio station, the graphics setting, the steering choice, the volumes and the saved escape-room game, all in your browser's `localStorage` (the full list is in [docs/rules/settings.md](docs/rules/settings.md)). The game has no server of its own. The fonts ship with the game; only the three.js library comes from cdnjs and jsDelivr, so those two services see your IP address. There are no credentials anywhere in the repository; a test scans every file for keys and tokens.
+- **No real accounts, no server, no personal data.** A driver for the leaderboard is only a name, with no password, kept in this browser; names are cleaned and escaped before they are shown. The only data the game stores is your last map and vehicle, best times, the drivers and leaderboards, the radio station, the graphics setting, the steering choice, the volumes and the saved escape-room game, all in your browser's `localStorage` (the full list is in [docs/rules/settings.md](docs/rules/settings.md)). The game has no server of its own. The fonts ship with the game; only the three.js library comes from cdnjs and jsDelivr, so those two services see your IP address. In the escape room, the air vent asks the Openverse API once (a fixed search, no key and nothing about you; the answer is kept for 30 days) and plays the recording from Freesound, so those two see your IP address too. No page sends a referrer. There are no credentials anywhere in the repository; a test scans every file for keys and tokens.
 - **Input validation.** Everything read back from `localStorage` is checked (`parsePick`, `parseBest`, `parseRadio`, `parseSteer`, `parseVolume`, and `restore` and `parseVolume` in room 1) and replaced by defaults when it is invalid. Menu picks and actions are checked against fixed lists using own properties only. Error messages are inserted as text, never as HTML.
 - **Access control.** Nothing on the site needs a login. Cards accept only the actions allowed in the current state, and the dev server only serves known file types from the project folder (no `.git`, no path traversal, GET and HEAD only).
 - **Dependencies.** No npm packages at all. The two fonts ship in each room's `fonts/` folder with their licences, so no font service is needed. The Python project pins every package in `uv.lock`, and CI audits them with `pip-audit` on every push; a known vulnerability fails the build and stops the deploy. GitHub's Dependabot alerts are on for the repository, so a newly published vulnerability in a pinned version is reported even when nobody pushes. The only runtime library is three.js 0.128.0 (9 files), pinned by exact URL, checked by SRI hashes (`npm run test:sri`) and loaded with `crossorigin="anonymous"`. `npm audit` reports 0 known vulnerabilities for `three@0.128.0` (checked 3 November 2026). GitHub Actions are pinned to commit hashes.
-- **Content Security Policy.** Scripts may only come from this site and the two pinned CDNs; there are no inline scripts, plugins, forms or foreign base URLs.
+- **Content Security Policy.** Scripts may only come from this site and the two pinned CDNs; there are no inline scripts, plugins, forms or foreign base URLs. In the escape room the page may also call `api.openverse.org` and play audio from `cdn.freesound.org`, nothing else; the API's answer is checked in `rules.js` (`pickVent`, `parseVent`: CC0 only, an MP3 on Freesound's server, 20 s to 10 min, titles shown as text).
 
 ## When something is unavailable
 
-The game needs no server of its own and calls no API. The only outside service is the CDN for three.js. Each thing that can be missing has a defined behaviour:
+The game needs no server of its own. The outside services are the CDN for three.js and, in the escape room, the free Openverse sound API (no key) that finds the air vent's recording on Freesound. Each thing that can be missing has a defined behaviour:
 
 | Missing | What happens |
 |---|---|
@@ -162,6 +162,7 @@ The game needs no server of its own and calls no API. The only outside service i
 | WebGL (old or locked-down browser) | The same error screen explains how to turn on hardware acceleration. A browser test removes WebGL and checks it |
 | `localStorage` (private mode, blocked storage) | Every read and write is wrapped, so the game runs with the defaults and simply does not remember settings, best times, drivers or the escape-room save |
 | The motion sensor on a phone (missing or refused) | Steering stays on the buttons |
+| The Openverse API or Freesound (offline, blocked, over the API's limit of a few searches per hour without a key, or no fitting CC0 recording), or an iPhone or iPad (a page cannot set an `<audio>` volume there) | The escape room's air vent keeps playing its bundled recording; nothing else changes |
 
 ## Limits
 
@@ -196,7 +197,7 @@ All radio music is composed and synthesised by the game at run time, so there ar
 
 Escape-room scans from [Poly Haven](https://polyhaven.com) (CC0, fetched through its public API and kept in `room-1-escape/textures/`): the textures *Hangar Concrete Floor*, *Concrete Wall 004* and *Blue Metal Plate*, and the HDRI *Bank Vault*; for the tunnel under the hatch *Castle Brick 07* (Rob Tuytel), *Stone Brick Wall 001* (Dimitrios Savva, Rico Cilliers), *Worn Brick Floor* (Amal Kumar) and, for the ladder, *Rough Wood* (Rob Tuytel). The cobwebs and the dust are painted and animated in code. CC0 asks for no credit; we give it anyway.
 
-Escape-room recordings (CC0, kept in `room-1-escape/sounds/` with their sources in `CREDITS.md`): the hot tap is *tap-water-1* from Owlish Media's *Sound Effects Pack* on OpenGameArt, and the air vent is *Fan* by lllBabaBooeylll on Freesound (536942). Both are bundled with the game, so no sound service is called while playing.
+Escape-room recordings (CC0, kept in `room-1-escape/sounds/` with their sources in `CREDITS.md`): the hot tap is *tap-water-1* from Owlish Media's *Sound Effects Pack* on OpenGameArt, and the air vent is *Fan* by lllBabaBooeylll on Freesound (536942). Both are bundled with the game. When it can, the air vent instead plays a CC0 ventilation recording from Freesound that the game finds through the [Openverse](https://openverse.org) API (no key); the pause card names it and its creator.
 
 The escape room's hands are the *generic-hand* models of the [WebXR Input Profiles](https://github.com/immersive-web/webxr-input-profiles) (© 2019 Amazon, MIT licence; copied unchanged into `room-1-escape/models/` with the licence in `LICENSE-hands.txt`). They are files, not an npm package: nothing is installed.
 

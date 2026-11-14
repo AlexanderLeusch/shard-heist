@@ -233,8 +233,46 @@
     return Number(raw);
   }
 
+  // ### The air vent's sound comes from the Openverse API (api.openverse.org), which needs no key: one search for CC0
+  // ### ventilation recordings on Freesound. pickVent() chooses from its answer, parseVent() checks the choice kept in this
+  // ### browser for 30 days (Openverse allows only a few searches per hour without a key). Both refuse anything that is not
+  // ### a CC0 MP3 preview on cdn.freesound.org of 20 s to 10 min; then the room plays its own recording.
+  const VENT_KEY = 'escape-room-vent', VENT_DAYS = 30;
+  const VENT_SEARCH = 'https://api.openverse.org/v1/audio/?q=ventilation&source=freesound&license=cc0&extension=mp3&page_size=20';
+  const VENT_URL = /^https:\/\/cdn\.freesound\.org\/previews\/\d+\/[\w.-]+\.mp3$/, VENT_PAGE = /^https:\/\/freesound\.org\/[\w./%-]+$/;
+  const VENT_GOOD = /\b(ventilation|ventilator|vent|vents|hvac|air ?con\w*|air ?duct|duct|extractor|exhaust)\b/, VENT_OK = /\b(hum|fan|drone|room ?tone|ambien\w*|loop|air)\b/;
+  const VENT_BAD = /\b(voice|voices|speech|talk\w*|music|song|alarm|beep\w*|scream\w*|door|footsteps?|bird\w*|rain|car|traffic|people)\b/;
+  const ventText = (v, max) => typeof v === 'string' ? v.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, max) : '';
+  function ventEntry(r){
+    if (!r || typeof r !== 'object' || r.license !== 'cc0' || r.mature === true) return null;
+    if (typeof r.url !== 'string' || !VENT_URL.test(r.url)) return null;
+    if (typeof r.duration !== 'number' || !(r.duration >= 20000 && r.duration <= 600000)) return null;
+    return { url: r.url, title: ventText(r.title, 80) || 'Untitled', creator: ventText(r.creator, 60) || 'unknown',
+      page: typeof r.foreign_landing_url === 'string' && VENT_PAGE.test(r.foreign_landing_url) ? r.foreign_landing_url : '' };
+  }
+  // ### The best recording in one answer of the API: words in its title and tags that name a vent count for it, words of other
+  // ### sounds against it; among equals the API's own order decides. Null when nothing fits.
+  function pickVent(body){
+    const list = body && Array.isArray(body.results) ? body.results : [];
+    let best = null, bestScore = -1;
+    for (const r of list){
+      const v = ventEntry(r); if (!v) continue;
+      const words = (ventText(r.title, 200) + ' ' + (Array.isArray(r.tags) ? r.tags.map(t => t && ventText(t.name, 40)).join(' ') : '')).toLowerCase();
+      const score = (VENT_GOOD.test(words) ? 2 : 0) + (VENT_OK.test(words) ? 1 : 0) - (VENT_BAD.test(words) ? 3 : 0);
+      if (score > bestScore){ best = v; bestScore = score; }
+    }
+    return best;
+  }
+  // ### The kept choice, stored as JSON with the time it was found; refused when broken, tampered with or older than 30 days.
+  function parseVent(raw, now){
+    let v; try { v = JSON.parse(raw); } catch (e) { return null; }
+    if (!v || typeof v !== 'object' || typeof v.at !== 'number' || !(v.at <= now && now - v.at < VENT_DAYS * 864e5)) return null;
+    const e = ventEntry({ license: 'cc0', url: v.url, duration: 60000, title: v.title, creator: v.creator, foreign_landing_url: v.page });
+    return e && e.title === v.title && e.creator === v.creator ? Object.assign(e, { at: v.at }) : null;
+  }
+
   return Object.freeze({
     TIME_LIMIT, WRONG_CODE_PENALTY, WEDGE_GRACE, CODE, SAVE_KEY, ITEMS, CLUES, SCENES, ENDINGS, WARNINGS, GAMES, SPOTS, GRAFFITI,
-    newState, visibleHotspots, perform, tick, restore, canContinue, VOLUME_KEY, parseVolume
+    newState, visibleHotspots, perform, tick, restore, canContinue, VOLUME_KEY, parseVolume, VENT_KEY, VENT_SEARCH, pickVent, parseVent
   });
 });

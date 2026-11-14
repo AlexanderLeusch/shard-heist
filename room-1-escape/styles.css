@@ -95,6 +95,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-display)
 .card h2{margin:0;font-size:36px;line-height:.95;font-weight:800;text-transform:uppercase}
 .card p{margin:0;font-family:var(--f-body);font-size:15.5px;line-height:1.55;color:var(--muted)}
 .card p b{color:var(--ink)}
+.card p.vent-credit{margin-top:12px;font-size:12px;line-height:1.45}
 .steps{display:flex;gap:6px}
 .steps i{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.12)}
 .steps i.on{background:var(--orange)}

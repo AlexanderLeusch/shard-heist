@@ -304,7 +304,7 @@ a{color:var(--accent)}
 </section>
 <section id="settings">
 <h1>Settings and options</h1>
-<blockquote>Every setting the player can change, in both rooms: where it is, what each choice does, and what the game remembers. All of it is stored only in this browser (<code>localStorage</code>). Nothing is sent anywhere. The only “account” is a driver name for the leaderboard, with no password, kept on this device.</blockquote>
+<blockquote>Every setting the player can change, in both rooms: where it is, what each choice does, and what the game remembers. All of it is stored only in this browser (<code>localStorage</code>). Nothing about you is sent anywhere; the only request the game makes on its own is the escape room's search for an air vent recording (below). The only “account” is a driver name for the leaderboard, with no password, kept on this device.</blockquote>
 <h2>Room 2 · Shard Heist: the main menu</h2>
 <table><tr><th>Setting</th><th>Choices</th><th>What it does</th></tr>
 <tr><td><b>Map</b></td><td>Lisbon (Baixa), Highway, Country Roads</td><td>Where the run takes place. Each map has its own goal, time limit and top speed (see <i>Maps</i> in the room 2 rules)</td></tr>
@@ -339,6 +339,7 @@ a{color:var(--accent)}
 <tr><td><b>Pause</b></td><td><code>P</code>, <code>Esc</code> or the pause button</td><td>Stops the clock. The pause card has Resume, Restart and the volume slider</td></tr>
 <tr><td><b>Volume</b></td><td>Slider on the pause card, 0–100 %</td><td>All sounds of the washroom: the light's hum, the air vent, dripping water, the tap and the effects. A short tone plays when it is let go</td></tr>
 <tr><td><b>Sound</b></td><td><code>M</code> or the speaker button</td><td>All sound off or on</td></tr>
+<tr><td><b>Air vent</b></td><td>Automatic, after the first click</td><td>The vent plays a CC0 ventilation recording from Freesound, found through the free Openverse sound API (no key); the pause card names it. Without the API (offline, blocked, iPhone or iPad) the room's own recording plays</td></tr>
 <tr><td><b>Walk</b></td><td>Arrow keys or <code>W A S D</code></td><td>Walks through the washroom in the first person</td></tr>
 <tr><td><b>Look around</b></td><td>Drag the mouse or a finger</td><td>Turns your head, all the way round</td></tr>
 </table>
@@ -355,6 +356,7 @@ a{color:var(--accent)}
 <tr><td>Game and music volume</td><td>2</td><td>100 % each; a value outside 0–100 % is cut to the range</td></tr>
 <tr><td>Saved game</td><td>1</td><td>No saved game; any save that no real game could produce is refused</td></tr>
 <tr><td>Volume</td><td>1</td><td>100 %</td></tr>
+<tr><td>Air vent recording found through the Openverse API (kept 30 days)</td><td>1</td><td>The API is asked again once; if it does not answer, the room's own vent recording plays</td></tr>
 </table>
 <p>To reset everything, clear this site's data in the browser settings.</p>
 </section>

@@ -1,7 +1,7 @@
 # Recorded sounds of the washroom
 
 Two real recordings, both in the public domain under **CC0 1.0** (https://creativecommons.org/publicdomain/zero/1.0/).
-CC0 asks for no credit; we give it anyway. Everything else the room plays (the tube's hum, the drips, the effects) is
+CC0 asks for no credit; we give it anyway. When the Openverse sound API answers (see `findApiVent` in `js/room.js`), the air vent plays a CC0 recording from Freesound instead of `air-vent.mp3`; the pause card names that recording and its creator. Everything else the room plays (the tube's hum, the drips, the effects) is
 synthesised by `js/room.js` at run time.
 
 | File | What it is | Source | Licence |

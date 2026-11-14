@@ -1,6 +1,6 @@
 # Settings and options
 
-> Every setting the player can change, in both rooms: where it is, what each choice does, and what the game remembers. All of it is stored only in this browser (`localStorage`). Nothing is sent anywhere. The only “account” is a driver name for the leaderboard, with no password, kept on this device.
+> Every setting the player can change, in both rooms: where it is, what each choice does, and what the game remembers. All of it is stored only in this browser (`localStorage`). Nothing about you is sent anywhere; the only request the game makes on its own is the escape room's search for an air vent recording (below). The only “account” is a driver name for the leaderboard, with no password, kept on this device.
 
 ## Room 2 · Shard Heist: the main menu
 
@@ -44,6 +44,7 @@
 | **Pause** | `P`, `Esc` or the pause button | Stops the clock. The pause card has Resume, Restart and the volume slider |
 | **Volume** | Slider on the pause card, 0–100 % | All sounds of the washroom: the light's hum, the air vent, dripping water, the tap and the effects. A short tone plays when it is let go |
 | **Sound** | `M` or the speaker button | All sound off or on |
+| **Air vent** | Automatic, after the first click | The vent plays a CC0 ventilation recording from Freesound, found through the free Openverse sound API (no key); the pause card names it. Without the API (offline, blocked, iPhone or iPad) the room's own recording plays |
 | **Walk** | Arrow keys or `W A S D` | Walks through the washroom in the first person |
 | **Look around** | Drag the mouse or a finger | Turns your head, all the way round |
 
@@ -63,5 +64,6 @@ Every stored value comes from outside the program, so each one is checked when i
 | Game and music volume | 2 | 100 % each; a value outside 0–100 % is cut to the range |
 | Saved game | 1 | No saved game; any save that no real game could produce is refused |
 | Volume | 1 | 100 % |
+| Air vent recording found through the Openverse API (kept 30 days) | 1 | The API is asked again once; if it does not answer, the room's own vent recording plays |
 
 To reset everything, clear this site's data in the browser settings.

@@ -2272,7 +2272,8 @@ function showPause(){
   showCard(`<div class="eyebrow">${esc(R.SCENES[S.scene] ? R.SCENES[S.scene].title : '')} · ${fmt(S.time)} left</div><h2>Paused</h2>
     <p>Items: <b>${S.inventory.length ? S.inventory.map(i => R.ITEMS[i]).join(', ') : 'none'}</b> · Clues: <b>${S.clues.length} of 3</b> · Wrong codes: <b>${S.wrongTries}</b></p>
     <div class="actions"><button class="btn" data-do="resume">Resume <small>Enter</small></button><button class="btn ghost" data-do="ask-new">Restart</button></div>
-    <label class="vol">Volume <input type="range" min="0" max="100" step="5" data-vol value="${Math.round(volume * 100)}" aria-label="Volume"><output>${Math.round(volume * 100)}%</output></label>`);
+    <label class="vol">Volume <input type="range" min="0" max="100" step="5" data-vol value="${Math.round(volume * 100)}" aria-label="Volume"><output>${Math.round(volume * 100)}%</output></label>
+    ${apiVent && apiVent.live ? `<p class="vent-credit">Air vent: “${esc(apiVent.info.title)}” by ${esc(apiVent.info.creator)} (Freesound, CC0), found through the Openverse API</p>` : ''}`);
 }
 function showClue(k){
   const c = R.CLUES[k];
@@ -2421,7 +2422,8 @@ addEventListener('shardheist:fatal', () => { if (S.scene !== 'intro' && !S.endin
 // ### Web Audio: two real recordings (CC0, in room-1-escape/sounds with their credits) for the hot tap and the air vent,
 // ### and synthesised sounds for the rest: the hum of the fluorescent tube, dripping water and short effects for every
 // ### kind of action. Starts on the first click, as browsers require. If a recording cannot be loaded (for example when
-// ### the page is opened as a file), the tap falls back to synthesised hiss and the vent stays silent.
+// ### the page is opened as a file), the tap falls back to synthesised hiss and the vent stays silent. The vent then
+// ### asks the Openverse sound API for a ventilation recording and crossfades to it (see "The air vent from the API").
 let ac = null, master = null, waterGain = null, noiseBuf = null, dripIn = 3;
 // ### Where the loops lie in the recordings (seconds): the tap's steady stream, then its end (water stops, handle shut);
 // ### the vent's seamless loop. Measured when the files were made; see sounds/CREDITS.md.
@@ -2446,6 +2448,7 @@ function initAudio(){
   tapBus = ac.createGain(); tapBus.gain.value = 0; tapBus.connect(master);
   loadSound(TAP.file, b => { tapBuf = b; });
   loadSound(VENT.file, startVent);
+  findApiVent();
 }
 // ### Fetches and decodes one recording, then hands it on; a failure leaves the synthesised sound in its place.
 function loadSound(file, then){
@@ -2453,12 +2456,62 @@ function loadSound(file, then){
     .then(data => new Promise((ok, fail) => ac.decodeAudioData(data, ok, fail)))
     .then(then, () => {});
 }
-// ### The air vent: its recording loops for the rest of the game, faded in over two seconds.
+// ### The air vent: its recording loops for the rest of the game, faded in over two seconds (unless the API's is playing).
+let ventGain = null;
 function startVent(buf){
   const s = ac.createBufferSource(), g = ac.createGain(), t = ac.currentTime;
   s.buffer = buf; s.loop = true; s.loopStart = VENT.loopStart; s.loopEnd = VENT.loopEnd;
-  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(VENT.vol, t + 2);
-  s.connect(g); g.connect(master); s.start(t, VENT.loopStart);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(apiVent && apiVent.live ? 0 : VENT.vol, t + 2);
+  s.connect(g); g.connect(master); s.start(t, VENT.loopStart); ventGain = g;
+}
+// ### Fades the room's own vent recording in or out, when the API's vent takes over or fails.
+function fadeVent(on){
+  if (!ventGain) return;
+  const t = ac.currentTime; ventGain.gain.cancelScheduledValues(t); ventGain.gain.setValueAtTime(ventGain.gain.value, t);
+  ventGain.gain.linearRampToValueAtTime(on ? VENT.vol : 0, t + 2);
+}
+
+// ---------- The air vent from the API ----------
+// ### One search of the Openverse API (no key; rules.js picks the recording and checks it) finds a CC0 ventilation recording
+// ### on Freesound; the choice is kept for 30 days, so a player asks only once. Freesound's server does not let a page read
+// ### the samples, so the recording plays in two <audio> elements outside Web Audio: they take turns, each fading in over the
+// ### last two seconds of the other, so it loops without a gap. Their volume follows the slider and mute here, and they stop
+// ### whenever the room's sound stops. On any failure, or where a page cannot set an <audio> volume (iPhone and iPad), the
+// ### room's own recording stays.
+const API_VENT = { vol: .15, fade: 2 };
+let apiVent = null;
+function findApiVent(){
+  const probe = new Audio(); probe.volume = .5;
+  if (probe.volume !== .5) return;
+  const kept = R.parseVent(readStore(R.VENT_KEY), Date.now());
+  if (kept) return playApiVent(kept);
+  fetch(R.VENT_SEARCH, { credentials: 'omit' }).then(r => r.ok ? r.json() : Promise.reject(new Error('Openverse ' + r.status)))
+    .then(body => { const v = R.pickVent(body); if (!v) return; writeStore(R.VENT_KEY, JSON.stringify(Object.assign({ at: Date.now() }, v))); playApiVent(v); })
+    .catch(() => {});
+}
+function playApiVent(v){
+  const els = [0, 1].map(() => { const a = new Audio(); a.preload = 'auto'; a.volume = 0; a.src = v.url; return a; });
+  const me = apiVent = { info: v, els, cur: 0, want: [true, false], live: false };
+  const fail = () => { if (apiVent !== me) return; els.forEach(a => { a.pause(); a.removeAttribute('src'); }); apiVent = null; if (me.live) fadeVent(true); };
+  els.forEach((a, i) => { a.addEventListener('error', fail); a.addEventListener('ended', () => { me.want[i] = false; }); });
+  els[0].addEventListener('playing', () => { if (apiVent === me && !me.live){ me.live = true; fadeVent(false); } }, { once: true });
+  if (ac.state === 'running') els[0].play().catch(fail);
+}
+// ### Each frame: the playing copy hands over to the other near its end; every copy's volume is the slider's, faded over
+// ### its first and last two seconds; both pause while the room's sound is stopped (hidden tab, error screen).
+function updateApiVent(){
+  const v = apiVent; if (!v) return;
+  const on = ac.state === 'running';
+  v.els.forEach((a, i) => {
+    if (!on || !v.want[i]){ if (!a.paused) a.pause(); return; }
+    if (a.paused) a.play().catch(() => {});
+    const d = a.duration, t = a.currentTime;
+    a.volume = d > 0 ? Math.max(0, Math.min(1, API_VENT.vol * loud() * Math.min(1, t / API_VENT.fade, (d - t) / API_VENT.fade))) : 0;
+  });
+  const a = v.els[v.cur], d = a.duration;
+  if (on && d > 2 * API_VENT.fade && a.currentTime > d - API_VENT.fade && !v.want[1 - v.cur]){
+    v.cur = 1 - v.cur; v.want[v.cur] = true; v.els[v.cur].currentTime = 0;
+  }
 }
 // ### The hot tap follows the rules' steam: turned on, the recording plays the handle and the water starting, then loops
 // ### the steady stream; turned off, the stream fades into the recording's end. Pausing only fades the tap out.
@@ -2696,7 +2749,7 @@ function frame(now){
   const st = S.steam ? 1 : 0;
   M.steam.opacity += (st * .92 - M.steam.opacity) * Math.min(1, dt * .45);
   if (waterGain) waterGain.gain.value += ((S.steam && !paused && !tapBuf ? .05 : 0) - waterGain.gain.value) * Math.min(1, dt * 4);
-  if (ac) updateTap(dt);
+  if (ac){ updateTap(dt); updateApiVent(); }
   steamPuffs.forEach(s => { s.userData.t = (s.userData.t + dt * .25) % 1; const t = s.userData.t; s.position.set(-3.73 + Math.sin(t * 9 + s.id) * .05, .9 + t * 1.1, -.65 + Math.cos(t * 7 + s.id) * .08); s.scale.setScalar(.15 + t * .5); s.material.opacity = S.steam ? Math.sin(t * Math.PI) * .35 : Math.max(0, s.material.opacity - dt); s.visible = s.material.opacity > .003; });
   // the guard's silhouette in the window
   guardShow = Math.max(0, guardShow - dt);

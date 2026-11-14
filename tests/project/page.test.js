@@ -171,7 +171,7 @@ test('escape room: every scanned texture the room loads ships with it and is cre
   assert.match(read('README.md'), /Poly Haven.*CC0/);
 });
 
-test('escape room: the tap and air vent recordings ship with it, are served as audio and are credited as CC0', () => {
+test('escape room: the tap and air vent recordings ship with it, are served as audio and are credited as CC0; the API vent is allowed only from its two hosts', () => {
   const files = [...new Set([...escRoom.matchAll(/'sounds\/([a-z-]+\.mp3)'/g)].map(m => m[1]))].sort();
   assert.deepEqual(files, ['air-vent.mp3', 'tap-water.mp3']);
   const credits = read('room-1-escape/sounds/CREDITS.md');
@@ -180,8 +180,14 @@ test('escape room: the tap and air vent recordings ship with it, are served as a
     assert.match(credits, new RegExp('`' + f.replace('.', '\\.') + '`.*CC0 1\\.0'), f + ' is credited with its licence');
   }
   assert.equal(resolvePath('/room-1-escape/sounds/tap-water.mp3'), path.join(ROOT, 'room-1-escape', 'sounds', 'tap-water.mp3'), 'the dev server serves MP3');
-  assert.match(escHtml, /media-src 'self'/);
-  assert.match(escHtml, /connect-src 'self'/, 'the recordings are fetched from this site only');
+  // the only outside hosts: the Openverse API for the air vent (searched, no key) and Freesound's server for its recording
+  const csp = escHtml.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1];
+  const dir = Object.fromEntries(csp.split(';').map(d => d.trim().split(/\s+/)).map(([k, ...v]) => [k, v]));
+  assert.deepEqual(dir['connect-src'], ["'self'", 'https://api.openverse.org']);
+  assert.deepEqual(dir['media-src'], ["'self'", 'blob:', 'https://cdn.freesound.org']);
+  const R = require('../../room-1-escape/js/rules.js');
+  assert.ok(R.VENT_SEARCH.startsWith('https://api.openverse.org/'), 'the search goes to the host the policy allows');
+  assert.ok(!/key=|token=|Authorization/i.test(R.VENT_SEARCH + escRoom.slice(escRoom.indexOf('function findApiVent'), escRoom.indexOf('function playApiVent'))), 'no key is sent');
 });
 
 test('escape room: the two rooms stay separate (no file of one room loads the other)', () => {

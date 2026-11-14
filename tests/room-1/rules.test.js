@@ -293,3 +293,32 @@ test('audit: a hand-edited save that no game can produce is refused, and every r
   assert.equal(R.restore(save({ wrongTries: 99, time: 0 })), null, 'more wrong codes than the clock allows');
   assert.equal(R.restore(save({ warned: [60], time: 500 })), null, 'a warning before its time');
 });
+
+test('the air vent from the Openverse API: the best CC0 ventilation recording is picked, anything else is refused', () => {
+  const ok = { license: 'cc0', url: 'https://cdn.freesound.org/previews/536/536942_1234-hq.mp3', duration: 45000, title: 'Ventilation hum', creator: 'someone',
+    foreign_landing_url: 'https://freesound.org/people/someone/sounds/536942', tags: [{ name: 'hvac' }] };
+  const v = R.pickVent({ results: [ok] });
+  assert.deepEqual(v, { url: ok.url, title: 'Ventilation hum', creator: 'someone', page: ok.foreign_landing_url });
+  assert.match(R.VENT_SEARCH, /^https:\/\/api\.openverse\.org\/v1\/audio\/\?q=ventilation&source=freesound&license=cc0&/);
+  // words of a vent count for a recording, words of other sounds against it; among equals the API's order stays
+  const plain = { ...ok, url: 'https://cdn.freesound.org/previews/1/1_1-hq.mp3', title: 'Recording 4', tags: [] };
+  const talk = { ...ok, url: 'https://cdn.freesound.org/previews/2/2_2-hq.mp3', title: 'Vent with people talking' };
+  assert.equal(R.pickVent({ results: [plain, ok] }).url, ok.url, 'the one that names a vent');
+  assert.equal(R.pickVent({ results: [talk, plain] }).url, plain.url, 'voices count against it');
+  assert.equal(R.pickVent({ results: [talk] }), null, 'nothing that fits');
+  // refused: other licences, hosts, file types, lengths, and answers that are not a list
+  for (const bad of [{ license: 'by' }, { url: 'https://evil.example/previews/1/1.mp3' }, { url: 'http://cdn.freesound.org/previews/1/1_1-hq.mp3' },
+    { url: 'https://cdn.freesound.org/previews/1/1_1-hq.ogg' }, { url: 'https://cdn.freesound.org/previews/1/"x".mp3' }, { duration: 5000 }, { duration: 3600000 },
+    { duration: '45000' }, { mature: true }]) assert.equal(R.pickVent({ results: [{ ...ok, ...bad }] }), null, JSON.stringify(bad));
+  for (const body of [null, {}, { results: 'x' }, { results: [null, 3, 'x'] }, 'results']) assert.equal(R.pickVent(body), null);
+  // titles and names are cut to size and lose markup characters; a landing page off Freesound is dropped
+  const odd = R.pickVent({ results: [{ ...ok, title: '<b>Vent</b> ' + 'x'.repeat(200), creator: '', foreign_landing_url: 'https://evil.example/' }] });
+  assert.equal(odd.title.length, 80); assert.ok(!/[<>]/.test(odd.title)); assert.equal(odd.creator, 'unknown'); assert.equal(odd.page, '');
+  // the kept choice: valid for 30 days, refused when broken or tampered with
+  const now = Date.UTC(2026, 10, 14), keep = at => JSON.stringify({ at, ...v });
+  assert.deepEqual(R.parseVent(keep(now - 864e5), now), { ...v, at: now - 864e5 });
+  assert.equal(R.parseVent(keep(now - 31 * 864e5), now), null, 'older than 30 days');
+  assert.equal(R.parseVent(keep(now + 1000), now), null, 'from the future');
+  for (const raw of [null, '', '{', '[]', 'null', JSON.stringify({ ...v }), JSON.stringify({ at: now, ...v, url: 'https://evil.example/a.mp3' }),
+    JSON.stringify({ at: now, ...v, title: '<script>' }), JSON.stringify({ at: String(now), ...v })]) assert.equal(R.parseVent(raw, now), null, 'refused: ' + raw);
+});

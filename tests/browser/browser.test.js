@@ -24,6 +24,21 @@ const CHROME = findChrome();
 const LOAD_MS = 120000;
 let chrome, server, base, ws, profile, seq = 0;
 const pending = new Map(), errors = [];
+// ### The escape room asks the Openverse API for its air vent and plays the answer from Freesound's server. Both hosts are
+// ### answered here by stand-ins (a fixed answer, and the room's own vent recording as the "Freesound" file), so the test
+// ### needs no internet, is the same every time and never counts against the API's limit.
+const VENT_HOSTS = ['https://api.openverse.org/', 'https://cdn.freesound.org/'], ventCalls = { api: 0, file: 0 };
+const VENT_ANSWER = { result_count: 2, results: [
+  { license: 'by', url: 'https://cdn.freesound.org/previews/1/1_1-hq.mp3', duration: 60000, title: 'Ventilation (CC BY)', creator: 'not this one' },
+  { license: 'cc0', url: 'https://cdn.freesound.org/previews/536/536942_1-hq.mp3', duration: 60000, title: 'Ventilation hum (test)', creator: 'stand-in',
+    foreign_landing_url: 'https://freesound.org/people/stand-in/sounds/536942', tags: [{ name: 'hvac' }] }] };
+function standIn(p){
+  const api = p.request.url.startsWith(VENT_HOSTS[0]);
+  ventCalls[api ? 'api' : 'file']++;
+  const body = api ? Buffer.from(JSON.stringify(VENT_ANSWER)) : fs.readFileSync(path.join(__dirname, '../../room-1-escape/sounds/air-vent.mp3'));
+  send('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: 200, body: body.toString('base64'),
+    responseHeaders: [{ name: 'Content-Type', value: api ? 'application/json' : 'audio/mpeg' }, { name: 'Access-Control-Allow-Origin', value: '*' }] });
+}
 
 function send(method, params = {}){
   const id = ++seq;
@@ -86,11 +101,13 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
     const msg = JSON.parse(ev.data);
     if (msg.id && pending.has(msg.id)){ const p = pending.get(msg.id); pending.delete(msg.id); msg.error ? p.reject(new Error(msg.error.message)) : p.resolve(msg.result); }
     else if (msg.method === 'Runtime.exceptionThrown') errors.push(msg.params.exceptionDetails.exception ? msg.params.exceptionDetails.exception.description : msg.params.exceptionDetails.text);
+    else if (msg.method === 'Fetch.requestPaused') standIn(msg.params);
     else if (msg.method === 'Runtime.consoleAPICalled' && msg.params.type === 'error') errors.push(msg.params.args.map(a => a.value || a.description).join(' '));
     // CSP violations, blocked or failed requests (the browser asks for a favicon on its own, which this game does not have)
     else if (msg.method === 'Log.entryAdded' && msg.params.entry.level === 'error' && !/favicon.ico/.test(msg.params.entry.url || '')) errors.push(msg.params.entry.text);
   };
   await send('Runtime.enable'); await send('Log.enable'); await send('Page.enable'); await send('Network.enable');
+  await send('Fetch.enable', { patterns: VENT_HOSTS.map(h => ({ urlPattern: h + '*' })) });
   await send('Emulation.setFocusEmulationEnabled', { enabled: true });
   // Software rendering is slow, so start in Balanced graphics unless a test sets something else on purpose
   await send('Page.addScriptToEvaluateOnNewDocument', { source: "try { if (!localStorage.getItem('shard-heist-gfx')) localStorage.setItem('shard-heist-gfx', 'balanced'); } catch (e) {}" });
@@ -342,6 +359,22 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       assert.deepEqual(errors, []);
     });
 
+    await t.test('escape room: the air vent comes from the Openverse API, is asked for once, kept, and credited on the pause card', async () => {
+      await waitFor("!!localStorage.getItem('escape-room-vent')", 30000, 'the choice from the API is kept');
+      const kept = JSON.parse(await evaluate("localStorage.getItem('escape-room-vent')"));
+      assert.equal(kept.url, VENT_ANSWER.results[1].url, 'the CC0 recording, not the CC BY one');
+      let card = '';
+      for (let i = 0; i < 30 && !/Openverse/.test(card); i++){
+        await key('keydown', 'KeyP'); await waitFor("!document.getElementById('overlay').hidden", 5000, 'pause card');
+        card = await text('#card'); await key('keydown', 'KeyP'); await waitFor("document.getElementById('overlay').hidden", 5000, 'resumed');
+        if (!/Openverse/.test(card)) await sleep(1000);
+      }
+      assert.match(card, /Air vent: “Ventilation hum \(test\)” by stand-in \(Freesound, CC0\), found through the Openverse API/);
+      assert.equal(ventCalls.api, 1, 'one search of the API');
+      assert.ok(ventCalls.file >= 1, 'the recording is played from Freesound');
+      assert.deepEqual(errors, []);
+    });
+
     // ### From here on the tests move between the parts of the room with the touch-screen "Walk to" buttons (hidden on a
     // ### computer, but still in the page), so they do not have to steer a walk with the arrow keys every time.
     await t.test('escape room rejected: the car key cannot be taken while the tile is on, and the sinks have nothing to take', async () => {
@@ -371,6 +404,7 @@ test('browser workflows', { skip: !CHROME && 'no Chrome or Edge found (set CHROM
       await click('[data-do="resume"]');
       assert.equal(await text('#place'), 'The Door');
       assert.equal(await evaluate("document.querySelectorAll('.slot.full').length"), 1);
+      assert.equal(ventCalls.api, 1, 'after the reload the kept air vent is used: the API is not asked again');
     });
 
     await t.test('escape room rejected: real keys on a lock wheel never try the code', async () => {
