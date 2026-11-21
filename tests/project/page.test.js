@@ -426,6 +426,14 @@ test('getting in: the hand opens the door by its handle, the cabin is seen from 
   assert.match(game, /cut: true, handle: spot\(parts\.handle\), pull: spot\(parts\.pull\)/);
 });
 
+test('the coupe\'s cabin: dials seen above the hub, a navigation screen, and a door handle that swings out when pulled', () => {
+  assert.match(game, /cabinDash\(g, eye, CAB, \[0\.97, 0\.3\]\)/, 'the dials sit in the opening of the wheel above its hub');
+  assert.match(game, /put\('navi', new THREE\.PlaneGeometry/, 'the navigation screen on the dash');
+  assert.match(game, /navi: new THREE\.MeshBasicMaterial\(\{ color: 0x1a1a1a, map: naviTexture\(\) \}\)/);
+  assert.match(game, /door\.flap\.rotation\.y = -door\.side \* 0\.45/, 'the handle swings out of its pocket');
+  assert.match(game, /walker\.dropHand\('l', s < N\.pull\)/, 'the other hand is out of the way');
+});
+
 test('all three vehicles have reversing lights, and the hills are visible at night', () => {
   assert.match(game, /Core\.isReversing\(car\.speed\)/);
   assert.equal((game.match(/reverseLamps\((g|root), /g) || []).length, 3, 'one call per vehicle');
